@@ -293,25 +293,8 @@ export default function Home() {
         <div className="audit-log-header">
           <div className="audit-log-title">
             <span>📋</span>
-            <span>รายการธุรกรรมทั้งหมด ({transactions.length} รายการ) — สามารถกดลบรายการได้ทันที</span>
+            <span>รายการธุรกรรมทั้งหมด ({transactions.length} รายการ) — สามารถกดลบรายการเฉพาะบรรทัดได้</span>
           </div>
-          {transactions.length > 0 && (
-            <button
-              onClick={handleClearAll}
-              style={{
-                background: 'rgba(255, 55, 95, 0.15)',
-                border: '1px solid rgba(255, 55, 95, 0.4)',
-                color: '#ff375f',
-                borderRadius: '8px',
-                padding: '6px 14px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: '700',
-              }}
-            >
-              🗑️ ล้างข้อมูลทั้งหมด
-            </button>
-          )}
         </div>
 
         {transactions.length === 0 ? (
