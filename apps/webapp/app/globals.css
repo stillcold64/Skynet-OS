@@ -621,3 +621,211 @@ body {
   color: var(--text-tertiary);
   font-size: 13px;
 }
+
+/* iOS Segmented Control Tab Switcher */
+.ios-segmented-control {
+  display: flex;
+  background: rgba(18, 21, 28, 0.7);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 24px;
+  width: fit-content;
+  gap: 4px;
+}
+
+.segmented-button {
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 20px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.segmented-button:hover {
+  color: var(--text-primary);
+}
+
+.segmented-button.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Debts & Investment Dashboard */
+.debts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.debt-card {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  position: relative;
+  background: rgba(26, 30, 42, 0.7);
+}
+
+.debt-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.debt-name-box h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.debt-name-box span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.interest-badge {
+  background: rgba(255, 55, 95, 0.15);
+  border: 1px solid rgba(255, 55, 95, 0.4);
+  color: #ff375f;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.debt-amounts-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+}
+
+.amount-col label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.amount-col .val {
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.amount-col.rem .val {
+  color: #ff453a;
+}
+
+.amount-col.paid .val {
+  color: #30d158;
+}
+
+/* Progress Bar */
+.progress-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0a84ff 0%, #30d158 100%);
+  border-radius: 6px;
+  transition: width 0.5s ease-out;
+}
+
+/* Debt Payments Log inside card */
+.debt-history-box {
+  border-top: 1px solid var(--glass-border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.debt-history-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+}
+
+.debt-history-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+/* Investment Drawdown Section */
+.drawdown-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+  background: rgba(36, 26, 42, 0.7);
+  border-color: rgba(191, 90, 242, 0.3);
+}
+
+.drawdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rate-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.rate-input {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  color: #bf5af2;
+  font-weight: 700;
+  font-size: 14px;
+  width: 75px;
+  text-align: right;
+  outline: none;
+}
+

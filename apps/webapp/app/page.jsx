@@ -16,11 +16,16 @@ export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-12
   const [selectedDateStr, setSelectedDateStr] = useState(null);
 
+  // Tab state: 'calendar' | 'debts'
+  const [activeTab, setActiveTab] = useState('calendar');
+
   // Data states
   const [transactions, setTransactions] = useState([]);
   const [groupTotals, setGroupTotals] = useState({ LIFE: 0, EXTRAVAGANT: 0, BILL: 0, INVESTING: 0, ETC: 0 });
   const [dailyMap, setDailyMap] = useState({});
   const [botLogs, setBotLogs] = useState([]);
+  const [debtsData, setDebtsData] = useState(null);
+  const [rateInput, setRateInput] = useState('36.0');
   const [loading, setLoading] = useState(true);
 
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
@@ -28,9 +33,10 @@ export default function Home() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [txRes, logRes] = await Promise.all([
+      const [txRes, logRes, debtRes] = await Promise.all([
         fetch(`/api/transactions?month=${currentMonthStr}`),
         fetch('/api/logs'),
+        fetch('/api/debts'),
       ]);
 
       if (txRes.ok) {
@@ -43,6 +49,14 @@ export default function Home() {
       if (logRes.ok) {
         const logData = await logRes.json();
         setBotLogs(logData.logs || []);
+      }
+
+      if (debtRes.ok) {
+        const dData = await debtRes.json();
+        setDebtsData(dData);
+        if (dData.drawdown && dData.drawdown.exchangeRate) {
+          setRateInput(String(dData.drawdown.exchangeRate));
+        }
       }
     } catch (err) {
       console.error('Fetch data error:', err);
@@ -70,16 +84,21 @@ export default function Home() {
     }
   };
 
-  const handleClearAll = async () => {
-    if (!confirm('⚠️ ยืนยันลบข้อมูลธุรกรรมทั้งหมดในระบบ?')) return;
-    try {
-      const res = await fetch('/api/transactions?all=true', { method: 'DELETE' });
-      if (res.ok) {
-        setSelectedDateStr(null);
-        await fetchData();
+  const handleUpdateRate = async (newRate) => {
+    setRateInput(newRate);
+    const num = parseFloat(newRate);
+    if (!isNaN(num) && num > 0) {
+      try {
+        await fetch('/api/debts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update_rate', exchangeRate: num }),
+        });
+        const res = await fetch('/api/debts');
+        if (res.ok) setDebtsData(await res.json());
+      } catch (e) {
+        console.error('Update rate error:', e);
       }
-    } catch (err) {
-      console.error('Clear all error:', err);
     }
   };
 
@@ -161,230 +180,418 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Monthly Overview Hero Cards (ผลรวมและค่าเฉลี่ยรายเดือน) */}
-      <section className="monthly-hero-grid">
-        <div className="glass-panel monthly-hero-card total">
-          <div className="hero-label">
-            <span>💳</span>
-            <span>ยอดรวมค่าใช้จ่ายประจำเดือน</span>
-          </div>
-          <div className="hero-value">{formatCurrency(monthlyExpenses)} ฿</div>
-          <div className="hero-sub">รวม 4 หมวด (LIFE, EXTRAVAGANT, BILL, ETC)</div>
-        </div>
+      {/* iOS Segmented Navigation Tabs */}
+      <div className="ios-segmented-control">
+        <button
+          className={`segmented-button ${activeTab === 'calendar' ? 'active' : ''}`}
+          onClick={() => setActiveTab('calendar')}
+        >
+          <span>📅</span>
+          <span>ปฏิทิน & ค่าใช้จ่าย</span>
+        </button>
+        <button
+          className={`segmented-button ${activeTab === 'debts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('debts')}
+        >
+          <span>💳</span>
+          <span>หนี้สิน & พอร์ตติดลบ</span>
+        </button>
+      </div>
 
-        <div className="glass-panel monthly-hero-card average">
-          <div className="hero-label">
-            <span>📊</span>
-            <span>ค่าเฉลี่ยค่าใช้จ่ายต่อวัน</span>
-          </div>
-          <div className="hero-value">{formatCurrency(dailyAverageActive)} ฿ <span style={{ fontSize: '18px', fontWeight: '500' }}>/ วัน</span></div>
-          <div className="hero-sub">คำนวณจากวันที่บันทึก ({activeDaysCount} วัน) • เฉลี่ยทั้งเดือน {daysInMonth} วัน: {formatCurrency(dailyAverageMonth)} ฿/วัน</div>
-        </div>
+      {/* TAB 1: CALENDAR & EXPENSES */}
+      {activeTab === 'calendar' && (
+        <>
+          {/* Monthly Overview Hero Cards (ผลรวมและค่าเฉลี่ยรายเดือน) */}
+          <section className="monthly-hero-grid">
+            <div className="glass-panel monthly-hero-card total">
+              <div className="hero-label">
+                <span>💳</span>
+                <span>ยอดรวมค่าใช้จ่ายประจำเดือน</span>
+              </div>
+              <div className="hero-value">{formatCurrency(monthlyExpenses)} ฿</div>
+              <div className="hero-sub">รวม 4 หมวด (LIFE, EXTRAVAGANT, BILL, ETC)</div>
+            </div>
 
-        <div className="glass-panel monthly-hero-card invest">
-          <div className="hero-label">
-            <span>📈</span>
-            <span>ยอดเงินลงทุนประจำเดือน</span>
-          </div>
-          <div className="hero-value">{formatCurrency(monthlyInvestment)} ฿</div>
-          <div className="hero-sub">หมวด INVESTING (หุ้น, คริปโต, กองทุน, ออม)</div>
-        </div>
-      </section>
+            <div className="glass-panel monthly-hero-card average">
+              <div className="hero-label">
+                <span>📊</span>
+                <span>ค่าเฉลี่ยค่าใช้จ่ายต่อวัน</span>
+              </div>
+              <div className="hero-value">{formatCurrency(dailyAverageActive)} ฿ <span style={{ fontSize: '18px', fontWeight: '500' }}>/ วัน</span></div>
+              <div className="hero-sub">คำนวณจากวันที่บันทึก ({activeDaysCount} วัน) • เฉลี่ยทั้งเดือน {daysInMonth} วัน: {formatCurrency(dailyAverageMonth)} ฿/วัน</div>
+            </div>
 
-      {/* 5 iOS Category Cards */}
-      <section className="categories-grid">
-        {Object.entries(CATEGORY_META).map(([key, meta]) => (
-          <div key={key} className={`glass-panel category-card ${key.toLowerCase()}`}>
-            <div className="card-top">
-              <div className="card-title">
-                <span>{meta.emoji}</span>
-                <span>{meta.name}</span>
+            <div className="glass-panel monthly-hero-card invest">
+              <div className="hero-label">
+                <span>📈</span>
+                <span>ยอดเงินลงทุนประจำเดือน</span>
+              </div>
+              <div className="hero-value">{formatCurrency(monthlyInvestment)} ฿</div>
+              <div className="hero-sub">หมวด INVESTING (หุ้น, คริปโต, กองทุน, ออม)</div>
+            </div>
+          </section>
+
+          {/* 5 iOS Category Cards */}
+          <section className="categories-grid">
+            {Object.entries(CATEGORY_META).map(([key, meta]) => (
+              <div key={key} className={`glass-panel category-card ${key.toLowerCase()}`}>
+                <div className="card-top">
+                  <div className="card-title">
+                    <span>{meta.emoji}</span>
+                    <span>{meta.name}</span>
+                  </div>
+                </div>
+                <div className="card-amount">{formatCurrency(groupTotals[key])} ฿</div>
+              </div>
+            ))}
+          </section>
+
+          {/* Main Dashboard: Calendar + Day Details */}
+          <section className="dashboard-grid">
+            {/* Calendar View */}
+            <div className="glass-panel calendar-card">
+              <div className="calendar-nav">
+                <button onClick={prevMonth} className="calendar-nav-btn">◀ เดือนก่อนหน้า</button>
+                <div className="calendar-month-title">
+                  📅 {monthNamesThai[selectedMonth - 1]} {selectedYear}
+                </div>
+                <button onClick={nextMonth} className="calendar-nav-btn">เดือนถัดไป ▶</button>
+              </div>
+
+              <div className="calendar-weekdays">
+                <span>อา.</span>
+                <span>จ.</span>
+                <span>อ.</span>
+                <span>พ.</span>
+                <span>พฤ.</span>
+                <span>ศ.</span>
+                <span>ส.</span>
+              </div>
+
+              <div className="calendar-days-grid">
+                {calendarDays.map((item, idx) => {
+                  if (!item) {
+                    return <div key={`empty-${idx}`} className="calendar-cell empty" />;
+                  }
+
+                  const hasData = Boolean(item.data && item.data.total > 0);
+                  const isSelected = selectedDateStr === item.dateStr;
+                  const isToday =
+                    item.dateStr ===
+                    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+                  return (
+                    <div
+                      key={item.dateStr}
+                      onClick={() => setSelectedDateStr(item.dateStr)}
+                      className={`calendar-cell ${hasData ? 'has-data' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                    >
+                      <div className="cell-top">
+                        <span className="cell-day-num">{item.day}</span>
+                      </div>
+
+                      {hasData && (
+                        <>
+                          <div className="cell-amount">{formatCurrency(item.data.total)}</div>
+                          <div className="cell-badges">
+                            {Object.keys(item.data.groups || {}).map((grp) => (
+                              <span key={grp} className="badge-dot" title={grp}>
+                                {CATEGORY_META[grp]?.emoji || '•'}
+                              </span>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div className="card-amount">{formatCurrency(groupTotals[key])} ฿</div>
-          </div>
-        ))}
-      </section>
 
-      {/* Main Dashboard: Calendar + Day Details */}
-      <section className="dashboard-grid">
-        {/* Calendar View */}
-        <div className="glass-panel calendar-card">
-          <div className="calendar-nav">
-            <button onClick={prevMonth} className="calendar-nav-btn">◀ เดือนก่อนหน้า</button>
-            <div className="calendar-month-title">
-              📅 {monthNamesThai[selectedMonth - 1]} {selectedYear}
-            </div>
-            <button onClick={nextMonth} className="calendar-nav-btn">เดือนถัดไป ▶</button>
-          </div>
-
-          <div className="calendar-weekdays">
-            <span>อา.</span>
-            <span>จ.</span>
-            <span>อ.</span>
-            <span>พ.</span>
-            <span>พฤ.</span>
-            <span>ศ.</span>
-            <span>ส.</span>
-          </div>
-
-          <div className="calendar-days-grid">
-            {calendarDays.map((item, idx) => {
-              if (!item) {
-                return <div key={`empty-${idx}`} className="calendar-cell empty" />;
-              }
-
-              const hasData = Boolean(item.data && item.data.total > 0);
-              const isSelected = selectedDateStr === item.dateStr;
-              const isToday =
-                item.dateStr ===
-                `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-              return (
-                <div
-                  key={item.dateStr}
-                  onClick={() => setSelectedDateStr(item.dateStr)}
-                  className={`calendar-cell ${hasData ? 'has-data' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
-                >
-                  <div className="cell-top">
-                    <span className="cell-day-num">{item.day}</span>
-                  </div>
-
-                  {hasData && (
-                    <>
-                      <div className="cell-amount">{formatCurrency(item.data.total)}</div>
-                      <div className="cell-badges">
-                        {Object.keys(item.data.groups || {}).map((grp) => (
-                          <span key={grp} className="badge-dot" title={grp}>
-                            {CATEGORY_META[grp]?.emoji || '•'}
-                          </span>
-                        ))}
-                      </div>
-                    </>
-                  )}
+            {/* Selected Day Details Panel */}
+            <div className="glass-panel day-details-card">
+              <div className="day-details-header">
+                <div className="day-details-title">
+                  {selectedDateStr ? `รายละเอียดประจำวันที่ ${selectedDateStr}` : 'คลิกเลือกวันที่ในปฏิทิน'}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+                {selectedDateStr && (
+                  <div className="day-details-total">
+                    ยอดรวม: {formatCurrency(selectedDayTotal)} ฿
+                  </div>
+                )}
+              </div>
 
-        {/* Selected Day Details Panel */}
-        <div className="glass-panel day-details-card">
-          <div className="day-details-header">
-            <div className="day-details-title">
-              {selectedDateStr ? `รายละเอียดประจำวันที่ ${selectedDateStr}` : 'คลิกเลือกวันที่ในปฏิทิน'}
+              {!selectedDateStr ? (
+                <div className="empty-placeholder">
+                  เลือกวันที่ในตารางปฏิทินเพื่อดูรายการของวันนั้น
+                </div>
+              ) : selectedDayItems.length === 0 ? (
+                <div className="empty-placeholder">
+                  ไม่มีรายการบันทึกในวันนี้
+                </div>
+              ) : (
+                <div className="day-items-list">
+                  {selectedDayItems.map((item) => (
+                    <div key={item.id} className="day-item-row">
+                      <div className="item-left">
+                        <span className="item-name">{item.category}</span>
+                        <span className={`item-group-pill ${item.category_group}`}>
+                          {CATEGORY_META[item.category_group]?.emoji} {item.category_group}
+                        </span>
+                      </div>
+                      <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="item-amount">{formatCurrency(item.amount)} ฿</div>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          title="ลบรายการนี้"
+                          style={{
+                            background: 'rgba(255, 55, 95, 0.15)',
+                            border: '1px solid rgba(255, 55, 95, 0.4)',
+                            color: '#ff375f',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                          }}
+                        >
+                          🗑️ ลบ
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            {selectedDateStr && (
-              <div className="day-details-total">
-                ยอดรวม: {formatCurrency(selectedDayTotal)} ฿
+          </section>
+
+          {/* All Transactions Table & Management */}
+          <section className="glass-panel audit-log-card" style={{ marginBottom: '24px' }}>
+            <div className="audit-log-header">
+              <div className="audit-log-title">
+                <span>📋</span>
+                <span>รายการธุรกรรมทั้งหมด ({transactions.length} รายการ) — สามารถกดลบรายการเฉพาะบรรทัดได้</span>
+              </div>
+            </div>
+
+            {transactions.length === 0 ? (
+              <div className="empty-placeholder">ไม่มีข้อมูลธุรกรรมในระบบ ส่งข้อความผ่าน Telegram เพื่อเริ่มต้นบันทึก</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
+                      <th style={{ padding: '10px 12px' }}>วันที่</th>
+                      <th style={{ padding: '10px 12px' }}>หมวดหมู่</th>
+                      <th style={{ padding: '10px 12px' }}>ชื่อรายการ</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>จำนวนเงิน</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center' }}>จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <td style={{ padding: '10px 12px' }}>{item.date}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span className={`item-group-pill ${item.category_group}`}>
+                            {CATEGORY_META[item.category_group]?.emoji} {item.category_group}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: '600' }}>{item.category}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700' }}>
+                          {formatCurrency(item.amount)} ฿
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            style={{
+                              background: 'rgba(255, 55, 95, 0.15)',
+                              border: '1px solid rgba(255, 55, 95, 0.4)',
+                              color: '#ff375f',
+                              borderRadius: '6px',
+                              padding: '3px 8px',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                            }}
+                          >
+                            🗑️ ลบ
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
-          </div>
+          </section>
+        </>
+      )}
 
-          {!selectedDateStr ? (
-            <div className="empty-placeholder">
-              เลือกวันที่ในตารางปฏิทินเพื่อดูรายการของวันนั้น
+      {/* TAB 2: DEBTS & INVESTMENT DRAWDOWN */}
+      {activeTab === 'debts' && debtsData && (
+        <>
+          {/* Debts Overview Hero Cards */}
+          <section className="monthly-hero-grid">
+            <div className="glass-panel monthly-hero-card total">
+              <div className="hero-label">
+                <span>💳</span>
+                <span>ยอดหนี้คงเหลือรวม</span>
+              </div>
+              <div className="hero-value">{formatCurrency(debtsData.totalRemainingDebt)} ฿</div>
+              <div className="hero-sub">จากยอดหนี้ตั้งต้น {formatCurrency(debtsData.totalInitialDebt)} ฿</div>
             </div>
-          ) : selectedDayItems.length === 0 ? (
-            <div className="empty-placeholder">
-              ไม่มีรายการบันทึกในวันนี้
+
+            <div className="glass-panel monthly-hero-card average">
+              <div className="hero-label">
+                <span>✅</span>
+                <span>ชำระหนี้แล้วสะสม</span>
+              </div>
+              <div className="hero-value" style={{ color: '#30d158' }}>
+                {formatCurrency(debtsData.totalPaidDebt)} ฿{' '}
+                <span style={{ fontSize: '18px', fontWeight: '600', color: '#30d158' }}>
+                  ({debtsData.overallProgressPct}%)
+                </span>
+              </div>
+              <div className="hero-sub">คำนวณตัดลบอัตโนมัติจากค่าใช้จ่ายใน Telegram</div>
             </div>
-          ) : (
-            <div className="day-items-list">
-              {selectedDayItems.map((item) => (
-                <div key={item.id} className="day-item-row">
-                  <div className="item-left">
-                    <span className="item-name">{item.category}</span>
-                    <span className={`item-group-pill ${item.category_group}`}>
-                      {CATEGORY_META[item.category_group]?.emoji} {item.category_group}
-                    </span>
+
+            <div className="glass-panel monthly-hero-card invest">
+              <div className="hero-label">
+                <span>📉</span>
+                <span>ยอดติดลบจากการลงทุน</span>
+              </div>
+              <div className="hero-value" style={{ color: '#bf5af2' }}>
+                ${formatCurrency(debtsData.drawdown.amountUsd)} USD
+              </div>
+              <div className="hero-sub">
+                ตีเป็นเงินไทย: {formatCurrency(debtsData.drawdown.amountThb)} ฿ (เรท {debtsData.drawdown.exchangeRate} ฿/$)
+              </div>
+            </div>
+
+            <div className="glass-panel monthly-hero-card" style={{ border: '1px solid rgba(255, 69, 58, 0.4)' }}>
+              <div className="hero-label">
+                <span>🔴</span>
+                <span>ภาระรวมสุทธิ (หนี้ + พอร์ตติดลบ)</span>
+              </div>
+              <div className="hero-value" style={{ color: '#ff453a' }}>
+                {formatCurrency(debtsData.totalLiabilitiesTHB)} ฿
+              </div>
+              <div className="hero-sub">หนี้คงเหลือ ({formatCurrency(debtsData.totalRemainingDebt)} ฿) + พอร์ต ({formatCurrency(debtsData.drawdown.amountThb)} ฿)</div>
+            </div>
+          </section>
+
+          {/* Investment Drawdown Control Card */}
+          <section className="glass-panel drawdown-card">
+            <div className="drawdown-header">
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#bf5af2' }}>
+                  📉 ยอดติดลบจากพอร์ตการลงทุน ($5,000 USD)
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  คำนวณมูลค่าความเสียหายเทียบเท่าเงินบาท สามารถปรับอัตราแลกเปลี่ยนได้
+                </p>
+              </div>
+
+              <div className="rate-control">
+                <span>อัตราแลกเปลี่ยน (THB/USD):</span>
+                <input
+                  type="number"
+                  step="0.05"
+                  className="rate-input"
+                  value={rateInput}
+                  onChange={(e) => handleUpdateRate(e.target.value)}
+                />
+                <span>฿</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>ยอดติดลบในพอร์ต (USD)</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#f5f5f7' }}>
+                  ${formatCurrency(debtsData.drawdown.amountUsd)}
+                </div>
+              </div>
+              <div style={{ fontSize: '20px', color: 'var(--text-tertiary)' }}>➔</div>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>คิดเป็นเงินบาทไทย (THB)</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#bf5af2' }}>
+                  {formatCurrency(debtsData.drawdown.amountThb)} ฿
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 4 Debts Cards Grid */}
+          <section style={{ marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>📑</span>
+              <span>รายการหนี้สิน 4 รายการ (ตัดลดยอดอัตโนมัติเมื่อมีค่าใช้จ่ายเข้า)</span>
+            </h3>
+
+            <div className="debts-grid">
+              {debtsData.debts.map((debt) => (
+                <div key={debt.id} className="glass-panel debt-card">
+                  <div className="debt-card-header">
+                    <div className="debt-name-box">
+                      <h3>{debt.name}</h3>
+                      <span>{debt.note}</span>
+                    </div>
+                    <span className="interest-badge">ดอกเบี้ย {debt.interestRate}%/ปี</span>
                   </div>
-                  <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div className="item-amount">{formatCurrency(item.amount)} ฿</div>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      title="ลบรายการนี้"
-                      style={{
-                        background: 'rgba(255, 55, 95, 0.15)',
-                        border: '1px solid rgba(255, 55, 95, 0.4)',
-                        color: '#ff375f',
-                        borderRadius: '6px',
-                        padding: '4px 8px',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                      }}
-                    >
-                      🗑️ ลบ
-                    </button>
+
+                  <div className="debt-amounts-row">
+                    <div className="amount-col">
+                      <label>ยอดตั้งต้น</label>
+                      <div className="val">{formatCurrency(debt.initialAmount)} ฿</div>
+                    </div>
+                    <div className="amount-col paid">
+                      <label>ชำระแล้ว ({debt.paymentsCount} ครั้ง)</label>
+                      <div className="val">-{formatCurrency(debt.paidAmount)} ฿</div>
+                    </div>
+                    <div className="amount-col rem">
+                      <label>คงเหลือ</label>
+                      <div className="val">{formatCurrency(debt.remainingAmount)} ฿</div>
+                    </div>
                   </div>
+
+                  {/* Progress Bar */}
+                  <div className="progress-box">
+                    <div className="progress-labels">
+                      <span>ความคืบหน้าการปลดหนี้</span>
+                      <strong style={{ color: debt.progressPct > 0 ? '#30d158' : 'var(--text-secondary)' }}>
+                        {debt.progressPct}%
+                      </strong>
+                    </div>
+                    <div className="progress-bar-bg">
+                      <div
+                        className="progress-bar-fill"
+                        style={{ width: `${debt.progressPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Payment transactions history linked to this debt */}
+                  {debt.payments && debt.payments.length > 0 && (
+                    <div className="debt-history-box">
+                      <div className="debt-history-title">
+                        <span>ประวัติการชำระที่ตัดยอด ({debt.payments.length} รายการ):</span>
+                      </div>
+                      {debt.payments.map((p) => (
+                        <div key={p.id} className="debt-history-item">
+                          <span>[{p.date}] {p.category}</span>
+                          <strong style={{ color: '#30d158' }}>-{formatCurrency(p.amount)} ฿</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* All Transactions Table & Management */}
-      <section className="glass-panel audit-log-card" style={{ marginBottom: '24px' }}>
-        <div className="audit-log-header">
-          <div className="audit-log-title">
-            <span>📋</span>
-            <span>รายการธุรกรรมทั้งหมด ({transactions.length} รายการ) — สามารถกดลบรายการเฉพาะบรรทัดได้</span>
-          </div>
-        </div>
-
-        {transactions.length === 0 ? (
-          <div className="empty-placeholder">ไม่มีข้อมูลธุรกรรมในระบบ ส่งข้อความผ่าน Telegram เพื่อเริ่มต้นบันทึก</div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '10px 12px' }}>วันที่</th>
-                  <th style={{ padding: '10px 12px' }}>หมวดหมู่</th>
-                  <th style={{ padding: '10px 12px' }}>ชื่อรายการ</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>จำนวนเงิน</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center' }}>จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((item) => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <td style={{ padding: '10px 12px' }}>{item.date}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span className={`item-group-pill ${item.category_group}`}>
-                        {CATEGORY_META[item.category_group]?.emoji} {item.category_group}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: '600' }}>{item.category}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700' }}>
-                      {formatCurrency(item.amount)} ฿
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        style={{
-                          background: 'rgba(255, 55, 95, 0.15)',
-                          border: '1px solid rgba(255, 55, 95, 0.4)',
-                          color: '#ff375f',
-                          borderRadius: '6px',
-                          padding: '3px 8px',
-                          cursor: 'pointer',
-                          fontSize: '11px',
-                          fontWeight: '600',
-                        }}
-                      >
-                        🗑️ ลบ
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+          </section>
+        </>
+      )}
 
       {/* Bot Audit & Activity Log */}
       <section className="glass-panel audit-log-card">

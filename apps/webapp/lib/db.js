@@ -149,4 +149,51 @@ if (ruleCount === 0) {
   insertMany(defaultRules);
 }
 
+// 5. Debts table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS debts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    keywords TEXT NOT NULL, -- comma-separated keywords for auto-linking
+    initial_amount REAL NOT NULL,
+    interest_rate REAL NOT NULL, -- % per year
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// 6. Investment Drawdown table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS investment_drawdown (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    amount_usd REAL NOT NULL DEFAULT 5000,
+    exchange_rate REAL NOT NULL DEFAULT 36.0,
+    note TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default debts if empty
+const debtCount = db.prepare('SELECT COUNT(*) as count FROM debts').get().count;
+if (debtCount === 0) {
+  const insertDebt = db.prepare(`
+    INSERT INTO debts (name, keywords, initial_amount, interest_rate, note)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  insertDebt.run('Finnix', 'finnix,ฟินนิกซ์', 10000, 33, 'สินเชื่อ Finnix ดอกเบี้ย 33% ต่อปี');
+  insertDebt.run('Money Thunder', 'ธันเดอ,thunder,money thunder', 28140.99, 33, 'สินเชื่อ Money Thunder ดอกเบี้ย 33% ต่อปี');
+  insertDebt.run('Shopee Paylater', 'paylater,shopee', 3378, 25, 'Shopee SPayLater ดอกเบี้ย 25% ต่อปี');
+  insertDebt.run('EasyCash', 'easaycash,easycash', 15322, 33, 'Shopee EasyCash ดอกเบี้ย 33% ต่อปี');
+}
+
+// Seed default investment drawdown if empty
+const drawdownCount = db.prepare('SELECT COUNT(*) as count FROM investment_drawdown').get().count;
+if (drawdownCount === 0) {
+  db.prepare(`
+    INSERT INTO investment_drawdown (amount_usd, exchange_rate, note)
+    VALUES (5000, 36.0, 'ยอดติดลบจากพอร์ตการลงทุน ($5,000 USD)')
+  `).run();
+}
+
 export default db;
