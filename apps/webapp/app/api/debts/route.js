@@ -21,8 +21,8 @@ export async function GET() {
         return keywords.some((kw) => cat.includes(kw));
       });
 
-      const paidAmount = matchedTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-      const remainingAmount = Math.max(0, debt.initial_amount - paidAmount);
+      const paidAmount = Math.round(matchedTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0) * 100) / 100;
+      const remainingAmount = Math.round(Math.max(0, debt.initial_amount - paidAmount) * 100) / 100;
       const progressPct = debt.initial_amount > 0 ? Math.min(100, (paidAmount / debt.initial_amount) * 100) : 0;
 
       totalInitialDebt += debt.initial_amount;
@@ -43,8 +43,10 @@ export async function GET() {
       };
     });
 
-    const totalRemainingDebt = Math.max(0, totalInitialDebt - totalPaidDebt);
-    const overallProgressPct = totalInitialDebt > 0 ? (totalPaidDebt / totalInitialDebt) * 100 : 0;
+    totalInitialDebt = Math.round(totalInitialDebt * 100) / 100;
+    totalPaidDebt = Math.round(totalPaidDebt * 100) / 100;
+    const totalRemainingDebt = Math.round(Math.max(0, totalInitialDebt - totalPaidDebt) * 100) / 100;
+    const overallProgressPct = totalInitialDebt > 0 ? parseFloat(((totalPaidDebt / totalInitialDebt) * 100).toFixed(1)) : 0;
 
     // Investment Drawdown
     const drawdown = db.prepare('SELECT * FROM investment_drawdown ORDER BY id DESC LIMIT 1').get() || {
@@ -53,8 +55,8 @@ export async function GET() {
       note: 'ยอดติดลบจากพอร์ตการลงทุน ($5,000 USD)',
     };
 
-    const amountThb = drawdown.amount_usd * drawdown.exchange_rate;
-    const totalLiabilitiesTHB = totalRemainingDebt + amountThb;
+    const amountThb = Math.round(drawdown.amount_usd * drawdown.exchange_rate * 100) / 100;
+    const totalLiabilitiesTHB = Math.round((totalRemainingDebt + amountThb) * 100) / 100;
 
     return NextResponse.json({
       debts,

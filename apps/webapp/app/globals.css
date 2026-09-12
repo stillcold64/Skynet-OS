@@ -129,16 +129,16 @@ body {
   100% { transform: scale(0.95); opacity: 0.8; }
 }
 
-/* Monthly Overview Hero Cards (ผลรวมและค่าเฉลี่ย) */
+/* Overview Hero Cards (ยอดประจำเดือน & สรุปภาพรวมสะสมทุกเดือน) */
 .monthly-hero-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
   margin-bottom: 20px;
 }
 
 .monthly-hero-card {
-  padding: 22px 24px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -146,24 +146,58 @@ body {
   background: rgba(28, 32, 44, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-xl);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.monthly-hero-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hero-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 .monthly-hero-card .hero-label {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
+}
+
+.hero-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.hero-badge.badge-month {
+  background: rgba(10, 132, 255, 0.16);
+  color: #64d2ff;
+  border: 1px solid rgba(100, 210, 255, 0.28);
+}
+
+.hero-badge.badge-alltime {
+  background: rgba(175, 82, 222, 0.16);
+  color: #da8fff;
+  border: 1px solid rgba(218, 143, 255, 0.28);
 }
 
 .monthly-hero-card .hero-value {
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: -0.8px;
-  margin: 10px 0 4px 0;
+  letter-spacing: -0.6px;
+  margin: 8px 0 2px 0;
   font-variant-numeric: tabular-nums;
   background: linear-gradient(135deg, #ffffff 40%, #d1d1d6 100%);
   -webkit-background-clip: text;
@@ -176,20 +210,32 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
-.monthly-hero-card.average .hero-value {
+.monthly-hero-card.fixed .hero-value {
   background: linear-gradient(135deg, #ffd60a 0%, #ff9f0a 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.monthly-hero-card.invest .hero-value {
-  background: linear-gradient(135deg, #da8fff 0%, #bf5af2 100%);
+.monthly-hero-card.variable .hero-value {
+  background: linear-gradient(135deg, #30d158 0%, #28cd41 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.monthly-hero-card.grand-total .hero-value {
+  background: linear-gradient(135deg, #da8fff 0%, #af52de 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.monthly-hero-card.grand-avg .hero-value {
+  background: linear-gradient(135deg, #ff7597 0%, #ff375f 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .monthly-hero-card .hero-sub {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-tertiary);
   margin-top: 2px;
 }

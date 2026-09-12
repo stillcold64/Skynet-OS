@@ -182,9 +182,9 @@ if (debtCount === 0) {
   `);
 
   insertDebt.run('Finnix', 'finnix,ฟินนิกซ์', 10000, 33, 'สินเชื่อ Finnix ดอกเบี้ย 33% ต่อปี');
-  insertDebt.run('Money Thunder', 'ธันเดอ,thunder,money thunder', 28140.99, 33, 'สินเชื่อ Money Thunder ดอกเบี้ย 33% ต่อปี');
-  insertDebt.run('Shopee Paylater', 'paylater,shopee', 3378, 25, 'Shopee SPayLater ดอกเบี้ย 25% ต่อปี');
-  insertDebt.run('EasyCash', 'easaycash,easycash', 15322, 33, 'Shopee EasyCash ดอกเบี้ย 33% ต่อปี');
+  insertDebt.run('Money Thunder', 'ธันเดอ,thunder,money thunder', 30140.99, 33, 'สินเชื่อ Money Thunder ดอกเบี้ย 33% ต่อปี');
+  insertDebt.run('Shopee Paylater', 'paylater,shopee', 4568.17, 25, 'Shopee SPayLater ดอกเบี้ย 25% ต่อปี');
+  insertDebt.run('EasyCash', 'easaycash,easycash', 17188.26, 33, 'Shopee EasyCash ดอกเบี้ย 33% ต่อปี');
 }
 
 // Seed default investment drawdown if empty

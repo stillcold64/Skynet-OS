@@ -25,6 +25,7 @@ export default function Home() {
   const [dailyMap, setDailyMap] = useState({});
   const [botLogs, setBotLogs] = useState([]);
   const [debtsData, setDebtsData] = useState(null);
+  const [allTimeStats, setAllTimeStats] = useState(null);
   const [rateInput, setRateInput] = useState('36.0');
   const [loading, setLoading] = useState(true);
 
@@ -44,6 +45,7 @@ export default function Home() {
         setTransactions(data.transactions || []);
         setGroupTotals(data.groupTotals || { LIFE: 0, EXTRAVAGANT: 0, BILL: 0, INVESTING: 0, ETC: 0 });
         setDailyMap(data.dailyMap || {});
+        setAllTimeStats(data.allTimeStats || null);
       }
 
       if (logRes.ok) {
@@ -155,12 +157,16 @@ export default function Home() {
 
   const selectedDayTotal = selectedDayItems.reduce((sum, item) => sum + item.amount, 0);
 
-  // Monthly Calculations
+  // Monthly & Multi-month Calculations
   const monthlyExpenses = (groupTotals.LIFE || 0) + (groupTotals.EXTRAVAGANT || 0) + (groupTotals.BILL || 0) + (groupTotals.ETC || 0);
-  const monthlyInvestment = groupTotals.INVESTING || 0;
-  const activeDaysCount = Object.keys(dailyMap).filter((d) => dailyMap[d] && dailyMap[d].total > 0).length;
-  const dailyAverageActive = activeDaysCount > 0 ? monthlyExpenses / activeDaysCount : 0;
-  const dailyAverageMonth = daysInMonth > 0 ? monthlyExpenses / daysInMonth : 0;
+  const monthlyFixed = groupTotals.BILL || 0;
+  const monthlyVariable = (groupTotals.LIFE || 0) + (groupTotals.EXTRAVAGANT || 0) + (groupTotals.ETC || 0);
+  const fixedPct = monthlyExpenses > 0 ? ((monthlyFixed / monthlyExpenses) * 100).toFixed(0) : '0';
+  const variablePct = monthlyExpenses > 0 ? ((monthlyVariable / monthlyExpenses) * 100).toFixed(0) : '0';
+
+  const allTimeTotal = allTimeStats?.totalExpense ?? monthlyExpenses;
+  const allTimeMonthsCount = allTimeStats?.monthsCount ?? 1;
+  const allTimeMonthlyAvg = allTimeStats?.monthlyAverage ?? monthlyExpenses;
 
   return (
     <main>
@@ -201,33 +207,66 @@ export default function Home() {
       {/* TAB 1: CALENDAR & EXPENSES */}
       {activeTab === 'calendar' && (
         <>
-          {/* Monthly Overview Hero Cards (ผลรวมและค่าเฉลี่ยรายเดือน) */}
+          {/* Overview Hero Cards (ยอดประจำเดือน & สรุปภาพรวมสะสมทุกเดือน) */}
           <section className="monthly-hero-grid">
             <div className="glass-panel monthly-hero-card total">
-              <div className="hero-label">
-                <span>💳</span>
-                <span>ยอดรวมค่าใช้จ่ายประจำเดือน</span>
+              <div className="hero-top-row">
+                <div className="hero-label">
+                  <span>💳</span>
+                  <span>ยอดรวมประจำเดือน</span>
+                </div>
+                <span className="hero-badge badge-month">📅 เดือนนี้</span>
               </div>
               <div className="hero-value">{formatCurrency(monthlyExpenses)} ฿</div>
-              <div className="hero-sub">รวม 4 หมวด (LIFE, EXTRAVAGANT, BILL, ETC)</div>
+              <div className="hero-sub">เดือน{monthNamesThai[selectedMonth - 1]} {selectedYear} ({transactions.length} รายการ)</div>
             </div>
 
-            <div className="glass-panel monthly-hero-card average">
-              <div className="hero-label">
-                <span>📊</span>
-                <span>ค่าเฉลี่ยค่าใช้จ่ายต่อวัน</span>
+            <div className="glass-panel monthly-hero-card fixed">
+              <div className="hero-top-row">
+                <div className="hero-label">
+                  <span>📌</span>
+                  <span>ค่าใช้จ่ายที่แน่นอน</span>
+                </div>
+                <span className="hero-badge badge-month">📅 เดือนนี้</span>
               </div>
-              <div className="hero-value">{formatCurrency(dailyAverageActive)} ฿ <span style={{ fontSize: '18px', fontWeight: '500' }}>/ วัน</span></div>
-              <div className="hero-sub">คำนวณจากวันที่บันทึก ({activeDaysCount} วัน) • เฉลี่ยทั้งเดือน {daysInMonth} วัน: {formatCurrency(dailyAverageMonth)} ฿/วัน</div>
+              <div className="hero-value">{formatCurrency(monthlyFixed)} ฿</div>
+              <div className="hero-sub">บิล ค่างวด และหนี้สิน ({fixedPct}% ของเดือนนี้)</div>
             </div>
 
-            <div className="glass-panel monthly-hero-card invest">
-              <div className="hero-label">
-                <span>📈</span>
-                <span>ยอดเงินลงทุนประจำเดือน</span>
+            <div className="glass-panel monthly-hero-card variable">
+              <div className="hero-top-row">
+                <div className="hero-label">
+                  <span>🌿</span>
+                  <span>ค่าใช้จ่ายผันแปร</span>
+                </div>
+                <span className="hero-badge badge-month">📅 เดือนนี้</span>
               </div>
-              <div className="hero-value">{formatCurrency(monthlyInvestment)} ฿</div>
-              <div className="hero-sub">หมวด INVESTING (หุ้น, คริปโต, กองทุน, ออม)</div>
+              <div className="hero-value">{formatCurrency(monthlyVariable)} ฿</div>
+              <div className="hero-sub">อาหาร ค่าใช้จ่ายทั่วไป ({variablePct}% ของเดือนนี้)</div>
+            </div>
+
+            <div className="glass-panel monthly-hero-card grand-total">
+              <div className="hero-top-row">
+                <div className="hero-label">
+                  <span>🌐</span>
+                  <span>ผลรวมสะสม (ทุกเดือน)</span>
+                </div>
+                <span className="hero-badge badge-alltime">🌐 สะสมทุกเดือน</span>
+              </div>
+              <div className="hero-value">{formatCurrency(allTimeTotal)} ฿</div>
+              <div className="hero-sub">รวมค่าใช้จ่ายสะสม {allTimeMonthsCount} เดือนในระบบ</div>
+            </div>
+
+            <div className="glass-panel monthly-hero-card grand-avg">
+              <div className="hero-top-row">
+                <div className="hero-label">
+                  <span>📊</span>
+                  <span>ค่าเฉลี่ยรวมต่อเดือน</span>
+                </div>
+                <span className="hero-badge badge-alltime">🌐 เฉลี่ยทุกเดือน</span>
+              </div>
+              <div className="hero-value">{formatCurrency(allTimeMonthlyAvg)} ฿ <span style={{ fontSize: '16px', fontWeight: '500' }}>/ ด.</span></div>
+              <div className="hero-sub">เฉลี่ยภาพรวมทุกเดือน (คำนวณเดือนถัดไปอัตโนมัติ)</div>
             </div>
           </section>
 

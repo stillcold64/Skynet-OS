@@ -85,12 +85,45 @@ export async function GET(request) {
       dailyMap[row.date].groups[row.category_group] = row.amount;
     }
 
+    // Multi-month aggregation across all time
+    const monthRows = db
+      .prepare(`
+        SELECT 
+          substr(date, 1, 7) as ym,
+          COALESCE(SUM(CASE WHEN type = 'ค่าใช้จ่าย' THEN amount ELSE 0 END), 0) as expense,
+          COALESCE(SUM(CASE WHEN type = 'ค่าใช้จ่าย' AND category_group = 'BILL' THEN amount ELSE 0 END), 0) as fixed,
+          COALESCE(SUM(CASE WHEN type = 'ค่าใช้จ่าย' AND category_group != 'BILL' THEN amount ELSE 0 END), 0) as variable,
+          COUNT(id) as count
+        FROM transactions
+        GROUP BY ym
+        ORDER BY ym ASC
+      `)
+      .all();
+
+    const allTimeTotalExpense = Math.round(monthRows.reduce((sum, r) => sum + r.expense, 0) * 100) / 100;
+    const allTimeTotalFixed = Math.round(monthRows.reduce((sum, r) => sum + r.fixed, 0) * 100) / 100;
+    const allTimeTotalVariable = Math.round(monthRows.reduce((sum, r) => sum + r.variable, 0) * 100) / 100;
+    const allTimeMonthsCount = Math.max(1, monthRows.length);
+    const allTimeMonthlyAvg = Math.round((allTimeTotalExpense / allTimeMonthsCount) * 100) / 100;
+    const allTimeFixedAvg = Math.round((allTimeTotalFixed / allTimeMonthsCount) * 100) / 100;
+
+    const allTimeStats = {
+      totalExpense: allTimeTotalExpense,
+      totalFixed: allTimeTotalFixed,
+      totalVariable: allTimeTotalVariable,
+      monthsCount: allTimeMonthsCount,
+      monthlyAverage: allTimeMonthlyAvg,
+      monthlyFixedAverage: allTimeFixedAvg,
+      months: monthRows,
+    };
+
     return NextResponse.json({
       transactions,
       groupTotals,
       totalExpense: typeTotals.totalExpense,
       totalInvestment: typeTotals.totalInvestment,
       dailyMap,
+      allTimeStats,
     });
   } catch (error) {
     console.error('Error fetching transactions:', error);
