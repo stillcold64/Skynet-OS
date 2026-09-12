@@ -129,6 +129,71 @@ body {
   100% { transform: scale(0.95); opacity: 0.8; }
 }
 
+/* Monthly Overview Hero Cards (ผลรวมและค่าเฉลี่ย) */
+.monthly-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.monthly-hero-card {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  background: rgba(28, 32, 44, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl);
+}
+
+.monthly-hero-card .hero-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.monthly-hero-card .hero-value {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  margin: 10px 0 4px 0;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, #ffffff 40%, #d1d1d6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.monthly-hero-card.total .hero-value {
+  background: linear-gradient(135deg, #64d2ff 0%, #0a84ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.monthly-hero-card.average .hero-value {
+  background: linear-gradient(135deg, #ffd60a 0%, #ff9f0a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.monthly-hero-card.invest .hero-value {
+  background: linear-gradient(135deg, #da8fff 0%, #bf5af2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.monthly-hero-card .hero-sub {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
 /* 5 iOS Category Cards Grid */
 .categories-grid {
   display: grid;

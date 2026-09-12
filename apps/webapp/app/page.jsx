@@ -136,6 +136,13 @@ export default function Home() {
 
   const selectedDayTotal = selectedDayItems.reduce((sum, item) => sum + item.amount, 0);
 
+  // Monthly Calculations
+  const monthlyExpenses = (groupTotals.LIFE || 0) + (groupTotals.EXTRAVAGANT || 0) + (groupTotals.BILL || 0) + (groupTotals.ETC || 0);
+  const monthlyInvestment = groupTotals.INVESTING || 0;
+  const activeDaysCount = Object.keys(dailyMap).filter((d) => dailyMap[d] && dailyMap[d].total > 0).length;
+  const dailyAverageActive = activeDaysCount > 0 ? monthlyExpenses / activeDaysCount : 0;
+  const dailyAverageMonth = daysInMonth > 0 ? monthlyExpenses / daysInMonth : 0;
+
   return (
     <main>
       {/* iOS Header */}
@@ -153,6 +160,36 @@ export default function Home() {
           <span>Telegram Sync Live</span>
         </div>
       </header>
+
+      {/* Monthly Overview Hero Cards (ผลรวมและค่าเฉลี่ยรายเดือน) */}
+      <section className="monthly-hero-grid">
+        <div className="glass-panel monthly-hero-card total">
+          <div className="hero-label">
+            <span>💳</span>
+            <span>ยอดรวมค่าใช้จ่ายประจำเดือน</span>
+          </div>
+          <div className="hero-value">{formatCurrency(monthlyExpenses)} ฿</div>
+          <div className="hero-sub">รวม 4 หมวด (LIFE, EXTRAVAGANT, BILL, ETC)</div>
+        </div>
+
+        <div className="glass-panel monthly-hero-card average">
+          <div className="hero-label">
+            <span>📊</span>
+            <span>ค่าเฉลี่ยค่าใช้จ่ายต่อวัน</span>
+          </div>
+          <div className="hero-value">{formatCurrency(dailyAverageActive)} ฿ <span style={{ fontSize: '18px', fontWeight: '500' }}>/ วัน</span></div>
+          <div className="hero-sub">คำนวณจากวันที่บันทึก ({activeDaysCount} วัน) • เฉลี่ยทั้งเดือน {daysInMonth} วัน: {formatCurrency(dailyAverageMonth)} ฿/วัน</div>
+        </div>
+
+        <div className="glass-panel monthly-hero-card invest">
+          <div className="hero-label">
+            <span>📈</span>
+            <span>ยอดเงินลงทุนประจำเดือน</span>
+          </div>
+          <div className="hero-value">{formatCurrency(monthlyInvestment)} ฿</div>
+          <div className="hero-sub">หมวด INVESTING (หุ้น, คริปโต, กองทุน, ออม)</div>
+        </div>
+      </section>
 
       {/* 5 iOS Category Cards */}
       <section className="categories-grid">
