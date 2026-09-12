@@ -26,6 +26,7 @@ export default function Home() {
   const [botLogs, setBotLogs] = useState([]);
   const [debtsData, setDebtsData] = useState(null);
   const [allTimeStats, setAllTimeStats] = useState(null);
+  const [drilldownModal, setDrilldownModal] = useState(null);
   const [rateInput, setRateInput] = useState('36.0');
   const [loading, setLoading] = useState(true);
 
@@ -73,6 +74,14 @@ export default function Home() {
     const interval = setInterval(fetchData, 4000);
     return () => clearInterval(interval);
   }, [selectedYear, selectedMonth]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setDrilldownModal(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleDelete = async (id) => {
     if (!confirm('ยืนยันลบรายการนี้?')) return;
@@ -209,7 +218,7 @@ export default function Home() {
         <>
           {/* Overview Hero Cards (ยอดประจำเดือน & สรุปภาพรวมสะสมทุกเดือน) */}
           <section className="monthly-hero-grid">
-            <div className="glass-panel monthly-hero-card total">
+            <div className="glass-panel monthly-hero-card total" onClick={() => setDrilldownModal('total')} title="กดเพื่อดูรายละเอียดค่าใช้จ่ายเดือนนี้">
               <div className="hero-top-row">
                 <div className="hero-label">
                   <span>💳</span>
@@ -219,9 +228,10 @@ export default function Home() {
               </div>
               <div className="hero-value">{formatCurrency(monthlyExpenses)} ฿</div>
               <div className="hero-sub">เดือน{monthNamesThai[selectedMonth - 1]} {selectedYear} ({transactions.length} รายการ)</div>
+              <div className="hero-click-hint"><span>🔍 กดดูที่มา & รายการทั้งหมด</span></div>
             </div>
 
-            <div className="glass-panel monthly-hero-card fixed">
+            <div className="glass-panel monthly-hero-card fixed" onClick={() => setDrilldownModal('fixed')} title="กดเพื่อดูที่มาของค่าใช้จ่ายที่แน่นอน">
               <div className="hero-top-row">
                 <div className="hero-label">
                   <span>📌</span>
@@ -231,9 +241,10 @@ export default function Home() {
               </div>
               <div className="hero-value">{formatCurrency(monthlyFixed)} ฿</div>
               <div className="hero-sub">บิล ค่างวด และหนี้สิน ({fixedPct}% ของเดือนนี้)</div>
+              <div className="hero-click-hint"><span>🔍 กดดูรายการบิล & หนี้สิน</span></div>
             </div>
 
-            <div className="glass-panel monthly-hero-card variable">
+            <div className="glass-panel monthly-hero-card variable" onClick={() => setDrilldownModal('variable')} title="กดเพื่อดูที่มาของค่าใช้จ่ายผันแปร">
               <div className="hero-top-row">
                 <div className="hero-label">
                   <span>🌿</span>
@@ -243,9 +254,10 @@ export default function Home() {
               </div>
               <div className="hero-value">{formatCurrency(monthlyVariable)} ฿</div>
               <div className="hero-sub">อาหาร ค่าใช้จ่ายทั่วไป ({variablePct}% ของเดือนนี้)</div>
+              <div className="hero-click-hint"><span>🔍 กดดูรายการกินอยู่ & ทั่วไป</span></div>
             </div>
 
-            <div className="glass-panel monthly-hero-card grand-total">
+            <div className="glass-panel monthly-hero-card grand-total" onClick={() => setDrilldownModal('grand-total')} title="กดเพื่อดูสรุปรายเดือนทุกเดือน">
               <div className="hero-top-row">
                 <div className="hero-label">
                   <span>🌐</span>
@@ -255,9 +267,10 @@ export default function Home() {
               </div>
               <div className="hero-value">{formatCurrency(allTimeTotal)} ฿</div>
               <div className="hero-sub">รวมค่าใช้จ่ายสะสม {allTimeMonthsCount} เดือนในระบบ</div>
+              <div className="hero-click-hint"><span>🔍 กดดูตารางรวมทุกเดือน</span></div>
             </div>
 
-            <div className="glass-panel monthly-hero-card grand-avg">
+            <div className="glass-panel monthly-hero-card grand-avg" onClick={() => setDrilldownModal('grand-avg')} title="กดเพื่อดูสูตรและการคำนวณค่าเฉลี่ย">
               <div className="hero-top-row">
                 <div className="hero-label">
                   <span>📊</span>
@@ -267,6 +280,7 @@ export default function Home() {
               </div>
               <div className="hero-value">{formatCurrency(allTimeMonthlyAvg)} ฿ <span style={{ fontSize: '16px', fontWeight: '500' }}>/ ด.</span></div>
               <div className="hero-sub">เฉลี่ยภาพรวมทุกเดือน (คำนวณเดือนถัดไปอัตโนมัติ)</div>
+              <div className="hero-click-hint"><span>🔍 กดดูสูตรและการคำนวณ</span></div>
             </div>
           </section>
 
@@ -677,6 +691,346 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* DRILLDOWN INSPECTOR MODAL */}
+      {drilldownModal && (
+        <div className="drilldown-overlay" onClick={() => setDrilldownModal(null)}>
+          <div className="drilldown-modal" onClick={(e) => e.stopPropagation()}>
+            {/* 1. FIXED (ค่าใช้จ่ายที่แน่นอน) */}
+            {drilldownModal === 'fixed' && (() => {
+              const fixedItems = transactions
+                .filter((t) => t.category_group === 'BILL' && t.type === 'ค่าใช้จ่าย')
+                .sort((a, b) => b.amount - a.amount);
+              return (
+                <>
+                  <div className="drilldown-header">
+                    <div className="drilldown-title-group">
+                      <span className="drilldown-icon">📌</span>
+                      <div>
+                        <h2 className="drilldown-title">ที่มา: ค่าใช้จ่ายที่แน่นอน</h2>
+                        <div className="drilldown-subtitle">ประจำเดือน{monthNamesThai[selectedMonth - 1]} {selectedYear}</div>
+                      </div>
+                    </div>
+                    <button className="drilldown-close-btn" onClick={() => setDrilldownModal(null)}>✕</button>
+                  </div>
+
+                  <div className="drilldown-kpi-bar">
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">ยอดรวมค่าใช้จ่ายที่แน่นอน</span>
+                      <span className="drilldown-kpi-val" style={{ color: '#ffd60a' }}>{formatCurrency(monthlyFixed)} ฿</span>
+                    </div>
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">จำนวนรายการ</span>
+                      <span className="drilldown-kpi-val">{fixedItems.length} รายการ</span>
+                    </div>
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">สัดส่วนในเดือนนี้</span>
+                      <span className="drilldown-kpi-val">{fixedPct}%</span>
+                    </div>
+                  </div>
+
+                  <div className="drilldown-formula-box">
+                    <div className="drilldown-formula-title">💡 คำอธิบายหมวดค่าใช้จ่ายที่แน่นอน</div>
+                    <div>
+                      รวบรวมจากรายการหมวด <strong>📄 BILL</strong> ซึ่งประกอบด้วยค่างวดหนี้สิน (เช่น ธันเดอร์, PayLater, EasyCash, ฟินนิกซ์), ค่าบริการรายเดือน (เน็ต, GPU+YouTube), ค่าสาธารณูปโภค (ค่าน้ำ) และบิลประจำที่ต้องจ่ายแน่นอนในแต่ละเดือน
+                    </div>
+                  </div>
+
+                  <div className="drilldown-body">
+                    <div className="drilldown-item-list">
+                      {fixedItems.map((item) => (
+                        <div key={item.id} className="drilldown-row">
+                          <div className="drilldown-row-left">
+                            <div className="drilldown-row-title">
+                              <span>📄</span>
+                              <span>{item.category}</span>
+                            </div>
+                            <div className="drilldown-row-meta">
+                              <span>📅 {item.date}</span>
+                              {item.raw_text && <span>• ข้อความ: "{item.raw_text}"</span>}
+                            </div>
+                          </div>
+                          <div className="drilldown-row-amount" style={{ color: '#ffd60a' }}>
+                            {formatCurrency(item.amount)} ฿
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* 2. VARIABLE (ค่าใช้จ่ายผันแปร) */}
+            {drilldownModal === 'variable' && (() => {
+              const varItems = transactions
+                .filter((t) => t.category_group !== 'BILL' && t.type === 'ค่าใช้จ่าย')
+                .sort((a, b) => b.amount - a.amount);
+              return (
+                <>
+                  <div className="drilldown-header">
+                    <div className="drilldown-title-group">
+                      <span className="drilldown-icon">🌿</span>
+                      <div>
+                        <h2 className="drilldown-title">ที่มา: ค่าใช้จ่ายผันแปร</h2>
+                        <div className="drilldown-subtitle">ประจำเดือน{monthNamesThai[selectedMonth - 1]} {selectedYear}</div>
+                      </div>
+                    </div>
+                    <button className="drilldown-close-btn" onClick={() => setDrilldownModal(null)}>✕</button>
+                  </div>
+
+                  <div className="drilldown-kpi-bar">
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">ยอดรวมค่าใช้จ่ายผันแปร</span>
+                      <span className="drilldown-kpi-val" style={{ color: '#30d158' }}>{formatCurrency(monthlyVariable)} ฿</span>
+                    </div>
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">จำนวนรายการ</span>
+                      <span className="drilldown-kpi-val">{varItems.length} รายการ</span>
+                    </div>
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">สัดส่วนในเดือนนี้</span>
+                      <span className="drilldown-kpi-val">{variablePct}%</span>
+                    </div>
+                  </div>
+
+                  <div className="drilldown-formula-box" style={{ background: 'rgba(48, 209, 88, 0.08)', borderColor: 'rgba(48, 209, 88, 0.25)', color: '#d2f9dc' }}>
+                    <div className="drilldown-formula-title" style={{ color: '#30d158' }}>💡 คำอธิบายหมวดค่าใช้จ่ายผันแปร</div>
+                    <div>
+                      รวบรวมจากหมวด <strong>🌿 LIFE</strong> (ค่าอาหาร, แมว, ข้าวของเครื่องใช้), <strong>✨ EXTRAVAGANT</strong> (กาแฟ, เบียร์, พักผ่อนหย่อนใจ), และ <strong>📦 ETC</strong> (จิปาถะทั่วไป) ซึ่งเป็นค่าใช้จ่ายที่ปรับเปลี่ยนได้ตามการใช้ชีวิตประจำวัน
+                    </div>
+                  </div>
+
+                  <div className="drilldown-body">
+                    <div className="drilldown-item-list">
+                      {varItems.map((item) => (
+                        <div key={item.id} className="drilldown-row">
+                          <div className="drilldown-row-left">
+                            <div className="drilldown-row-title">
+                              <span>{CATEGORY_META[item.category_group]?.emoji || '📦'}</span>
+                              <span>{item.category}</span>
+                              <span style={{ fontSize: '10px', padding: '1px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px' }}>
+                                {item.category_group}
+                              </span>
+                            </div>
+                            <div className="drilldown-row-meta">
+                              <span>📅 {item.date}</span>
+                              {item.raw_text && <span>• ข้อความ: "{item.raw_text}"</span>}
+                            </div>
+                          </div>
+                          <div className="drilldown-row-amount" style={{ color: '#30d158' }}>
+                            {formatCurrency(item.amount)} ฿
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* 3. MONTH TOTAL (ยอดรวมประจำเดือน) */}
+            {drilldownModal === 'total' && (() => {
+              const allMonthItems = transactions.filter((t) => t.type === 'ค่าใช้จ่าย');
+              return (
+                <>
+                  <div className="drilldown-header">
+                    <div className="drilldown-title-group">
+                      <span className="drilldown-icon">💳</span>
+                      <div>
+                        <h2 className="drilldown-title">ที่มา: ยอดรวมค่าใช้จ่ายประจำเดือน</h2>
+                        <div className="drilldown-subtitle">ประจำเดือน{monthNamesThai[selectedMonth - 1]} {selectedYear}</div>
+                      </div>
+                    </div>
+                    <button className="drilldown-close-btn" onClick={() => setDrilldownModal(null)}>✕</button>
+                  </div>
+
+                  <div className="drilldown-kpi-bar">
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">ยอดรวมค่าใช้จ่ายเดือนนี้</span>
+                      <span className="drilldown-kpi-val" style={{ color: '#64d2ff' }}>{formatCurrency(monthlyExpenses)} ฿</span>
+                    </div>
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">จำนวนรายการ</span>
+                      <span className="drilldown-kpi-val">{allMonthItems.length} รายการ</span>
+                    </div>
+                  </div>
+
+                  <div className="drilldown-formula-box">
+                    <div className="drilldown-formula-title">📊 สรุปโครงสร้างค่าใช้จ่ายเดือนนี้</div>
+                    <div>
+                      📌 ค่าใช้จ่ายที่แน่นอน (หนี้/บิล): <strong>{formatCurrency(monthlyFixed)} ฿ ({fixedPct}%)</strong><br/>
+                      🌿 ค่าใช้จ่ายผันแปร (กินอยู่/ช้อป): <strong>{formatCurrency(monthlyVariable)} ฿ ({variablePct}%)</strong><br/>
+                      รวมกันได้ยอดสุทธิ = <strong>{formatCurrency(monthlyExpenses)} ฿</strong>
+                    </div>
+                  </div>
+
+                  <div className="drilldown-body">
+                    <div className="drilldown-item-list">
+                      {allMonthItems.map((item) => (
+                        <div key={item.id} className="drilldown-row">
+                          <div className="drilldown-row-left">
+                            <div className="drilldown-row-title">
+                              <span>{CATEGORY_META[item.category_group]?.emoji || '📦'}</span>
+                              <span>{item.category}</span>
+                              <span style={{ fontSize: '10px', padding: '1px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px' }}>
+                                {item.category_group}
+                              </span>
+                            </div>
+                            <div className="drilldown-row-meta">
+                              <span>📅 {item.date}</span>
+                              {item.raw_text && <span>• "{item.raw_text}"</span>}
+                            </div>
+                          </div>
+                          <div className="drilldown-row-amount">
+                            {formatCurrency(item.amount)} ฿
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* 4. GRAND TOTAL (ผลรวมสะสมทุกเดือน) */}
+            {drilldownModal === 'grand-total' && (() => {
+              const months = allTimeStats?.months || [{ ym: currentMonthStr, expense: monthlyExpenses, fixed: monthlyFixed, variable: monthlyVariable, count: transactions.length }];
+              return (
+                <>
+                  <div className="drilldown-header">
+                    <div className="drilldown-title-group">
+                      <span className="drilldown-icon">🌐</span>
+                      <div>
+                        <h2 className="drilldown-title">ที่มา: ผลรวมสะสมทั้งหมด (ทุกเดือน)</h2>
+                        <div className="drilldown-subtitle">รวบรวมข้อมูลรายจ่ายจากทุกเดือนในระบบ</div>
+                      </div>
+                    </div>
+                    <button className="drilldown-close-btn" onClick={() => setDrilldownModal(null)}>✕</button>
+                  </div>
+
+                  <div className="drilldown-kpi-bar">
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">ยอดรวมสะสมทุกเดือน</span>
+                      <span className="drilldown-kpi-val" style={{ color: '#da8fff' }}>{formatCurrency(allTimeTotal)} ฿</span>
+                    </div>
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">จำนวนเดือนที่มีประวัติ</span>
+                      <span className="drilldown-kpi-val">{allTimeMonthsCount} เดือน</span>
+                    </div>
+                  </div>
+
+                  <div className="drilldown-formula-box" style={{ background: 'rgba(175, 82, 222, 0.08)', borderColor: 'rgba(175, 82, 222, 0.25)', color: '#f3e1ff' }}>
+                    <div className="drilldown-formula-title" style={{ color: '#da8fff' }}>💡 วิธีการสะสมยอด</div>
+                    <div>
+                      ระบบดึงยอดค่าใช้จ่ายรวมจากทุกเดือนที่มีบันทึกมารวมกันอัตโนมัติ เมื่อขึ้นเดือนถัดไป (เช่น ตุลาคม, พฤศจิกายน ฯลฯ) ยอดค่าใช้จ่ายของเดือนใหม่จะถูกนำมาบวกทบเข้ากับยอดสะสมทันทีแบบเรียลไทม์
+                    </div>
+                  </div>
+
+                  <div className="drilldown-body">
+                    <table className="drilldown-table">
+                      <thead>
+                        <tr>
+                          <th>เดือน</th>
+                          <th>ที่แน่นอน (Fixed)</th>
+                          <th>ผันแปร (Variable)</th>
+                          <th>จำนวน</th>
+                          <th style={{ textAlign: 'right' }}>ยอดรวมเดือน</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {months.map((m) => (
+                          <tr key={m.ym}>
+                            <td style={{ fontWeight: '700', color: '#fff' }}>{m.ym}</td>
+                            <td style={{ color: '#ffd60a' }}>{formatCurrency(m.fixed)} ฿</td>
+                            <td style={{ color: '#30d158' }}>{formatCurrency(m.variable)} ฿</td>
+                            <td>{m.count} รายการ</td>
+                            <td style={{ textAlign: 'right', fontWeight: '800', color: '#64d2ff' }}>{formatCurrency(m.expense)} ฿</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ borderTop: '2px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.02)' }}>
+                          <td colSpan={4} style={{ fontWeight: '700', color: '#fff' }}>รวมสะสมทั้งหมด ({months.length} เดือน)</td>
+                          <td style={{ textAlign: 'right', fontWeight: '900', fontSize: '15px', color: '#da8fff' }}>{formatCurrency(allTimeTotal)} ฿</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* 5. GRAND AVERAGE (ค่าเฉลี่ยรวมต่อเดือน) */}
+            {drilldownModal === 'grand-avg' && (() => {
+              const months = allTimeStats?.months || [{ ym: currentMonthStr, expense: monthlyExpenses, fixed: monthlyFixed, variable: monthlyVariable, count: transactions.length }];
+              return (
+                <>
+                  <div className="drilldown-header">
+                    <div className="drilldown-title-group">
+                      <span className="drilldown-icon">📊</span>
+                      <div>
+                        <h2 className="drilldown-title">ที่มา: การคำนวณค่าเฉลี่ยรวมต่อเดือน</h2>
+                        <div className="drilldown-subtitle">สูตรและการเฉลี่ยข้อมูลจากทุกเดือนในระบบ</div>
+                      </div>
+                    </div>
+                    <button className="drilldown-close-btn" onClick={() => setDrilldownModal(null)}>✕</button>
+                  </div>
+
+                  <div className="drilldown-kpi-bar">
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">ค่าเฉลี่ยรวมต่อเดือน</span>
+                      <span className="drilldown-kpi-val" style={{ color: '#ff7597' }}>{formatCurrency(allTimeMonthlyAvg)} ฿ / ด.</span>
+                    </div>
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">ยอดรวมสะสมทุกเดือน</span>
+                      <span className="drilldown-kpi-val">{formatCurrency(allTimeTotal)} ฿</span>
+                    </div>
+                    <div className="drilldown-kpi-item">
+                      <span className="drilldown-kpi-label">หารด้วย</span>
+                      <span className="drilldown-kpi-val">{allTimeMonthsCount} เดือน</span>
+                    </div>
+                  </div>
+
+                  <div className="drilldown-formula-box" style={{ background: 'rgba(255, 55, 95, 0.08)', borderColor: 'rgba(255, 55, 95, 0.25)', color: '#ffe5ec' }}>
+                    <div className="drilldown-formula-title" style={{ color: '#ff7597' }}>📐 สูตรการคำนวณ</div>
+                    <div style={{ fontSize: '14px', margin: '4px 0 8px 0', fontFamily: 'monospace', fontWeight: 'bold' }}>
+                      ค่าเฉลี่ยต่อเดือน = ยอดรวมทุกเดือน ({formatCurrency(allTimeTotal)} ฿) ÷ {allTimeMonthsCount} เดือน = {formatCurrency(allTimeMonthlyAvg)} ฿/เดือน
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)' }}>
+                      💡 เมื่อมีเดือนถัดไป (เช่น ต.ค. ยอด 10,000 ฿) ระบบจะคำนวณ: ({formatCurrency(allTimeTotal)} + 10,000) ÷ 2 = ยอดเฉลี่ยใหม่ทันทีโดยอัตโนมัติ
+                    </div>
+                  </div>
+
+                  <div className="drilldown-body">
+                    <h3 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-secondary)' }}>ข้อมูลรายเดือนที่นำมาคำนวณค่าเฉลี่ย:</h3>
+                    <table className="drilldown-table">
+                      <thead>
+                        <tr>
+                          <th>เดือน</th>
+                          <th>คงที่ (Fixed)</th>
+                          <th>ผันแปร (Variable)</th>
+                          <th style={{ textAlign: 'right' }}>ยอดค่าใช้จ่ายเดือน</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {months.map((m) => (
+                          <tr key={m.ym}>
+                            <td style={{ fontWeight: '700', color: '#fff' }}>{m.ym}</td>
+                            <td style={{ color: '#ffd60a' }}>{formatCurrency(m.fixed)} ฿</td>
+                            <td style={{ color: '#30d158' }}>{formatCurrency(m.variable)} ฿</td>
+                            <td style={{ textAlign: 'right', fontWeight: '800', color: '#64d2ff' }}>{formatCurrency(m.expense)} ฿</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
