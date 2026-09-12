@@ -23,11 +23,6 @@ export default function Home() {
   const [botLogs, setBotLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Telegram Ingestion state
-  const [telegramText, setTelegramText] = useState('');
-  const [ingesting, setIngesting] = useState(false);
-  const [ingestSuccessMsg, setIngestSuccessMsg] = useState('');
-
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
   const fetchData = async () => {
@@ -58,40 +53,10 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
+    // Auto-refresh every 4 seconds so when user sends a message in Telegram, web updates in real time
+    const interval = setInterval(fetchData, 4000);
+    return () => clearInterval(interval);
   }, [selectedYear, selectedMonth]);
-
-  const handleTelegramIngest = async (e) => {
-    e.preventDefault();
-    if (!telegramText.trim()) return;
-
-    try {
-      setIngesting(true);
-      setIngestSuccessMsg('');
-      const res = await fetch('/api/telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: telegramText }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setIngestSuccessMsg(`✅ บอทบันทึกสำเร็จ ${data.count} รายการ`);
-        setTelegramText('');
-        await fetchData();
-        // Select the date of the first parsed item if available
-        if (data.items && data.items.length > 0) {
-          setSelectedDateStr(data.items[0].date);
-        }
-      } else {
-        alert('บอทแจ้งเตือน: ' + (data.error || 'ไม่สามารถแยกแยะข้อมูลได้'));
-      }
-    } catch (err) {
-      console.error('Ingest error:', err);
-      alert('เกิดข้อผิดพลาดในการส่งข้อความ');
-    } finally {
-      setIngesting(false);
-    }
-  };
 
   const handleDelete = async (id) => {
     if (!confirm('ยืนยันลบรายการนี้?')) return;
@@ -191,29 +156,7 @@ export default function Home() {
         ))}
       </section>
 
-      {/* Telegram Live Ingest Bar */}
-      <section className="glass-panel telegram-bar">
-        <div className="telegram-bar-header">
-          <div className="telegram-bar-title">
-            <span>💬</span>
-            <span>บันทึกผ่าน Telegram (พิมพ์แบบภาษาพูด รองรับการลงย้อนหลัง เช่น วันที่ 1, วันที่ 2...)</span>
-          </div>
-          {ingestSuccessMsg && <span className="badge-success">{ingestSuccessMsg}</span>}
-        </div>
 
-        <form onSubmit={handleTelegramIngest} className="telegram-input-row">
-          <input
-            type="text"
-            className="telegram-input"
-            placeholder="ตัวอย่าง: วันที่ 1 จ่ายหนี้ ธันเดอ 2000 wifi 524.30 วันที่ 2 อาหารแมว 300 Zaza 300 eat 310"
-            value={telegramText}
-            onChange={(e) => setTelegramText(e.target.value)}
-          />
-          <button type="submit" className="telegram-btn" disabled={ingesting || !telegramText.trim()}>
-            {ingesting ? 'กำลังวิเคราะห์...' : '⚡ บันทึกผ่านบอท'}
-          </button>
-        </form>
-      </section>
 
       {/* Main Dashboard: Calendar + Day Details */}
       <section className="dashboard-grid">
