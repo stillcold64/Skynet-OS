@@ -2,74 +2,106 @@
 
 import { useState, useEffect } from 'react';
 
+const CATEGORY_META = {
+  LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
+  EXTRAVAGANT: { name: 'EXTRAVAGANT', emoji: '✨', label: 'ฟุ่มเฟือย / บันเทิง', color: 'var(--extravagant-color)' },
+  BILL: { name: 'BILL', emoji: '📄', label: 'บิล / หนี้สิน / คงที่', color: 'var(--bill-color)' },
+  INVESTING: { name: 'INVESTING', emoji: '📈', label: 'การลงทุน / ออมเงิน', color: 'var(--investing-color)' },
+  ETC: { name: 'ETC', emoji: '📦', label: 'เบ็ดเตล็ด / อื่น ๆ', color: 'var(--etc-color)' },
+};
+
 export default function Home() {
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-12
+  const [selectedDateStr, setSelectedDateStr] = useState(null);
+
+  // Data states
   const [transactions, setTransactions] = useState([]);
-  const [totalExpense, setTotalExpense] = useState(0);
-  const [totalInvestment, setTotalInvestment] = useState(0);
+  const [groupTotals, setGroupTotals] = useState({ LIFE: 0, EXTRAVAGANT: 0, BILL: 0, INVESTING: 0, ETC: 0 });
+  const [dailyMap, setDailyMap] = useState({});
+  const [botLogs, setBotLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
-  // Form states
-  const today = new Date().toISOString().split('T')[0];
-  const [date, setDate] = useState(today);
-  const [type, setType] = useState('ค่าใช้จ่าย');
-  const [category, setCategory] = useState('');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
+  // Telegram Ingestion state
+  const [telegramText, setTelegramText] = useState('');
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestSuccessMsg, setIngestSuccessMsg] = useState('');
 
-  const fetchTransactions = async () => {
+  const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/transactions');
-      if (res.ok) {
-        const data = await res.json();
+      const [txRes, logRes] = await Promise.all([
+        fetch(`/api/transactions?month=${currentMonthStr}`),
+        fetch('/api/logs'),
+      ]);
+
+      if (txRes.ok) {
+        const data = await txRes.json();
         setTransactions(data.transactions || []);
-        setTotalExpense(data.totalExpense || 0);
-        setTotalInvestment(data.totalInvestment || 0);
+        setGroupTotals(data.groupTotals || { LIFE: 0, EXTRAVAGANT: 0, BILL: 0, INVESTING: 0, ETC: 0 });
+        setDailyMap(data.dailyMap || {});
+      }
+
+      if (logRes.ok) {
+        const logData = await logRes.json();
+        setBotLogs(logData.logs || []);
       }
     } catch (err) {
-      console.error('Failed to load transactions:', err);
+      console.error('Fetch data error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTransactions();
-  }, []);
+    fetchData();
+  }, [selectedYear, selectedMonth]);
 
-  const handleSubmit = async (e) => {
+  const handleTelegramIngest = async (e) => {
     e.preventDefault();
-    if (!category.trim() || !amount || isNaN(Number(amount))) return;
+    if (!telegramText.trim()) return;
 
     try {
-      setSubmitting(true);
-      const res = await fetch('/api/transactions', {
+      setIngesting(true);
+      setIngestSuccessMsg('');
+      const res = await fetch('/api/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date,
-          type,
-          category: category.trim(),
-          amount: parseFloat(amount),
-          note: note.trim() || null,
-        }),
+        body: JSON.stringify({ text: telegramText }),
       });
 
-      if (res.ok) {
-        setCategory('');
-        setAmount('');
-        setNote('');
-        await fetchTransactions();
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setIngestSuccessMsg(`✅ บอทบันทึกสำเร็จ ${data.count} รายการ`);
+        setTelegramText('');
+        await fetchData();
+        // Select the date of the first parsed item if available
+        if (data.items && data.items.length > 0) {
+          setSelectedDateStr(data.items[0].date);
+        }
       } else {
-        const err = await res.json();
-        alert('เกิดข้อผิดพลาด: ' + (err.error || 'บันทึกไม่สำเร็จ'));
+        alert('บอทแจ้งเตือน: ' + (data.error || 'ไม่สามารถแยกแยะข้อมูลได้'));
       }
     } catch (err) {
-      console.error('Submit error:', err);
-      alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      console.error('Ingest error:', err);
+      alert('เกิดข้อผิดพลาดในการส่งข้อความ');
     } finally {
-      setSubmitting(false);
+      setIngesting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('ยืนยันลบรายการนี้?')) return;
+    try {
+      const res = await fetch(`/api/transactions?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        await fetchData();
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
     }
   };
 
@@ -80,148 +112,269 @@ export default function Home() {
     }).format(val || 0);
   };
 
+  // Month navigation
+  const prevMonth = () => {
+    if (selectedMonth === 1) {
+      setSelectedMonth(12);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (selectedMonth === 12) {
+      setSelectedMonth(1);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  // Calendar calculations
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const firstDayIndex = new Date(selectedYear, selectedMonth - 1, 1).getDay(); // 0 = Sun, 1 = Mon ...
+  const monthNamesThai = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+  ];
+
+  const calendarDays = [];
+  for (let i = 0; i < firstDayIndex; i++) {
+    calendarDays.push(null);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    calendarDays.push({
+      day: d,
+      dateStr: dStr,
+      data: dailyMap[dStr] || null,
+    });
+  }
+
+  const selectedDayItems = selectedDateStr
+    ? transactions.filter((t) => t.date === selectedDateStr)
+    : [];
+
+  const selectedDayTotal = selectedDayItems.reduce((sum, item) => sum + item.amount, 0);
+
   return (
     <main>
-      <header>
-        <h1>⚡ Skynet OS — บันทึกค่าใช้จ่ายและการลงทุน</h1>
-        <p>ระบบบันทึกธุรกรรมการเงินและพอร์ตการลงทุนส่วนบุคคล (Local SQLite)</p>
+      {/* iOS Header */}
+      <header className="glass-panel ios-header">
+        <div className="brand">
+          <div className="brand-icon">⚡</div>
+          <div>
+            <h1>Skynet OS</h1>
+            <p>ระบบบันทึกการเงินอัตโนมัติผ่าน Telegram (ธีม iOS Frosted Glass)</p>
+          </div>
+        </div>
+
+        <div className="status-badge">
+          <div className="pulse-dot" />
+          <span>Telegram Auto-Ingest Active</span>
+        </div>
       </header>
 
-      {/* Summary Totals */}
-      <div className="summary-cards">
-        <div className="card expense">
-          <div className="label">🔴 ยอดรวมค่าใช้จ่าย</div>
-          <div className="value">{formatCurrency(totalExpense)} ฿</div>
-        </div>
-        <div className="card investment">
-          <div className="label">🟢 ยอดรวมการลงทุน</div>
-          <div className="value">{formatCurrency(totalInvestment)} ฿</div>
-        </div>
-      </div>
-
-      {/* Form */}
-      <section className="form-card">
-        <h2>➕ เพิ่มรายการใหม่</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>วันที่</label>
-              <input
-                type="date"
-                required
-                className="form-control"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
+      {/* 5 iOS Category Cards */}
+      <section className="categories-grid">
+        {Object.entries(CATEGORY_META).map(([key, meta]) => (
+          <div key={key} className={`glass-panel category-card ${key.toLowerCase()}`}>
+            <div className="card-top">
+              <div className="card-title">
+                <span>{meta.emoji}</span>
+                <span>{meta.name}</span>
+              </div>
             </div>
-
-            <div className="form-group">
-              <label>ประเภท</label>
-              <select
-                className="form-control"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="ค่าใช้จ่าย">ค่าใช้จ่าย</option>
-                <option value="การลงทุน">การลงทุน</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>หมวดหมู่</label>
-              <input
-                type="text"
-                required
-                placeholder="เช่น อาหาร, หุ้นกู้, BTC"
-                className="form-control"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>จำนวนเงิน (บาท)</label>
-              <input
-                type="number"
-                step="any"
-                min="0.01"
-                required
-                placeholder="0.00"
-                className="form-control"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>หมายเหตุ (ไม่บังคับ)</label>
-              <input
-                type="text"
-                placeholder="รายละเอียดเพิ่มเติม..."
-                className="form-control"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
-
-            <button type="submit" className="btn-submit" disabled={submitting}>
-              {submitting ? 'กำลังบันทึก...' : 'บันทึกรายการ'}
-            </button>
+            <div className="card-amount">{formatCurrency(groupTotals[key])} ฿</div>
           </div>
+        ))}
+      </section>
+
+      {/* Telegram Live Ingest Bar */}
+      <section className="glass-panel telegram-bar">
+        <div className="telegram-bar-header">
+          <div className="telegram-bar-title">
+            <span>💬</span>
+            <span>บันทึกผ่าน Telegram (พิมพ์แบบภาษาพูด รองรับการลงย้อนหลัง เช่น วันที่ 1, วันที่ 2...)</span>
+          </div>
+          {ingestSuccessMsg && <span className="badge-success">{ingestSuccessMsg}</span>}
+        </div>
+
+        <form onSubmit={handleTelegramIngest} className="telegram-input-row">
+          <input
+            type="text"
+            className="telegram-input"
+            placeholder="ตัวอย่าง: วันที่ 1 จ่ายหนี้ ธันเดอ 2000 wifi 524.30 วันที่ 2 อาหารแมว 300 Zaza 300 eat 310"
+            value={telegramText}
+            onChange={(e) => setTelegramText(e.target.value)}
+          />
+          <button type="submit" className="telegram-btn" disabled={ingesting || !telegramText.trim()}>
+            {ingesting ? 'กำลังวิเคราะห์...' : '⚡ บันทึกผ่านบอท'}
+          </button>
         </form>
       </section>
 
-      {/* Transactions Table */}
-      <section className="table-card">
-        <div className="table-header-box">
-          <h2>📋 รายการทั้งหมด ({transactions.length} รายการ)</h2>
+      {/* Main Dashboard: Calendar + Day Details */}
+      <section className="dashboard-grid">
+        {/* Calendar View */}
+        <div className="glass-panel calendar-card">
+          <div className="calendar-nav">
+            <button onClick={prevMonth} className="calendar-nav-btn">◀ เดือนก่อนหน้า</button>
+            <div className="calendar-month-title">
+              📅 {monthNamesThai[selectedMonth - 1]} {selectedYear}
+            </div>
+            <button onClick={nextMonth} className="calendar-nav-btn">เดือนถัดไป ▶</button>
+          </div>
+
+          <div className="calendar-weekdays">
+            <span>อา.</span>
+            <span>จ.</span>
+            <span>อ.</span>
+            <span>พ.</span>
+            <span>พฤ.</span>
+            <span>ศ.</span>
+            <span>ส.</span>
+          </div>
+
+          <div className="calendar-days-grid">
+            {calendarDays.map((item, idx) => {
+              if (!item) {
+                return <div key={`empty-${idx}`} className="calendar-cell empty" />;
+              }
+
+              const hasData = Boolean(item.data && item.data.total > 0);
+              const isSelected = selectedDateStr === item.dateStr;
+              const isToday =
+                item.dateStr ===
+                `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+              return (
+                <div
+                  key={item.dateStr}
+                  onClick={() => setSelectedDateStr(item.dateStr)}
+                  className={`calendar-cell ${hasData ? 'has-data' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                >
+                  <div className="cell-top">
+                    <span className="cell-day-num">{item.day}</span>
+                  </div>
+
+                  {hasData && (
+                    <>
+                      <div className="cell-amount">{formatCurrency(item.data.total)}</div>
+                      <div className="cell-badges">
+                        {Object.keys(item.data.groups || {}).map((grp) => (
+                          <span key={grp} className="badge-dot" title={grp}>
+                            {CATEGORY_META[grp]?.emoji || '•'}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="table-responsive">
-          {loading ? (
-            <div className="empty-state">กำลังโหลดข้อมูล...</div>
-          ) : transactions.length === 0 ? (
-            <div className="empty-state">ยังไม่มีรายการบันทึก เริ่มต้นเพิ่มรายการด้านบนได้เลย</div>
+        {/* Selected Day Details Panel */}
+        <div className="glass-panel day-details-card">
+          <div className="day-details-header">
+            <div className="day-details-title">
+              {selectedDateStr ? `รายละเอียดประจำวันที่ ${selectedDateStr}` : 'คลิกเลือกวันที่ในปฏิทิน'}
+            </div>
+            {selectedDateStr && (
+              <div className="day-details-total">
+                ยอดรวม: {formatCurrency(selectedDayTotal)} ฿
+              </div>
+            )}
+          </div>
+
+          {!selectedDateStr ? (
+            <div className="empty-placeholder">
+              เลือกวันที่ในตารางปฏิทินเพื่อดูรายการค่าใช้จ่ายและการลงทุนของวันนั้น
+            </div>
+          ) : selectedDayItems.length === 0 ? (
+            <div className="empty-placeholder">
+              ไม่มีรายการบันทึกในวันนี้
+            </div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>วันที่</th>
-                  <th>ประเภท</th>
-                  <th>หมวดหมู่</th>
-                  <th style={{ textAlign: 'right' }}>จำนวนเงิน</th>
-                  <th>หมายเหตุ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.date}</td>
-                    <td>
-                      <span
-                        className={`badge ${
-                          item.type === 'ค่าใช้จ่าย' ? 'badge-expense' : 'badge-investment'
-                        }`}
-                      >
-                        {item.type}
-                      </span>
-                    </td>
-                    <td>{item.category}</td>
-                    <td
-                      style={{ textAlign: 'right' }}
-                      className={`amount ${
-                        item.type === 'ค่าใช้จ่าย' ? 'amount-expense' : 'amount-investment'
-                      }`}
+            <div className="day-items-list">
+              {selectedDayItems.map((item) => (
+                <div key={item.id} className="day-item-row">
+                  <div className="item-left">
+                    <span className="item-name">{item.category}</span>
+                    <span className={`item-group-pill ${item.category_group}`}>
+                      {CATEGORY_META[item.category_group]?.emoji} {item.category_group}
+                    </span>
+                  </div>
+                  <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="item-amount">{formatCurrency(item.amount)} ฿</div>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      title="ลบรายการนี้"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                      }}
                     >
-                      {formatCurrency(item.amount)} ฿
-                    </td>
-                    <td style={{ color: 'var(--text-muted)' }}>{item.note || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
+      </section>
+
+      {/* Bot Audit & Activity Log */}
+      <section className="glass-panel audit-log-card">
+        <div className="audit-log-header">
+          <div className="audit-log-title">
+            <span>🛡️</span>
+            <span>Bot Audit Log (ประวัติการวิเคราะห์และบันทึกของบอท ป้องกันข้อมูลผิดพลาด)</span>
+          </div>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            ล่าสุด 20 รายการ
+          </span>
+        </div>
+
+        {botLogs.length === 0 ? (
+          <div className="empty-placeholder">ยังไม่มีประวัติการส่งข้อมูลจาก Telegram</div>
+        ) : (
+          <div className="audit-log-list">
+            {botLogs.map((log) => {
+              let parsedItems = [];
+              try {
+                parsedItems = JSON.parse(log.parsed_data || '[]');
+              } catch (e) {}
+
+              return (
+                <div key={log.id} className="audit-log-item">
+                  <div className="log-item-top">
+                    <span>Log #{log.id} • บันทึกสำเร็จ {log.parsed_count} รายการ</span>
+                    <span>{log.created_at}</span>
+                  </div>
+                  <div className="log-item-raw">"{log.raw_message}"</div>
+                  {parsedItems.length > 0 && (
+                    <div className="log-item-summary">
+                      <strong>ผลการจำแนก:</strong>{' '}
+                      {parsedItems.map((p, i) => (
+                        <span key={i} style={{ marginRight: '10px' }}>
+                          [{p.date}] {CATEGORY_META[p.category_group]?.emoji} {p.category}: {formatCurrency(p.amount)} ฿
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </main>
   );
