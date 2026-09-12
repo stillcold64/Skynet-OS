@@ -70,6 +70,19 @@ export default function Home() {
     }
   };
 
+  const handleClearAll = async () => {
+    if (!confirm('⚠️ ยืนยันลบข้อมูลธุรกรรมทั้งหมดในระบบ?')) return;
+    try {
+      const res = await fetch('/api/transactions?all=true', { method: 'DELETE' });
+      if (res.ok) {
+        setSelectedDateStr(null);
+        await fetchData();
+      }
+    } catch (err) {
+      console.error('Clear all error:', err);
+    }
+  };
+
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('th-TH', {
       minimumFractionDigits: 2,
@@ -131,13 +144,13 @@ export default function Home() {
           <div className="brand-icon">⚡</div>
           <div>
             <h1>Skynet OS</h1>
-            <p>ระบบบันทึกการเงินอัตโนมัติผ่าน Telegram (ธีม iOS Frosted Glass)</p>
+            <p>ระบบแดชบอร์ดแสดงผลการเงิน (รับข้อมูลอัตโนมัติจาก Telegram @my_skynet_money_bot)</p>
           </div>
         </div>
 
         <div className="status-badge">
           <div className="pulse-dot" />
-          <span>Telegram Auto-Ingest Active</span>
+          <span>Telegram Sync Live</span>
         </div>
       </header>
 
@@ -155,8 +168,6 @@ export default function Home() {
           </div>
         ))}
       </section>
-
-
 
       {/* Main Dashboard: Calendar + Day Details */}
       <section className="dashboard-grid">
@@ -235,7 +246,7 @@ export default function Home() {
 
           {!selectedDateStr ? (
             <div className="empty-placeholder">
-              เลือกวันที่ในตารางปฏิทินเพื่อดูรายการค่าใช้จ่ายและการลงทุนของวันนั้น
+              เลือกวันที่ในตารางปฏิทินเพื่อดูรายการของวันนั้น
             </div>
           ) : selectedDayItems.length === 0 ? (
             <div className="empty-placeholder">
@@ -257,14 +268,17 @@ export default function Home() {
                       onClick={() => handleDelete(item.id)}
                       title="ลบรายการนี้"
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-tertiary)',
+                        background: 'rgba(255, 55, 95, 0.15)',
+                        border: '1px solid rgba(255, 55, 95, 0.4)',
+                        color: '#ff375f',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
                         cursor: 'pointer',
-                        fontSize: '12px',
+                        fontSize: '11px',
+                        fontWeight: '600',
                       }}
                     >
-                      ✕
+                      🗑️ ลบ
                     </button>
                   </div>
                 </div>
@@ -274,12 +288,90 @@ export default function Home() {
         </div>
       </section>
 
+      {/* All Transactions Table & Management */}
+      <section className="glass-panel audit-log-card" style={{ marginBottom: '24px' }}>
+        <div className="audit-log-header">
+          <div className="audit-log-title">
+            <span>📋</span>
+            <span>รายการธุรกรรมทั้งหมด ({transactions.length} รายการ) — สามารถกดลบรายการได้ทันที</span>
+          </div>
+          {transactions.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              style={{
+                background: 'rgba(255, 55, 95, 0.15)',
+                border: '1px solid rgba(255, 55, 95, 0.4)',
+                color: '#ff375f',
+                borderRadius: '8px',
+                padding: '6px 14px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '700',
+              }}
+            >
+              🗑️ ล้างข้อมูลทั้งหมด
+            </button>
+          )}
+        </div>
+
+        {transactions.length === 0 ? (
+          <div className="empty-placeholder">ไม่มีข้อมูลธุรกรรมในระบบ ส่งข้อความผ่าน Telegram เพื่อเริ่มต้นบันทึก</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '10px 12px' }}>วันที่</th>
+                  <th style={{ padding: '10px 12px' }}>หมวดหมู่</th>
+                  <th style={{ padding: '10px 12px' }}>ชื่อรายการ</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>จำนวนเงิน</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center' }}>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((item) => (
+                  <tr key={item.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <td style={{ padding: '10px 12px' }}>{item.date}</td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <span className={`item-group-pill ${item.category_group}`}>
+                        {CATEGORY_META[item.category_group]?.emoji} {item.category_group}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 12px', fontWeight: '600' }}>{item.category}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700' }}>
+                      {formatCurrency(item.amount)} ฿
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        style={{
+                          background: 'rgba(255, 55, 95, 0.15)',
+                          border: '1px solid rgba(255, 55, 95, 0.4)',
+                          color: '#ff375f',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                        }}
+                      >
+                        🗑️ ลบ
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       {/* Bot Audit & Activity Log */}
       <section className="glass-panel audit-log-card">
         <div className="audit-log-header">
           <div className="audit-log-title">
             <span>🛡️</span>
-            <span>Bot Audit Log (ประวัติการวิเคราะห์และบันทึกของบอท ป้องกันข้อมูลผิดพลาด)</span>
+            <span>Bot Audit Log (ประวัติข้อความจาก Telegram และผลการแยกแยะ)</span>
           </div>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
             ล่าสุด 20 รายการ

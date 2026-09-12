@@ -9,13 +9,24 @@
  */
 
 import { ingestMessage } from '../lib/parser.js';
+import fs from 'fs';
+import path from 'path';
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
+let token = process.env.TELEGRAM_BOT_TOKEN;
 
 if (!token) {
-  console.log('⚠️ ไม่พบ TELEGRAM_BOT_TOKEN ใน Environment');
-  console.log('💡 วิธีตั้งค่า: สร้างไฟล์ .env ใน apps/webapp/ โดยใส่ TELEGRAM_BOT_TOKEN=xxxx');
-  console.log('   หรือพิมพ์ทดสอบผ่านกล่อง "ส่งข้อความจำลอง Telegram" บนหน้าเว็บ http://localhost:3000 ได้ทันที!');
+  const envPath = path.join(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const match = envContent.match(/TELEGRAM_BOT_TOKEN\s*=\s*(.+)/);
+    if (match) {
+      token = match[1].trim();
+    }
+  }
+}
+
+if (!token) {
+  console.log('⚠️ ไม่พบ TELEGRAM_BOT_TOKEN ใน Environment หรือ .env');
   process.exit(0);
 }
 

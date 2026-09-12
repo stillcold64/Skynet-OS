@@ -102,13 +102,20 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const all = searchParams.get('all');
+
+    if (all === 'true') {
+      db.prepare('DELETE FROM transactions').run();
+      db.prepare('DELETE FROM bot_logs').run();
+      return NextResponse.json({ success: true, message: 'All transactions cleared' });
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Missing transaction ID' }, { status: 400 });
     }
 
-    db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
-    return NextResponse.json({ success: true, deletedId: id });
+    const info = db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
+    return NextResponse.json({ success: true, deletedId: id, changes: info.changes });
   } catch (error) {
     console.error('Error deleting transaction:', error);
     return NextResponse.json({ error: 'Failed to delete transaction' }, { status: 500 });
