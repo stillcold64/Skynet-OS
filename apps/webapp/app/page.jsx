@@ -95,6 +95,39 @@ export default function Home() {
     }
   };
 
+  const handleUpdateCategory = async (id, newGroup) => {
+    // Optimistic UI update
+    setTransactions((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              category_group: newGroup,
+              type: newGroup === 'INVESTING' ? 'การลงทุน' : 'ค่าใช้จ่าย',
+            }
+          : t
+      )
+    );
+
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, category_group: newGroup }),
+      });
+      if (res.ok) {
+        await fetchData();
+      } else {
+        console.error('Update category failed');
+        await fetchData();
+      }
+    } catch (err) {
+      console.error('Update category error:', err);
+      await fetchData();
+    }
+  };
+
+
   const handleUpdateRate = async (newRate) => {
     setRateInput(newRate);
     const num = parseFloat(newRate);
@@ -388,9 +421,18 @@ export default function Home() {
                     <div key={item.id} className="day-item-row">
                       <div className="item-left">
                         <span className="item-name">{item.category}</span>
-                        <span className={`item-group-pill ${item.category_group}`}>
-                          {CATEGORY_META[item.category_group]?.emoji} {item.category_group}
-                        </span>
+                        <select
+                          value={item.category_group}
+                          onChange={(e) => handleUpdateCategory(item.id, e.target.value)}
+                          className={`item-group-select ${item.category_group}`}
+                          title="คลิกเพื่อเปลี่ยนหมวดหมู่"
+                        >
+                          <option value="LIFE">🌿 LIFE</option>
+                          <option value="EXTRAVAGANT">✨ EXTRAVAGANT</option>
+                          <option value="BILL">📄 BILL</option>
+                          <option value="INVESTING">📈 INVESTING</option>
+                          <option value="ETC">📦 ETC</option>
+                        </select>
                       </div>
                       <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div className="item-amount">{formatCurrency(item.amount)} ฿</div>
@@ -446,9 +488,18 @@ export default function Home() {
                       <tr key={item.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
                         <td style={{ padding: '10px 12px' }}>{item.date}</td>
                         <td style={{ padding: '10px 12px' }}>
-                          <span className={`item-group-pill ${item.category_group}`}>
-                            {CATEGORY_META[item.category_group]?.emoji} {item.category_group}
-                          </span>
+                          <select
+                            value={item.category_group}
+                            onChange={(e) => handleUpdateCategory(item.id, e.target.value)}
+                            className={`item-group-select ${item.category_group}`}
+                            title="คลิกเพื่อเปลี่ยนหมวดหมู่"
+                          >
+                            <option value="LIFE">🌿 LIFE</option>
+                            <option value="EXTRAVAGANT">✨ EXTRAVAGANT</option>
+                            <option value="BILL">📄 BILL</option>
+                            <option value="INVESTING">📈 INVESTING</option>
+                            <option value="ETC">📦 ETC</option>
+                          </select>
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: '600' }}>{item.category}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700' }}>

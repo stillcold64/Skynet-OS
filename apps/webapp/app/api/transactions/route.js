@@ -154,3 +154,48 @@ export async function DELETE(request) {
     return NextResponse.json({ error: 'Failed to delete transaction' }, { status: 500 });
   }
 }
+
+export async function PATCH(request) {
+  try {
+    const body = await request.json();
+    const { id, category_group } = body;
+
+    if (!id || !category_group) {
+      return NextResponse.json({ error: 'Missing id or category_group' }, { status: 400 });
+    }
+
+    const validGroups = ['LIFE', 'EXTRAVAGANT', 'BILL', 'INVESTING', 'ETC'];
+    if (!validGroups.includes(category_group)) {
+      return NextResponse.json({ error: 'Invalid category_group' }, { status: 400 });
+    }
+
+    const newType = category_group === 'INVESTING' ? 'การลงทุน' : 'ค่าใช้จ่าย';
+
+    // 1. Update transaction row
+    const info = db
+      .prepare('UPDATE transactions SET category_group = ?, type = ? WHERE id = ?')
+      .run(category_group, newType, id);
+
+    if (info.changes === 0) {
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+    }
+
+    // 2. Fetch the transaction item name to learn the keyword for future messages
+    const tx = db.prepare('SELECT category FROM transactions WHERE id = ?').get(id);
+    if (tx && tx.category) {
+      const kw = tx.category.trim().toLowerCase();
+      if (kw.length >= 2) {
+        db.prepare(`
+          INSERT OR REPLACE INTO category_rules (keyword, category_group, suggested_type)
+          VALUES (?, ?, ?)
+        `).run(kw, category_group, newType);
+      }
+    }
+
+    return NextResponse.json({ success: true, id, category_group, type: newType });
+  } catch (error) {
+    console.error('Error updating transaction category:', error);
+    return NextResponse.json({ error: 'Failed to update transaction category' }, { status: 500 });
+  }
+}
+
