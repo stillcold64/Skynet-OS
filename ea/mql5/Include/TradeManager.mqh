@@ -354,6 +354,15 @@ public:
       return NormalizeDouble(calculatedLot, 2);
    }
 
+   // เปิดไม้ Buy ใหม่ โดยระบุระยะ SL เป็น Points (สำหรับ DCASnowball)
+   bool OpenBuy(double lotSize, int initialSLPoints, string comment = "DCA_Snowball")
+   {
+      double ask   = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
+      double point = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
+      double sl    = (initialSLPoints > 0) ? (ask - (initialSLPoints * point)) : 0.0;
+      return OpenBuy(lotSize, sl, 0.0, comment);
+   }
+
    // เปิดไม้ Buy ใหม่
    bool OpenBuy(double lotSize, double initialSL = 0.0, double initialTP = 0.0, string comment = "DavidDruz_Buy")
    {

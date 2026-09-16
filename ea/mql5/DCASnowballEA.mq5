@@ -103,7 +103,8 @@ void OnTick()
    g_trade.ManageBreakevenAndTrailing();
 
    // 3. อ่านค่า Moving Average
-   double maVal[2];
+   double maVal[];
+   ArraySetAsSeries(maVal, true);
    if(CopyBuffer(g_maHandle, 0, 0, 2, maVal) < 2)
       return;
 
@@ -122,10 +123,18 @@ void OnTick()
       return;
    }
 
+   // ตัวแปรควบคุมความถี่ (Cooldown) ป้องกันการยิง OrderSend รัวระดับ Tick จน Tester ค้าง
+   static datetime s_lastActionTime = 0;
+   datetime now = TimeCurrent();
+
    // 5. ระบบ Trim Profit เพื่อดึงทุนออก (Rebalance)
    if(Inp_TrimProfitTarget > 0.0 && g_trade.GetTotalFloatingProfit() >= Inp_TrimProfitTarget)
    {
-      g_trade.TrimBestPosition();
+      if(now - s_lastActionTime >= 3)
+      {
+         if(g_trade.TrimBestPosition())
+            s_lastActionTime = now;
+      }
    }
 
    // 6. ตรวจสอบความปลอดภัยก่อนเปิดไม้ใหม่
@@ -141,11 +150,16 @@ void OnTick()
       return;
    }
 
+   // ป้องกันการส่งคำสั่งเปิดไม้ซ้ำๆ ถี่เกินไป
+   if(now - s_lastActionTime < 3)
+      return;
+
    // 8. พิจารณาเปิดไม้ตามโหมดที่เลือก
    if(currentPositions == 0)
    {
       // ไม้แรกของรอบ
-      g_trade.OpenBuy(Inp_LotSize, Inp_InitialSLPoints, "Snowball_Base_0");
+      if(g_trade.OpenBuy(Inp_LotSize, Inp_InitialSLPoints, "Snowball_Base_0"))
+         s_lastActionTime = now;
    }
    else
    {
@@ -156,7 +170,8 @@ void OnTick()
          if(currentAsk >= highestBuy + (Inp_StepPoints * point))
          {
             string comment = StringFormat("Snowball_Add_%d", currentPositions);
-            g_trade.OpenBuy(Inp_LotSize, Inp_InitialSLPoints, comment);
+            if(g_trade.OpenBuy(Inp_LotSize, Inp_InitialSLPoints, comment))
+               s_lastActionTime = now;
          }
       }
       else if(Inp_EntryMode == ENTRY_BAR_CLOSE)
