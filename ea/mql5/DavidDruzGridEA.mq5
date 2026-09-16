@@ -64,6 +64,7 @@ input ENUM_GRID_STEP_MODE  Inp_GridStepMode      = GRID_STEP_POINTS;      // ร
 input int                  Inp_GridStepPoints    = 300;                   // ระยะกริดคงที่ (Points) (เช่น 300 = $3.00 ทองคำ)
 input double               Inp_GridStepATRMult   = 1.0;                   // ตัวคูณ ATR เมื่อเลือกแบบ Dynamic ATR Step
 input bool                 Inp_RequirePriorBE    = true;                  // บังคับล็อก Breakeven ไม้ก่อนหน้าก่อนเปิดกริดถัดไป (Free-Roll)
+input bool                 Inp_GridOnBarClose    = true;                  // เปิดไม้กริดเฉพาะเมื่อจบแท่ง (กันหลอก/ลดโหลด UI MT5)
 
 sinput group "=== 5. การบริหารเงินทุน (Money Management) ==="
 input ENUM_LOT_MODE        Inp_LotMode           = LOT_MODE_RISK_PCT;     // โหมดคำนวณ Lot Size
@@ -310,14 +311,15 @@ void OnTick()
    // 5. ตรวจสอบความปลอดภัยก่อนพิจารณาเปิดไม้กริด
    if(!g_risk.IsSpreadOk(_Symbol)) return;
    if(!g_risk.IsMarginLevelOk()) return;
-   if(now - g_lastOrderTime < 3) return; // Cooldown ป้องกันยิงรัวซ้ำ
+   if(now - g_lastOrderTime < 5) return; // Cooldown ป้องกันยิงรัวซ้ำ
 
    double currentAsk = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double currentBid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double pipPoint   = g_trade.GetPipPoint();
 
    // คำนวณระยะ Grid Step ที่ต้องการ
    double gridDistance = (Inp_GridStepMode == GRID_STEP_POINTS) ? 
-                         (Inp_GridStepPoints * point) : 
+                         (Inp_GridStepPoints * pipPoint) : 
                          (atrCurrent * Inp_GridStepATRMult);
 
    // --- 6. จัดการกริดฝั่ง BUY (In-Trend BUY Grid) ---
@@ -330,8 +332,8 @@ void OnTick()
          {
             if(g_trend.CheckBuySignal(Inp_UseMAFilter) && CheckTRIXSignal(true))
             {
-               double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
-               if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
+               double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * pipPoint);
+               if(slDist < Inp_MinSLPoints * pipPoint) slDist = Inp_MinSLPoints * pipPoint;
 
                double initialSL = NormalizeDouble(currentAsk - slDist, digits);
                double slPoints  = slDist / point;
@@ -348,7 +350,7 @@ void OnTick()
             }
          }
          // กรณีที่ 2: วางกริดไม้ถัดไปตามเทรนด์ (In-Trend Grid Addition)
-         else if(openBuyCount > 0 && openBuyCount < Inp_MaxGridOrders)
+         else if(openBuyCount > 0 && openBuyCount < Inp_MaxGridOrders && (!Inp_GridOnBarClose || isNewBar))
          {
             // ตรวจสอบเงื่อนไข Free-Roll (ไม้ก่อนหน้าต้องล็อก BE แล้ว)
             if(!Inp_RequirePriorBE || g_trade.ArePositionsSecured(POSITION_TYPE_BUY))
@@ -356,8 +358,8 @@ void OnTick()
                double highestBuy = g_trade.GetHighestBuyPrice();
                if(currentAsk >= highestBuy + gridDistance)
                {
-                  double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
-                  if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
+                  double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * pipPoint);
+                  if(slDist < Inp_MinSLPoints * pipPoint) slDist = Inp_MinSLPoints * pipPoint;
 
                   double initialSL = NormalizeDouble(currentAsk - slDist, digits);
                   double slPoints  = slDist / point;
@@ -388,8 +390,8 @@ void OnTick()
          {
             if(g_trend.CheckSellSignal(Inp_UseMAFilter) && CheckTRIXSignal(false))
             {
-               double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
-               if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
+               double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * pipPoint);
+               if(slDist < Inp_MinSLPoints * pipPoint) slDist = Inp_MinSLPoints * pipPoint;
 
                double initialSL = NormalizeDouble(currentBid + slDist, digits);
                double slPoints  = slDist / point;
@@ -406,7 +408,7 @@ void OnTick()
             }
          }
          // กรณีที่ 2: วางกริดไม้ถัดไปตามเทรนด์ (In-Trend Grid Addition)
-         else if(openSellCount > 0 && openSellCount < Inp_MaxGridOrders)
+         else if(openSellCount > 0 && openSellCount < Inp_MaxGridOrders && (!Inp_GridOnBarClose || isNewBar))
          {
             // ตรวจสอบเงื่อนไข Free-Roll (ไม้ก่อนหน้าต้องล็อก BE แล้ว)
             if(!Inp_RequirePriorBE || g_trade.ArePositionsSecured(POSITION_TYPE_SELL))
@@ -414,8 +416,8 @@ void OnTick()
                double lowestSell = g_trade.GetLowestSellPrice();
                if(currentBid <= lowestSell - gridDistance)
                {
-                  double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
-                  if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
+                  double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * pipPoint);
+                  if(slDist < Inp_MinSLPoints * pipPoint) slDist = Inp_MinSLPoints * pipPoint;
 
                   double initialSL = NormalizeDouble(currentBid + slDist, digits);
                   double slPoints  = slDist / point;

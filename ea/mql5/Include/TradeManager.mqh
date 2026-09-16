@@ -116,12 +116,21 @@ public:
       return (lowest == DBL_MAX) ? 0.0 : lowest;
    }
 
+   // ปรับสเกล Point ให้เป็น Pip / Dollar ที่ถูกต้อง (รองรับทั้ง 3-digit/5-digit และ 2-digit/4-digit)
+   double GetPipPoint()
+   {
+      double point  = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
+      int    digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
+      return (digits == 3 || digits == 5) ? (point * 10.0) : point;
+   }
+
    // ตรวจสอบว่าไม้เปิดทุกไม้ได้รับการตั้ง Breakeven (Free-Roll) แล้วหรือไม่
    bool ArePositionsSecured(ENUM_POSITION_TYPE posType = POSITION_TYPE_BUY)
    {
       int total = 0;
       int secured = 0;
       int totalPos = PositionsTotal();
+      double pipPoint = GetPipPoint();
 
       for(int i = totalPos - 1; i >= 0; i--)
       {
@@ -137,12 +146,12 @@ public:
                double sl = PositionGetDouble(POSITION_SL);
                if(posType == POSITION_TYPE_BUY)
                {
-                  if(sl >= (openPrice - 0.0001))
+                  if(sl >= (openPrice - (2 * pipPoint)))
                      secured++;
                }
                else
                {
-                  if(sl > 0.0 && sl <= (openPrice + 0.0001))
+                  if(sl > 0.0 && sl <= (openPrice + (2 * pipPoint)))
                      secured++;
                }
             }
@@ -185,6 +194,7 @@ public:
    void ManageBreakevenAndTrailing()
    {
       double point      = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
+      double pipPoint   = GetPipPoint();
       double currentBid = SymbolInfoDouble(m_symbol, SYMBOL_BID);
       double currentAsk = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
       int digits        = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
@@ -210,9 +220,9 @@ public:
                   if(m_bePoints > 0)
                   {
                      double profitDistance = currentBid - openPrice;
-                     if(profitDistance >= m_bePoints * point)
+                     if(profitDistance >= m_bePoints * pipPoint)
                      {
-                        double newSL = NormalizeDouble(openPrice + (m_bufferPoints * point), digits);
+                        double newSL = NormalizeDouble(openPrice + (m_bufferPoints * pipPoint), digits);
                         if(curSL < openPrice)
                         {
                            if(ModifySL(ticket, newSL, curTP))
@@ -224,8 +234,8 @@ public:
                   // 2. Trailing Stop
                   if(m_trailingPoints > 0 && curSL >= openPrice)
                   {
-                     double proposedSL = NormalizeDouble(currentBid - (m_trailingPoints * point), digits);
-                     if(proposedSL > curSL + (10 * point))
+                     double proposedSL = NormalizeDouble(currentBid - (m_trailingPoints * pipPoint), digits);
+                     if(proposedSL > curSL + (10 * pipPoint))
                      {
                         ModifySL(ticket, proposedSL, curTP);
                      }
@@ -238,9 +248,9 @@ public:
                   if(m_bePoints > 0)
                   {
                      double profitDistance = openPrice - currentAsk;
-                     if(profitDistance >= m_bePoints * point)
+                     if(profitDistance >= m_bePoints * pipPoint)
                      {
-                        double newSL = NormalizeDouble(openPrice - (m_bufferPoints * point), digits);
+                        double newSL = NormalizeDouble(openPrice - (m_bufferPoints * pipPoint), digits);
                         if(curSL <= 0.0 || curSL > openPrice)
                         {
                            if(ModifySL(ticket, newSL, curTP))
@@ -252,8 +262,8 @@ public:
                   // 2. Trailing Stop
                   if(m_trailingPoints > 0 && curSL > 0.0 && curSL <= openPrice)
                   {
-                     double proposedSL = NormalizeDouble(currentAsk + (m_trailingPoints * point), digits);
-                     if(proposedSL < curSL - (10 * point))
+                     double proposedSL = NormalizeDouble(currentAsk + (m_trailingPoints * pipPoint), digits);
+                     if(proposedSL < curSL - (10 * pipPoint))
                      {
                         ModifySL(ticket, proposedSL, curTP);
                      }
@@ -270,10 +280,12 @@ public:
       if(atrValue <= 0.0 || atrMultiplier <= 0.0) return;
 
       double point      = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
+      double pipPoint   = GetPipPoint();
       double currentBid = SymbolInfoDouble(m_symbol, SYMBOL_BID);
       double currentAsk = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
       int digits        = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
       double trailDist  = atrValue * atrMultiplier;
+      double minStep    = MathMax(atrValue * 0.1, 50 * pipPoint); // เลื่อนทีละ 0.1 ATR หรือ $0.50 เพื่อป้องกัน Modify รัว
       int totalPos      = PositionsTotal();
 
       for(int i = totalPos - 1; i >= 0; i--)
@@ -291,22 +303,22 @@ public:
 
                if(posType == POSITION_TYPE_BUY)
                {
-                  if(minProfitPoints > 0 && (currentBid - openPrice) < (minProfitPoints * point))
+                  if(minProfitPoints > 0 && (currentBid - openPrice) < (minProfitPoints * pipPoint))
                      continue;
 
                   double proposedSL = NormalizeDouble(currentBid - trailDist, digits);
-                  if(proposedSL > curSL + (10 * point))
+                  if(proposedSL > curSL + minStep)
                   {
                      ModifySL(ticket, proposedSL, curTP);
                   }
                }
                else if(posType == POSITION_TYPE_SELL)
                {
-                  if(minProfitPoints > 0 && (openPrice - currentAsk) < (minProfitPoints * point))
+                  if(minProfitPoints > 0 && (openPrice - currentAsk) < (minProfitPoints * pipPoint))
                      continue;
 
                   double proposedSL = NormalizeDouble(currentAsk + trailDist, digits);
-                  if(curSL <= 0.0 || proposedSL < curSL - (10 * point))
+                  if(curSL <= 0.0 || proposedSL < curSL - minStep)
                   {
                      ModifySL(ticket, proposedSL, curTP);
                   }
