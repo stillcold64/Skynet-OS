@@ -19,3 +19,5 @@
 
 7. **Offsite Data Redundancy (สำรองข้อมูลบัญชี/ธุรกรรม):** ข้อมูลธุรกรรมการเงินที่ส่งผ่านบอท Telegram ต้องมีกลไกสำรองข้อมูลแบบ Real-time ไปยัง Google Sheets เสมอ เพื่อให้มั่นใจว่าแม้ Database ในเครื่องเสียหาย ข้อมูลทางการเงินจะไม่สูญหาย
 
+8. **EA & Optimization Presets Backup:** โค้ด EA ที่กำลังรัน Forward Test และไฟล์พารามิเตอร์การ Optimize (`.set`) ต้องถูกซิงค์เข้ามาเก็บใน `ea/forward_test/` และ `ea/presets/` แล้ว Commit/Push ขึ้น Git ทันที ป้องกันการสูญหายของการตั้งค่าและผลการวิจัย
+

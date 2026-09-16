@@ -1,4 +1,4 @@
-﻿# Skynet OS Agent Guidelines
+# Skynet OS Agent Guidelines
 
 ## 🛡️ Mandatory Safety & Backup Discipline
 
@@ -15,3 +15,8 @@
    - Never delete or overwrite files outside the repository.
    - Never run recursive wildcard delete commands on broad paths.
    - Always verify and prove changes before declaring them done.
+
+4. **EA Code & Optimization Presets Protection:**
+   - Always safeguard active forward-testing EAs in `ea/forward_test/` and optimized parameter sets (`.set`) in `ea/presets/`.
+   - Run `ea/scripts/sync_ea_backup.ps1` whenever new presets or forward tests are prepared to ensure they are backed up to GitHub immediately.
+
