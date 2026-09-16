@@ -72,8 +72,15 @@ async function syncToGoogleSheets(items, rawMessage) {
         rawMessage,
         timestamp: new Date().toISOString(),
       }),
+      redirect: 'follow',
     });
-    return res.ok;
+    if (res.ok) {
+      console.log(`☁️ [Google Sheets] สำรองข้อมูล ${items.length} รายการสำเร็จ (Status: ${res.status})`);
+      return true;
+    } else {
+      console.error(`⚠️ [Google Sheets] สำรองข้อมูลไม่สำเร็จ (Status: ${res.status})`);
+      return false;
+    }
   } catch (err) {
     console.error('Error syncing to Google Sheets:', err.message);
     return false;
