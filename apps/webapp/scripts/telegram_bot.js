@@ -5,6 +5,7 @@
 import { ingestMessage } from '../lib/parser.js';
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
 
 function loadEnv() {
   const envPath = path.join(process.cwd(), '.env');
@@ -32,7 +33,25 @@ if (!token) {
   process.exit(0);
 }
 
+// Guard against duplicate instances & provide healthcheck
+const healthServer = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: 'ok', bot: 'skynet_telegram_bot' }));
+});
+
+healthServer.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log('[INFO] Another Telegram Bot instance is already running on port 3001. Exiting duplicate.');
+    process.exit(0);
+  }
+});
+
+healthServer.listen(3001, '127.0.0.1', () => {
+  console.log('Bot health server listening on http://127.0.0.1:3001');
+});
+
 const API_BASE = `https://api.telegram.org/bot${token}`;
+
 let offset = 0;
 
 console.log('🤖 Telegram Polling Bot เริ่มทำงานแล้ว กำลังรอรับข้อความ...');
