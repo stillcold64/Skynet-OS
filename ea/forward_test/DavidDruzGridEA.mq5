@@ -5,8 +5,8 @@
 //+------------------------------------------------------------------+
 #property copyright "Skynet OS / UHNWI"
 #property link      "https://github.com/"
-#property version   "1.00"
-#property description "David Druz Trend-Following Grid EA (Beta Plan: Mid Risk / Aggressive In-Trend Scaling)"
+#property version   "1.10"
+#property description "David Druz Trend-Following Grid EA - Cashflow Harvester ($50-$100 Target with TRIX Filter)"
 
 #include "Include/RiskManager.mqh"
 #include "Include/TradeManager.mqh"
@@ -27,14 +27,21 @@ enum ENUM_TRADE_DIRECTION
 
 enum ENUM_GRID_STEP_MODE
 {
-   GRID_STEP_POINTS,  // วางระยะกริดคงที่เป็น Points (เช่น ทุกๆ 400 Points)
+   GRID_STEP_POINTS,  // วางระยะกริดคงที่เป็น Points (เช่น ทุกๆ 300 - 400 Points)
    GRID_STEP_ATR      // วางระยะกริดแบบ Dynamic ตามค่าความผันผวน ATR
 };
 
+enum ENUM_HARVEST_MODE
+{
+   HARVEST_DISABLED,  // ปิดระบบ Cashflow Harvest (รันเทรนด์ปกติ)
+   HARVEST_BASKET,    // [แนะนำ] ปิดรวบทั้งแผงเมื่อกำไรรวมแตะเป้า $50 - $100 (รีเซ็ตพอร์ตเร็ว DD ต่ำ)
+   HARVEST_PER_ORDER  // ปิดทำกำไรทีละไม้เมื่อไม้นั้นๆ กำไรแตะเป้า $50 - $100
+};
+
 //--- INPUT PARAMETERS ---
-sinput group "=== 1. กลยุทธ์เทรนด์หลัก (Trend Following Foundation) ==="
+sinput group "=== 1. กลยุทธ์เทรนด์หลัก (Trend Foundation) ==="
 input ENUM_TRADE_DIRECTION Inp_TradeDirection    = TRADE_DIR_BOTH;        // ทิศทางการเทรด
-input ENUM_TIMEFRAMES      Inp_Timeframe         = PERIOD_H4;             // Timeframe วิเคราะห์แนวโน้ม
+input ENUM_TIMEFRAMES      Inp_Timeframe         = PERIOD_H1;             // Timeframe วิเคราะห์แนวโน้ม (แนะนำ H1 หรือ H4)
 input int                  Inp_EntryBars         = 20;                    // Donchian Breakout Period ไม้แรก (แท่ง)
 input int                  Inp_ExitBars          = 10;                    // Donchian Exit Period ปิดยกชุด (แท่ง)
 input bool                 Inp_UseMAFilter       = true;                  // กรองด้วยเส้น Moving Average
@@ -42,36 +49,46 @@ input int                  Inp_MAPeriod          = 200;                   // ค
 input ENUM_MA_METHOD       Inp_MAMethod          = MODE_EMA;              // ประเภท Moving Average
 input bool                 Inp_CloseOnMATrendExit= true;                  // ปิดกริดยกชุดเมื่อราคาปิดข้ามกลับเส้น 200 EMA
 
-sinput group "=== 2. ระบบกริดตามเทรนด์ (In-Trend Grid / Pyramiding) ==="
-input int                  Inp_MaxGridOrders     = 4;                     // จำนวนไม้กริดสะสมสูงสุด (เช่น 3 - 5 ไม้)
+sinput group "=== 2. ตัวกรองโมเมนตัมขั้นสูง (TRIX Filter) ==="
+input bool                 Inp_UseTRIXFilter     = true;                  // เปิดใช้งานตัวกรอง TRIX ตัด Noise
+input int                  Inp_TRIXPeriod        = 14;                    // คาบ TRIX (Triple Smoothed EMA)
+input bool                 Inp_TRIXSlopeFilter   = true;                  // ต้องมี Slope เชิดหัวขึ้น (Buy) หรือดิ่งลง (Sell)
+
+sinput group "=== 3. ระบบเก็บกระแสเงินสด (Cashflow Harvesting) ==="
+input ENUM_HARVEST_MODE    Inp_HarvestMode       = HARVEST_BASKET;        // รูปแบบการเก็บแคชโฟลว์ ($50 - $100)
+input double               Inp_CashflowTargetUSD = 50.0;                  // เป้าหมายแคชโฟลว์ต่อรอบ ($) (เช่น 50 หรือ 100 ดอลลาร์)
+
+sinput group "=== 4. ระบบกริดตามเทรนด์ (In-Trend Grid Scaling) ==="
+input int                  Inp_MaxGridOrders     = 3;                     // จำนวนไม้กริดสะสมสูงสุด (แนะนำ 2 - 4 ไม้ คุม DD < 50%)
 input ENUM_GRID_STEP_MODE  Inp_GridStepMode      = GRID_STEP_POINTS;      // รูปแบบระยะห่างแต่ละชั้นกริด
-input int                  Inp_GridStepPoints    = 400;                   // ระยะกริดคงที่ (Points) เมื่อเลือกแบบ Points
+input int                  Inp_GridStepPoints    = 300;                   // ระยะกริดคงที่ (Points) (เช่น 300 = $3.00 ทองคำ)
 input double               Inp_GridStepATRMult   = 1.0;                   // ตัวคูณ ATR เมื่อเลือกแบบ Dynamic ATR Step
 input bool                 Inp_RequirePriorBE    = true;                  // บังคับล็อก Breakeven ไม้ก่อนหน้าก่อนเปิดกริดถัดไป (Free-Roll)
 
-sinput group "=== 3. การบริหารเงินทุน (Money Management) ==="
+sinput group "=== 5. การบริหารเงินทุน (Money Management) ==="
 input ENUM_LOT_MODE        Inp_LotMode           = LOT_MODE_RISK_PCT;     // โหมดคำนวณ Lot Size
 input double               Inp_RiskPctPerOrder   = 0.4;                   // เปอร์เซ็นต์ความเสี่ยงต่อไม้ (แนะนำ 0.3% - 0.5%)
-input double               Inp_FixedLot          = 0.01;                  // ขนาด Lot กรณีเลือก Fixed Lot
+input double               Inp_FixedLot          = 0.05;                  // ขนาด Lot กรณีเลือก Fixed Lot (0.05 lot วิ่ง $10 = $50)
 input int                  Inp_ATRPeriod         = 14;                    // คาบ ATR
-input double               Inp_ATRMultiplierSL   = 3.0;                   // ตัวคูณ ATR สำหรับ Initial Stop Loss ของแต่ละไม้
+input double               Inp_ATRMultiplierSL   = 3.0;                   // ตัวคูณ ATR สำหรับ Initial Stop Loss
 input int                  Inp_MinSLPoints       = 150;                   // ระยะ Stop Loss ขั้นต่ำ (Points)
 
-sinput group "=== 4. การปิดกำไรและ Trailing Stop ยกชุด (Basket Exit) ==="
+sinput group "=== 6. การล็อกกำไร & Trailing Stop (Safety Protection) ==="
 input double               Inp_ATRTrailMult      = 2.8;                   // ตัวคูณ ATR สำหรับ Chandelier Trailing Stop ยกชุด
 input int                  Inp_BEPoints          = 250;                   // ระยะกำไรเพื่อดึง SL บังหน้าทุน (Points)
 input int                  Inp_BufferPoints      = 30;                    // กำไรกันชนหน้าทุน (Points)
 
-sinput group "=== 5. ระบบความปลอดภัยของพอร์ต (Safety & Protection) ==="
+sinput group "=== 7. ระบบความปลอดภัยของพอร์ต (Drawdown Control) ==="
 input int                  Inp_MaxSpread         = 500;                   // Spread สูงสุดที่ยอมให้เปิดออเดอร์ (Points)
 input double               Inp_MinMarginLevel    = 300.0;                 // Margin Level ขั้นต่ำ (%)
-input double               Inp_MaxDrawdownPct    = 35.0;                  // Max Drawdown Cut ฉุกเฉิน (%)
+input double               Inp_MaxDrawdownPct    = 40.0;                  // Max Drawdown Cut ฉุกเฉิน (%) (การันตี DD ไม่เกิน 50%)
 input ulong                Inp_MagicNumber       = 88829100;              // Magic Number ประจำตัว Grid EA
 
 //--- GLOBAL INSTANCES ---
 CRiskManager   g_risk;
 CTradeManager  g_trade;
 CTrendEngine   g_trend;
+int            g_trixHandle = INVALID_HANDLE;
 datetime       g_lastBarTime = 0;
 datetime       g_lastOrderTime = 0;
 double         g_initialBalance = 0.0;
@@ -91,6 +108,36 @@ bool IsNewBar()
 }
 
 //+------------------------------------------------------------------+
+//| ดึงค่า TRIX และตรวจสอบสัญญาณโมเมนตัม                                |
+//+------------------------------------------------------------------+
+bool CheckTRIXSignal(bool isBuyCheck)
+{
+   if(!Inp_UseTRIXFilter || g_trixHandle == INVALID_HANDLE)
+      return true;
+
+   double trixBuffer[];
+   ArraySetAsSeries(trixBuffer, true);
+   if(CopyBuffer(g_trixHandle, 0, 1, 2, trixBuffer) < 2)
+      return false;
+
+   double curTrix  = trixBuffer[0];
+   double prevTrix = trixBuffer[1];
+
+   if(isBuyCheck)
+   {
+      if(curTrix <= 0.0) return false;
+      if(Inp_TRIXSlopeFilter && curTrix <= prevTrix) return false;
+      return true;
+   }
+   else
+   {
+      if(curTrix >= 0.0) return false;
+      if(Inp_TRIXSlopeFilter && curTrix >= prevTrix) return false;
+      return true;
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -106,8 +153,19 @@ int OnInit()
       return INIT_FAILED;
    }
 
-   PrintFormat("[DavidDruzGrid] Initialized successfully on %s (%s). Balance: %.2f, MaxGrid: %d",
-               _Symbol, EnumToString(Inp_Timeframe), g_initialBalance, Inp_MaxGridOrders);
+   // สร้าง Handle สำหรับ TRIX Indicator
+   if(Inp_UseTRIXFilter)
+   {
+      g_trixHandle = iTriX(_Symbol, Inp_Timeframe, Inp_TRIXPeriod, PRICE_CLOSE);
+      if(g_trixHandle == INVALID_HANDLE)
+      {
+         PrintFormat("[DavidDruzGrid] Error creating TRIX indicator handle on %s!", _Symbol);
+         return INIT_FAILED;
+      }
+   }
+
+   PrintFormat("[DavidDruzGrid] Initialized successfully on %s (%s). Balance: %.2f, Cashflow Target: $%.2f",
+               _Symbol, EnumToString(Inp_Timeframe), g_initialBalance, Inp_CashflowTargetUSD);
    return INIT_SUCCEEDED;
 }
 
@@ -117,6 +175,11 @@ int OnInit()
 void OnDeinit(const int reason)
 {
    g_trend.Release();
+   if(g_trixHandle != INVALID_HANDLE)
+   {
+      IndicatorRelease(g_trixHandle);
+      g_trixHandle = INVALID_HANDLE;
+   }
    PrintFormat("[DavidDruzGrid] Deinitialized. Reason: %d", reason);
 }
 
@@ -125,7 +188,9 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   // 1. ตรวจสอบเงื่อนไขฉุกเฉินระดับพอร์ต (Drawdown Cut)
+   datetime now = TimeCurrent();
+
+   // 1. ตรวจสอบเงื่อนไขฉุกเฉินระดับพอร์ต (Drawdown Cut ป้องกัน DD เกิน 50% เด็ดขาด)
    if(g_risk.IsDrawdownExceeded(g_initialBalance))
    {
       Print("[DavidDruzGrid] Max Drawdown reached! Closing all grid positions to protect capital.");
@@ -133,7 +198,44 @@ void OnTick()
       return;
    }
 
-   // 2. จัดการ Breakeven และ Trailing Stop ยกชุด (Chandelier Trailing) ทุกๆ Tick
+   // 2. ระบบ Cashflow Harvesting ($50 - $100 เป้าหมายกระแสเงินสด)
+   if(Inp_HarvestMode == HARVEST_BASKET && Inp_CashflowTargetUSD > 0.0)
+   {
+      double totalFloating = g_trade.GetTotalFloatingProfit();
+      if(totalFloating >= Inp_CashflowTargetUSD)
+      {
+         PrintFormat("[DavidDruzGrid] 💰 Cashflow Harvested (Basket)! Total Profit $%.2f >= Target $%.2f. Closing all positions.",
+                     totalFloating, Inp_CashflowTargetUSD);
+         g_trade.CloseAllPositions();
+         g_lastOrderTime = now;
+         return;
+      }
+   }
+   else if(Inp_HarvestMode == HARVEST_PER_ORDER && Inp_CashflowTargetUSD > 0.0)
+   {
+      int totalPos = PositionsTotal();
+      for(int i = totalPos - 1; i >= 0; i--)
+      {
+         ulong ticket = PositionGetTicket(i);
+         if(ticket > 0)
+         {
+            if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
+               PositionGetInteger(POSITION_MAGIC) == (long)Inp_MagicNumber)
+            {
+               double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+               if(pnl >= Inp_CashflowTargetUSD)
+               {
+                  PrintFormat("[DavidDruzGrid] 💰 Cashflow Harvested (Per-Order)! Ticket #%I64u reached $%.2f >= Target $%.2f",
+                              ticket, pnl, Inp_CashflowTargetUSD);
+                  g_trade.ClosePositionByTicket(ticket);
+                  g_lastOrderTime = now;
+               }
+            }
+         }
+      }
+   }
+
+   // 3. จัดการ Breakeven และ Trailing Stop ยกชุด (Chandelier Trailing) ทุกๆ Tick
    double atrCurrent = g_trend.GetATR(1);
    if(atrCurrent > 0.0 && Inp_ATRTrailMult > 0.0)
    {
@@ -141,7 +243,7 @@ void OnTick()
    }
    g_trade.ManageBreakevenAndTrailing();
 
-   // 3. ตรวจสอบการปิดกริดยกชุดเมื่อเทรนด์หมดแรง (Exit Check on Bar Close)
+   // 4. ตรวจสอบการปิดกริดยกชุดเมื่อเทรนด์หมดแรง (Exit Check on Bar Close)
    bool isNewBar = IsNewBar();
    int openBuyCount  = g_trade.CountOpenPositions(POSITION_TYPE_BUY);
    int openSellCount = g_trade.CountOpenPositions(POSITION_TYPE_SELL);
@@ -158,7 +260,7 @@ void OnTick()
 
       double maVal = g_trend.GetMA(1);
 
-      // A. ตรวจสอบปิดชุด BUY ทั้งหมด
+      // A. ตรวจสอบปิดชุด BUY ทั้งหมดเมื่อเทรนด์กลับตัว
       if(openBuyCount > 0)
       {
          bool exitBuy = false;
@@ -181,7 +283,7 @@ void OnTick()
          }
       }
 
-      // B. ตรวจสอบปิดชุด SELL ทั้งหมด
+      // B. ตรวจสอบปิดชุด SELL ทั้งหมดเมื่อเทรนด์กลับตัว
       if(openSellCount > 0)
       {
          bool exitSell = false;
@@ -205,12 +307,10 @@ void OnTick()
       }
    }
 
-   // 4. ตรวจสอบความปลอดภัยก่อนพิจารณาเปิดไม้กริด
+   // 5. ตรวจสอบความปลอดภัยก่อนพิจารณาเปิดไม้กริด
    if(!g_risk.IsSpreadOk(_Symbol)) return;
    if(!g_risk.IsMarginLevelOk()) return;
-
-   datetime now = TimeCurrent();
-   if(now - g_lastOrderTime < 5) return; // Cooldown ป้องกันยิงรัวซ้ำ
+   if(now - g_lastOrderTime < 3) return; // Cooldown ป้องกันยิงรัวซ้ำ
 
    double currentAsk = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double currentBid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
@@ -220,15 +320,15 @@ void OnTick()
                          (Inp_GridStepPoints * point) : 
                          (atrCurrent * Inp_GridStepATRMult);
 
-   // --- 5. จัดการกริดฝั่ง BUY (In-Trend BUY Grid) ---
+   // --- 6. จัดการกริดฝั่ง BUY (In-Trend BUY Grid) ---
    if(Inp_TradeDirection == TRADE_DIR_BOTH || Inp_TradeDirection == TRADE_DIR_BUY_ONLY)
    {
       if(openSellCount == 0)
       {
-         // กรณีที่ 1: ไม้แรกของชุด BUY (ต้องมี Breakout แท้จริงเมื่อจบแท่ง)
+         // กรณีที่ 1: ไม้แรกของชุด BUY (ต้องมี Breakout แท้จริง + TRIX กรอง)
          if(openBuyCount == 0 && isNewBar)
          {
-            if(g_trend.CheckBuySignal(Inp_UseMAFilter))
+            if(g_trend.CheckBuySignal(Inp_UseMAFilter) && CheckTRIXSignal(true))
             {
                double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
                if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
@@ -278,15 +378,15 @@ void OnTick()
       }
    }
 
-   // --- 6. จัดการกริดฝั่ง SELL (In-Trend SELL Grid) ---
+   // --- 7. จัดการกริดฝั่ง SELL (In-Trend SELL Grid) ---
    if(Inp_TradeDirection == TRADE_DIR_BOTH || Inp_TradeDirection == TRADE_DIR_SELL_ONLY)
    {
       if(openBuyCount == 0)
       {
-         // กรณีที่ 1: ไม้แรกของชุด SELL (ต้องมี Breakout แท้จริงเมื่อจบแท่ง)
+         // กรณีที่ 1: ไม้แรกของชุด SELL (ต้องมี Breakout แท้จริง + TRIX กรอง)
          if(openSellCount == 0 && isNewBar)
          {
-            if(g_trend.CheckSellSignal(Inp_UseMAFilter))
+            if(g_trend.CheckSellSignal(Inp_UseMAFilter) && CheckTRIXSignal(false))
             {
                double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
                if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
