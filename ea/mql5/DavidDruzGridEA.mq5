@@ -47,7 +47,7 @@ input int                  Inp_ExitBars          = 0;                     // Don
 input bool                 Inp_UseMAFilter       = true;                  // กรองด้วยเส้น Moving Average
 input int                  Inp_MAPeriod          = 200;                   // คาบ Moving Average หลัก (200 EMA)
 input ENUM_MA_METHOD       Inp_MAMethod          = MODE_EMA;              // ประเภท Moving Average
-input bool                 Inp_CloseOnMATrendExit= false;                 // ปิดกริดยกชุดเมื่อราคาปิดหลุด 200 EMA (false = รอเก็บ Cashflow หรือชน Hard SL -50%)
+input bool                 Inp_CloseOnMATrendExit= true;                  // ปิดกริดยกชุดเมื่อราคาปิดหลุด 200 EMA (ตัดขาดทุนเล็กน้อยเพื่อป้องกันติดดอยตลาดหมี)
 
 sinput group "=== 2. ตัวกรองโมเมนตัมขั้นสูง (TRIX Filter) ==="
 input bool                 Inp_UseTRIXFilter     = true;                  // เปิดใช้งานตัวกรอง TRIX ตัด Noise
