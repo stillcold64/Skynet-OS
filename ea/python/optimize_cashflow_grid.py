@@ -20,13 +20,17 @@ def run_grid_sim(
     lot_size: float = 0.05,
     cashflow_target: float = 50.0,  # $50 or $100
     harvest_mode: str = "basket",   # "basket" or "per_order"
-    grid_step_pts: float = 400.0,   # in points ($4.00)
+    grid_step_pts: float = 500.0,   # in points ($5.00)
     max_layers: int = 3,
     trix_period: int = 14,
     use_trix: bool = True,
     ma_period: int = 200,
-    be_profit_pts: float = 250.0,
-    trail_mult: float = 2.8
+    be_profit_pts: float = 0.0,
+    trail_mult: float = 0.0,
+    trade_dir: str = "BUY",
+    use_order_sl: bool = False,
+    use_trend_exit: bool = False,
+    hard_dd_pct: float = 50.0
 ):
     close = df['Close'].values
     high = df['High'].values
@@ -42,10 +46,6 @@ def run_grid_sim(
 
     # Positions: list of dicts: {'type': 'BUY'/'SELL', 'open': price, 'lot': lot, 'sl': sl, 'be': bool}
     positions = []
-
-    pt_val = 1.0  # $1 per point for 1 standard lot on gold (0.10 lot = $10 per $1.00 move)
-    # Gold standard contract: 1 lot = 100 oz. So 0.01 lot = 1 oz ($1 move = $1 profit).
-    # 0.05 lot = 5 oz ($1 move = $5 profit). 0.10 lot = 10 oz ($1 move = $10 profit).
     oz = lot_size * 100.0
 
     step_usd = grid_step_pts / 100.0
@@ -72,53 +72,58 @@ def run_grid_sim(
         equity = balance + open_pnl
         if equity > peak_equity:
             peak_equity = equity
-        dd_pct = ((peak_equity - equity) / peak_equity) * 100.0
+        dd_pct = ((peak_equity - equity) / peak_equity) * 100.0 if peak_equity > 0 else 0
         if dd_pct > max_dd_pct:
             max_dd_pct = dd_pct
 
-        # 1. Stop Loss & Breakeven Check
-        surviving = []
-        for p in positions:
-            stopped = False
-            if p['type'] == 'BUY':
-                if cur_low <= p['sl']:
-                    exit_p = p['sl']
-                    pnl = (exit_p - p['open']) * oz
-                    balance += pnl
-                    stopped = True
-                    total_trades += 1
-                else:
-                    # check Breakeven
-                    if not p['be'] and (cur_high - p['open']) >= be_usd:
-                        p['sl'] = p['open'] + 0.3  # small buffer
-                        p['be'] = True
-            else: # SELL
-                if cur_high >= p['sl']:
-                    exit_p = p['sl']
-                    pnl = (p['open'] - exit_p) * oz
-                    balance += pnl
-                    stopped = True
-                    total_trades += 1
-                else:
-                    # check Breakeven
-                    if not p['be'] and (p['open'] - cur_low) >= be_usd:
-                        p['sl'] = p['open'] - 0.3
-                        p['be'] = True
+        # Hard SL -50% Emergency Cut
+        if hard_dd_pct > 0 and dd_pct >= hard_dd_pct:
+            balance += open_pnl
+            total_trades += len(positions)
+            positions = []
+            break
 
-            if not stopped:
-                surviving.append(p)
-        positions = surviving
+        # 1. Stop Loss & Breakeven Check (if use_order_sl)
+        if use_order_sl:
+            surviving = []
+            for p in positions:
+                stopped = False
+                if p['type'] == 'BUY':
+                    if cur_low <= p['sl']:
+                        exit_p = p['sl']
+                        pnl = (exit_p - p['open']) * oz
+                        balance += pnl
+                        stopped = True
+                        total_trades += 1
+                    else:
+                        if not p['be'] and be_usd > 0 and (cur_high - p['open']) >= be_usd:
+                            p['sl'] = p['open'] + 0.3
+                            p['be'] = True
+                else: # SELL
+                    if cur_high >= p['sl']:
+                        exit_p = p['sl']
+                        pnl = (p['open'] - exit_p) * oz
+                        balance += pnl
+                        stopped = True
+                        total_trades += 1
+                    else:
+                        if not p['be'] and be_usd > 0 and (p['open'] - cur_low) >= be_usd:
+                            p['sl'] = p['open'] - 0.3
+                            p['be'] = True
+
+                if not stopped:
+                    surviving.append(p)
+            positions = surviving
 
         # 2. Cashflow Harvesting Check
-        if harvest_mode == "basket":
-            # Check total floating profit
+        if harvest_mode == "basket" and len(positions) > 0:
             basket_pnl = sum([(cur_close - p['open']) * oz if p['type'] == 'BUY' else (p['open'] - cur_close) * oz for p in positions])
             if basket_pnl >= cashflow_target:
                 balance += basket_pnl
                 cashflow_harvest_count += 1
                 total_trades += len(positions)
                 positions = []
-        elif harvest_mode == "per_order":
+        elif harvest_mode == "per_order" and len(positions) > 0:
             surviving = []
             for p in positions:
                 pnl = (cur_close - p['open']) * oz if p['type'] == 'BUY' else (p['open'] - cur_close) * oz
@@ -130,8 +135,8 @@ def run_grid_sim(
                     surviving.append(p)
             positions = surviving
 
-        # 3. Trend Exit Check (Close crosses EMA)
-        if len(positions) > 0:
+        # 3. Optional Trend Exit Check (Close crosses EMA)
+        if use_trend_exit and len(positions) > 0:
             pos_type = positions[0]['type']
             if (pos_type == 'BUY' and cur_close < cur_ema) or (pos_type == 'SELL' and cur_close > cur_ema):
                 for p in positions:
@@ -141,13 +146,11 @@ def run_grid_sim(
                 positions = []
 
         # 4. Entry & Grid Scaling Logic
-        # Trend check
         is_bullish = cur_close > cur_ema
         is_bearish = cur_close < cur_ema
         trix_bull = (cur_trix > 0 and cur_trix > prev_trix) if use_trix else True
         trix_bear = (cur_trix < 0 and cur_trix < prev_trix) if use_trix else True
 
-        # Donchian 20 High/Low
         don_high = np.max(high[i-20:i])
         don_low = np.min(low[i-20:i])
 
@@ -156,25 +159,22 @@ def run_grid_sim(
 
         # Base Buy
         if buy_count == 0 and sell_count == 0:
-            if is_bullish and trix_bull and cur_close > don_high:
-                sl = cur_close - 10.0 # $10 SL
+            if trade_dir in ["BUY", "BOTH"] and is_bullish and trix_bull and cur_close >= don_high:
+                sl = (cur_close - 10.0) if use_order_sl else 0.0
                 positions.append({'type': 'BUY', 'open': cur_close, 'sl': sl, 'be': False})
-            elif is_bearish and trix_bear and cur_close < don_low:
-                sl = cur_close + 10.0 # $10 SL
+            elif trade_dir in ["SELL", "BOTH"] and is_bearish and trix_bear and cur_close <= don_low:
+                sl = (cur_close + 10.0) if use_order_sl else 0.0
                 positions.append({'type': 'SELL', 'open': cur_close, 'sl': sl, 'be': False})
         # Grid additions (In-trend)
-        elif buy_count > 0 and buy_count < max_layers:
-            # check prior BE
-            all_be = all([p['be'] for p in positions])
+        elif buy_count > 0 and buy_count < max_layers and trade_dir in ["BUY", "BOTH"]:
             highest_buy = max([p['open'] for p in positions])
-            if all_be and (cur_close >= highest_buy + step_usd):
-                sl = cur_close - 10.0
+            if cur_close >= highest_buy + step_usd:
+                sl = (cur_close - 10.0) if use_order_sl else 0.0
                 positions.append({'type': 'BUY', 'open': cur_close, 'sl': sl, 'be': False})
-        elif sell_count > 0 and sell_count < max_layers:
-            all_be = all([p['be'] for p in positions])
+        elif sell_count > 0 and sell_count < max_layers and trade_dir in ["SELL", "BOTH"]:
             lowest_sell = min([p['open'] for p in positions])
-            if all_be and (cur_close <= lowest_sell - step_usd):
-                sl = cur_close + 10.0
+            if cur_close <= lowest_sell - step_usd:
+                sl = (cur_close + 10.0) if use_order_sl else 0.0
                 positions.append({'type': 'SELL', 'open': cur_close, 'sl': sl, 'be': False})
 
     # Close remaining
