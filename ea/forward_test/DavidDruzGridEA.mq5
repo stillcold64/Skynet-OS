@@ -40,14 +40,14 @@ enum ENUM_HARVEST_MODE
 
 //--- INPUT PARAMETERS ---
 sinput group "=== 1. กลยุทธ์เทรนด์หลัก (Trend Foundation) ==="
-input ENUM_TRADE_DIRECTION Inp_TradeDirection    = TRADE_DIR_BOTH;        // ทิศทางการเทรด
+input ENUM_TRADE_DIRECTION Inp_TradeDirection    = TRADE_DIR_BUY_ONLY;    // ทิศทางการเทรด (แนะนำ TRADE_DIR_BUY_ONLY สำหรับเน้น Buy Side Grid)
 input ENUM_TIMEFRAMES      Inp_Timeframe         = PERIOD_H1;             // Timeframe วิเคราะห์แนวโน้ม (แนะนำ H1 หรือ H4)
 input int                  Inp_EntryBars         = 20;                    // Donchian Breakout Period ไม้แรก (แท่ง)
-input int                  Inp_ExitBars          = 10;                    // Donchian Exit Period ปิดยกชุด (แท่ง)
+input int                  Inp_ExitBars          = 0;                     // Donchian Exit Period ปิดยกชุด (0 = ปิด ปล่อยรวบปิดด้วย Cashflow)
 input bool                 Inp_UseMAFilter       = true;                  // กรองด้วยเส้น Moving Average
 input int                  Inp_MAPeriod          = 200;                   // คาบ Moving Average หลัก (200 EMA)
 input ENUM_MA_METHOD       Inp_MAMethod          = MODE_EMA;              // ประเภท Moving Average
-input bool                 Inp_CloseOnMATrendExit= true;                  // ปิดกริดยกชุดเมื่อราคาปิดข้ามกลับเส้น 200 EMA
+input bool                 Inp_CloseOnMATrendExit= true;                  // ปิดกริดยกชุดเมื่อราคาปิดหลุด 200 EMA (ตัดขาดทุนเล็กน้อยเพื่อป้องกันติดดอยตลาดหมี)
 
 sinput group "=== 2. ตัวกรองโมเมนตัมขั้นสูง (TRIX Filter) ==="
 input bool                 Inp_UseTRIXFilter     = true;                  // เปิดใช้งานตัวกรอง TRIX ตัด Noise
@@ -61,27 +61,29 @@ input double               Inp_CashflowTargetUSD = 50.0;                  // เ
 sinput group "=== 4. ระบบกริดตามเทรนด์ (In-Trend Grid Scaling) ==="
 input int                  Inp_MaxGridOrders     = 3;                     // จำนวนไม้กริดสะสมสูงสุด (แนะนำ 2 - 4 ไม้ คุม DD < 50%)
 input ENUM_GRID_STEP_MODE  Inp_GridStepMode      = GRID_STEP_POINTS;      // รูปแบบระยะห่างแต่ละชั้นกริด
-input int                  Inp_GridStepPoints    = 300;                   // ระยะกริดคงที่ (Points) (เช่น 300 = $3.00 ทองคำ)
+input int                  Inp_GridStepPoints    = 500;                   // ระยะกริดคงที่ (Points) (เช่น 500 = $5.00 ทองคำ)
 input double               Inp_GridStepATRMult   = 1.0;                   // ตัวคูณ ATR เมื่อเลือกแบบ Dynamic ATR Step
-input bool                 Inp_RequirePriorBE    = true;                  // บังคับล็อก Breakeven ไม้ก่อนหน้าก่อนเปิดกริดถัดไป (Free-Roll)
+input bool                 Inp_RequirePriorBE    = false;                 // บังคับล็อก Breakeven ไม้ก่อนหน้าก่อนเปิดกริดถัดไป (เมื่อไม่มี SL ให้ตั้ง false)
+input bool                 Inp_GridOnBarClose    = true;                  // เปิดไม้กริดเฉพาะเมื่อจบแท่ง (กันหลอก/ลดโหลด UI MT5)
 
 sinput group "=== 5. การบริหารเงินทุน (Money Management) ==="
-input ENUM_LOT_MODE        Inp_LotMode           = LOT_MODE_RISK_PCT;     // โหมดคำนวณ Lot Size
-input double               Inp_RiskPctPerOrder   = 0.4;                   // เปอร์เซ็นต์ความเสี่ยงต่อไม้ (แนะนำ 0.3% - 0.5%)
-input double               Inp_FixedLot          = 0.05;                  // ขนาด Lot กรณีเลือก Fixed Lot (0.05 lot วิ่ง $10 = $50)
+input bool                 Inp_UseOrderSL        = false;                 // เปิดใช้งาน Stop Loss แต่ละไม้ (false = ไม่มี SL รายไม้ มีแค่ Hard SL -50%)
+input ENUM_LOT_MODE        Inp_LotMode           = LOT_MODE_FIXED;        // โหมดคำนวณ Lot Size (แนะนำ Fixed Lot เมื่อไม่มี SL รายไม้)
+input double               Inp_FixedLot          = 0.03;                  // ขนาด Lot ต่อไม้ (0.03 lot ทองคำวิ่ง $17 = $50)
+input double               Inp_RiskPctPerOrder   = 0.4;                   // เปอร์เซ็นต์ความเสี่ยงต่อไม้ (กรณีเลือกโหมด Risk %)
 input int                  Inp_ATRPeriod         = 14;                    // คาบ ATR
-input double               Inp_ATRMultiplierSL   = 3.0;                   // ตัวคูณ ATR สำหรับ Initial Stop Loss
+input double               Inp_ATRMultiplierSL   = 3.0;                   // ตัวคูณ ATR สำหรับ Initial Stop Loss (หากเปิดใช้ SL รายไม้)
 input int                  Inp_MinSLPoints       = 150;                   // ระยะ Stop Loss ขั้นต่ำ (Points)
 
 sinput group "=== 6. การล็อกกำไร & Trailing Stop (Safety Protection) ==="
-input double               Inp_ATRTrailMult      = 2.8;                   // ตัวคูณ ATR สำหรับ Chandelier Trailing Stop ยกชุด
-input int                  Inp_BEPoints          = 250;                   // ระยะกำไรเพื่อดึง SL บังหน้าทุน (Points)
+input double               Inp_ATRTrailMult      = 0.0;                   // ตัวคูณ ATR สำหรับ Chandelier Trailing Stop ยกชุด (0 = ปิด)
+input int                  Inp_BEPoints          = 0;                     // ระยะกำไรเพื่อดึง SL บังหน้าทุน (Points) (0 = ปิด)
 input int                  Inp_BufferPoints      = 30;                    // กำไรกันชนหน้าทุน (Points)
 
 sinput group "=== 7. ระบบความปลอดภัยของพอร์ต (Drawdown Control) ==="
 input int                  Inp_MaxSpread         = 500;                   // Spread สูงสุดที่ยอมให้เปิดออเดอร์ (Points)
-input double               Inp_MinMarginLevel    = 300.0;                 // Margin Level ขั้นต่ำ (%)
-input double               Inp_MaxDrawdownPct    = 40.0;                  // Max Drawdown Cut ฉุกเฉิน (%) (การันตี DD ไม่เกิน 50%)
+input double               Inp_MinMarginLevel    = 200.0;                 // Margin Level ขั้นต่ำ (%)
+input double               Inp_MaxDrawdownPct    = 50.0;                  // Hard SL ฉุกเฉินระดับพอร์ต (%) (การันตี DD ไม่เกิน 50% เด็ดขาด)
 input ulong                Inp_MagicNumber       = 88829100;              // Magic Number ประจำตัว Grid EA
 
 //--- GLOBAL INSTANCES ---
@@ -235,13 +237,16 @@ void OnTick()
       }
    }
 
-   // 3. จัดการ Breakeven และ Trailing Stop ยกชุด (Chandelier Trailing) ทุกๆ Tick
+   // 3. จัดการ Breakeven และ Trailing Stop ยกชุด (เฉพาะเมื่อเปิดใช้งาน SL รายไม้)
    double atrCurrent = g_trend.GetATR(1);
-   if(atrCurrent > 0.0 && Inp_ATRTrailMult > 0.0)
+   if(Inp_UseOrderSL)
    {
-      g_trade.ManageATRTrailing(atrCurrent, Inp_ATRTrailMult);
+      if(atrCurrent > 0.0 && Inp_ATRTrailMult > 0.0)
+      {
+         g_trade.ManageATRTrailing(atrCurrent, Inp_ATRTrailMult);
+      }
+      g_trade.ManageBreakevenAndTrailing();
    }
-   g_trade.ManageBreakevenAndTrailing();
 
    // 4. ตรวจสอบการปิดกริดยกชุดเมื่อเทรนด์หมดแรง (Exit Check on Bar Close)
    bool isNewBar = IsNewBar();
@@ -264,7 +269,7 @@ void OnTick()
       if(openBuyCount > 0)
       {
          bool exitBuy = false;
-         if(g_trend.CheckBuyExitSignal())
+         if(Inp_ExitBars > 0 && g_trend.CheckBuyExitSignal())
          {
             PrintFormat("[DavidDruzGrid] Donchian Exit triggered for BUY Grid. Closing all %d positions.", openBuyCount);
             exitBuy = true;
@@ -287,7 +292,7 @@ void OnTick()
       if(openSellCount > 0)
       {
          bool exitSell = false;
-         if(g_trend.CheckSellExitSignal())
+         if(Inp_ExitBars > 0 && g_trend.CheckSellExitSignal())
          {
             PrintFormat("[DavidDruzGrid] Donchian Exit triggered for SELL Grid. Closing all %d positions.", openSellCount);
             exitSell = true;
@@ -310,14 +315,15 @@ void OnTick()
    // 5. ตรวจสอบความปลอดภัยก่อนพิจารณาเปิดไม้กริด
    if(!g_risk.IsSpreadOk(_Symbol)) return;
    if(!g_risk.IsMarginLevelOk()) return;
-   if(now - g_lastOrderTime < 3) return; // Cooldown ป้องกันยิงรัวซ้ำ
+   if(now - g_lastOrderTime < 5) return; // Cooldown ป้องกันยิงรัวซ้ำ
 
    double currentAsk = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double currentBid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double pipPoint   = g_trade.GetPipPoint();
 
    // คำนวณระยะ Grid Step ที่ต้องการ
    double gridDistance = (Inp_GridStepMode == GRID_STEP_POINTS) ? 
-                         (Inp_GridStepPoints * point) : 
+                         (Inp_GridStepPoints * pipPoint) : 
                          (atrCurrent * Inp_GridStepATRMult);
 
    // --- 6. จัดการกริดฝั่ง BUY (In-Trend BUY Grid) ---
@@ -330,14 +336,18 @@ void OnTick()
          {
             if(g_trend.CheckBuySignal(Inp_UseMAFilter) && CheckTRIXSignal(true))
             {
-               double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
-               if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
-
-               double initialSL = NormalizeDouble(currentAsk - slDist, digits);
-               double slPoints  = slDist / point;
+               double initialSL = 0.0;
+               double slPoints  = 0.0;
+               if(Inp_UseOrderSL)
+               {
+                  double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * pipPoint);
+                  if(slDist < Inp_MinSLPoints * pipPoint) slDist = Inp_MinSLPoints * pipPoint;
+                  initialSL = NormalizeDouble(currentAsk - slDist, digits);
+                  slPoints  = slDist / point;
+               }
 
                double lot = Inp_FixedLot;
-               if(Inp_LotMode == LOT_MODE_RISK_PCT)
+               if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
                   lot = g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
 
                if(g_trade.OpenBuy(lot, initialSL, 0.0, "DruzGrid_B1"))
@@ -348,22 +358,26 @@ void OnTick()
             }
          }
          // กรณีที่ 2: วางกริดไม้ถัดไปตามเทรนด์ (In-Trend Grid Addition)
-         else if(openBuyCount > 0 && openBuyCount < Inp_MaxGridOrders)
+         else if(openBuyCount > 0 && openBuyCount < Inp_MaxGridOrders && (!Inp_GridOnBarClose || isNewBar))
          {
-            // ตรวจสอบเงื่อนไข Free-Roll (ไม้ก่อนหน้าต้องล็อก BE แล้ว)
-            if(!Inp_RequirePriorBE || g_trade.ArePositionsSecured(POSITION_TYPE_BUY))
+            // ตรวจสอบเงื่อนไข Free-Roll (ถ้าไม่ใช้ SL รายไม้ ให้เปิดเพิ่มตามระยะกริดได้ทันที)
+            if(!Inp_RequirePriorBE || !Inp_UseOrderSL || g_trade.ArePositionsSecured(POSITION_TYPE_BUY))
             {
                double highestBuy = g_trade.GetHighestBuyPrice();
                if(currentAsk >= highestBuy + gridDistance)
                {
-                  double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
-                  if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
-
-                  double initialSL = NormalizeDouble(currentAsk - slDist, digits);
-                  double slPoints  = slDist / point;
+                  double initialSL = 0.0;
+                  double slPoints  = 0.0;
+                  if(Inp_UseOrderSL)
+                  {
+                     double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * pipPoint);
+                     if(slDist < Inp_MinSLPoints * pipPoint) slDist = Inp_MinSLPoints * pipPoint;
+                     initialSL = NormalizeDouble(currentAsk - slDist, digits);
+                     slPoints  = slDist / point;
+                  }
 
                   double lot = Inp_FixedLot;
-                  if(Inp_LotMode == LOT_MODE_RISK_PCT)
+                  if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
                      lot = g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
 
                   string comment = StringFormat("DruzGrid_B%d", openBuyCount + 1);
@@ -388,14 +402,18 @@ void OnTick()
          {
             if(g_trend.CheckSellSignal(Inp_UseMAFilter) && CheckTRIXSignal(false))
             {
-               double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
-               if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
-
-               double initialSL = NormalizeDouble(currentBid + slDist, digits);
-               double slPoints  = slDist / point;
+               double initialSL = 0.0;
+               double slPoints  = 0.0;
+               if(Inp_UseOrderSL)
+               {
+                  double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * pipPoint);
+                  if(slDist < Inp_MinSLPoints * pipPoint) slDist = Inp_MinSLPoints * pipPoint;
+                  initialSL = NormalizeDouble(currentBid + slDist, digits);
+                  slPoints  = slDist / point;
+               }
 
                double lot = Inp_FixedLot;
-               if(Inp_LotMode == LOT_MODE_RISK_PCT)
+               if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
                   lot = g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
 
                if(g_trade.OpenSell(lot, initialSL, 0.0, "DruzGrid_S1"))
@@ -406,22 +424,26 @@ void OnTick()
             }
          }
          // กรณีที่ 2: วางกริดไม้ถัดไปตามเทรนด์ (In-Trend Grid Addition)
-         else if(openSellCount > 0 && openSellCount < Inp_MaxGridOrders)
+         else if(openSellCount > 0 && openSellCount < Inp_MaxGridOrders && (!Inp_GridOnBarClose || isNewBar))
          {
-            // ตรวจสอบเงื่อนไข Free-Roll (ไม้ก่อนหน้าต้องล็อก BE แล้ว)
-            if(!Inp_RequirePriorBE || g_trade.ArePositionsSecured(POSITION_TYPE_SELL))
+            // ตรวจสอบเงื่อนไข Free-Roll (ถ้าไม่ใช้ SL รายไม้ ให้เปิดเพิ่มตามระยะกริดได้ทันที)
+            if(!Inp_RequirePriorBE || !Inp_UseOrderSL || g_trade.ArePositionsSecured(POSITION_TYPE_SELL))
             {
                double lowestSell = g_trade.GetLowestSellPrice();
                if(currentBid <= lowestSell - gridDistance)
                {
-                  double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * point);
-                  if(slDist < Inp_MinSLPoints * point) slDist = Inp_MinSLPoints * point;
-
-                  double initialSL = NormalizeDouble(currentBid + slDist, digits);
-                  double slPoints  = slDist / point;
+                  double initialSL = 0.0;
+                  double slPoints  = 0.0;
+                  if(Inp_UseOrderSL)
+                  {
+                     double slDist = (atrCurrent > 0.0) ? (atrCurrent * Inp_ATRMultiplierSL) : (Inp_MinSLPoints * pipPoint);
+                     if(slDist < Inp_MinSLPoints * pipPoint) slDist = Inp_MinSLPoints * pipPoint;
+                     initialSL = NormalizeDouble(currentBid + slDist, digits);
+                     slPoints  = slDist / point;
+                  }
 
                   double lot = Inp_FixedLot;
-                  if(Inp_LotMode == LOT_MODE_RISK_PCT)
+                  if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
                      lot = g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
 
                   string comment = StringFormat("DruzGrid_S%d", openSellCount + 1);

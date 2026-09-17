@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Skynet OS - MT5 EA & Preset Auto-Backup Script
 # Backs up forward-tested EAs and optimized .set parameter files to GitHub
 # ==============================================================================
@@ -51,13 +51,16 @@ if (Test-Path $terminalsDir) {
 }
 
 # 2. Also ensure current repo MQL5 code is mirrored to forward_test as snapshot
-$mainEA = Join-Path $repoPath "ea\mql5\DCASnowballEA.mq5"
-if (Test-Path $mainEA) {
-    Copy-Item -Path $mainEA -Destination (Join-Path $forwardDir "DCASnowballEA.mq5") -Force
-}
-$mainEX5 = Join-Path $repoPath "ea\mql5\DCASnowballEA.ex5"
-if (Test-Path $mainEX5) {
-    Copy-Item -Path $mainEX5 -Destination (Join-Path $forwardDir "DCASnowballEA.ex5") -Force
+$allEAs = @("DCASnowballEA", "DavidDruzTrendEA", "DavidDruzGridEA")
+foreach ($ea in $allEAs) {
+    $eaMQ5 = Join-Path $repoPath "ea\mql5\$ea.mq5"
+    if (Test-Path $eaMQ5) {
+        Copy-Item -Path $eaMQ5 -Destination (Join-Path $forwardDir "$ea.mq5") -Force
+    }
+    $eaEX5 = Join-Path $repoPath "ea\mql5\$ea.ex5"
+    if (Test-Path $eaEX5) {
+        Copy-Item -Path $eaEX5 -Destination (Join-Path $forwardDir "$ea.ex5") -Force
+    }
 }
 
 Write-Host "---------------------------------------------------"
