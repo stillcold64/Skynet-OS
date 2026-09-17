@@ -48,6 +48,9 @@ input bool                 Inp_UseMAFilter       = true;                  // ก
 input int                  Inp_MAPeriod          = 200;                   // คาบ Moving Average หลัก (200 EMA)
 input ENUM_MA_METHOD       Inp_MAMethod          = MODE_EMA;              // ประเภท Moving Average
 input bool                 Inp_CloseOnMATrendExit= true;                  // ปิดกริดยกชุดเมื่อราคาปิดหลุด 200 EMA (ตัดขาดทุนเล็กน้อยเพื่อป้องกันติดดอยตลาดหมี)
+input double               Inp_ExitATRBuffer     = 0.2;                   // กันชน ATR ใต้เส้น EMA ก่อนสั่งคัท (0.2 * ATR ป้องกันหลุด Noise)
+input int                  Inp_ExitCooldownBars  = 4;                     // แท่งพักรบหลังคัทลอส (จำนวนแท่ง Timeframe ที่ห้ามเปิดไม้ใหม่ ป้องกัน Whipsaw)
+input int                  Inp_MaxDailyTrendCuts = 2;                     // Circuit Breaker ประจำวัน (โดนคัท Trend เกิน N ครั้งใน 1 วันจะหยุดเทรดรอวันถัดไป, 0 = ไม่จำกัด)
 
 sinput group "=== 2. ตัวกรองโมเมนตัมขั้นสูง (TRIX Filter) ==="
 input bool                 Inp_UseTRIXFilter     = true;                  // เปิดใช้งานตัวกรอง TRIX ตัด Noise
@@ -94,6 +97,9 @@ int            g_trixHandle = INVALID_HANDLE;
 datetime       g_lastBarTime = 0;
 datetime       g_lastOrderTime = 0;
 double         g_initialBalance = 0.0;
+int            g_dailyCutsCount = 0;
+int            g_currentTradingDay = -1;
+datetime       g_lastExitTime = 0;
 
 //+------------------------------------------------------------------+
 //| ตรวจสอบแท่งเทียนใหม่ (Bar Close Detection)                         |
@@ -192,6 +198,15 @@ void OnTick()
 {
    datetime now = TimeCurrent();
 
+   // 0. ตรวจสอบขึ้นวันใหม่เพื่อรีเซ็ต Daily Trend Cuts Circuit Breaker
+   MqlDateTime dtNow;
+   TimeToStruct(now, dtNow);
+   if(dtNow.day != g_currentTradingDay)
+   {
+      g_currentTradingDay = dtNow.day;
+      g_dailyCutsCount = 0;
+   }
+
    // 1. ตรวจสอบเงื่อนไขฉุกเฉินระดับพอร์ต (Drawdown Cut ป้องกัน DD เกิน 50% เด็ดขาด)
    if(g_risk.IsDrawdownExceeded(g_initialBalance))
    {
@@ -265,7 +280,7 @@ void OnTick()
 
       double maVal = g_trend.GetMA(1);
 
-      // A. ตรวจสอบปิดชุด BUY ทั้งหมดเมื่อเทรนด์กลับตัว
+      // A. ตรวจสอบปิดชุด BUY ทั้งหมดเมื่อเทรนด์กลับตัว (พร้อม ATR Buffer กรอง False Breakout)
       if(openBuyCount > 0)
       {
          bool exitBuy = false;
@@ -274,17 +289,23 @@ void OnTick()
             PrintFormat("[DavidDruzGrid] Donchian Exit triggered for BUY Grid. Closing all %d positions.", openBuyCount);
             exitBuy = true;
          }
-         else if(Inp_CloseOnMATrendExit && maVal > 0.0 && closePrice < maVal)
+         else if(Inp_CloseOnMATrendExit && maVal > 0.0)
          {
-            PrintFormat("[DavidDruzGrid] 200 EMA Exit triggered for BUY Grid (Close %.5f < MA %.5f). Closing all %d positions.",
-                        closePrice, maVal, openBuyCount);
-            exitBuy = true;
+            double exitBufferDist = (Inp_ExitATRBuffer > 0.0 && atrCurrent > 0.0) ? (atrCurrent * Inp_ExitATRBuffer) : 0.0;
+            if(closePrice < (maVal - exitBufferDist))
+            {
+               PrintFormat("[DavidDruzGrid] 200 EMA Exit triggered for BUY Grid (Close %.5f < MA %.5f - Buf %.5f). Closing all %d positions.",
+                           closePrice, maVal, exitBufferDist, openBuyCount);
+               exitBuy = true;
+            }
          }
 
          if(exitBuy)
          {
             g_trade.ClosePositionsByType(POSITION_TYPE_BUY);
             openBuyCount = 0;
+            g_dailyCutsCount++;
+            g_lastExitTime = now;
          }
       }
 
@@ -297,17 +318,23 @@ void OnTick()
             PrintFormat("[DavidDruzGrid] Donchian Exit triggered for SELL Grid. Closing all %d positions.", openSellCount);
             exitSell = true;
          }
-         else if(Inp_CloseOnMATrendExit && maVal > 0.0 && closePrice > maVal)
+         else if(Inp_CloseOnMATrendExit && maVal > 0.0)
          {
-            PrintFormat("[DavidDruzGrid] 200 EMA Exit triggered for SELL Grid (Close %.5f > MA %.5f). Closing all %d positions.",
-                        closePrice, maVal, openSellCount);
-            exitSell = true;
+            double exitBufferDist = (Inp_ExitATRBuffer > 0.0 && atrCurrent > 0.0) ? (atrCurrent * Inp_ExitATRBuffer) : 0.0;
+            if(closePrice > (maVal + exitBufferDist))
+            {
+               PrintFormat("[DavidDruzGrid] 200 EMA Exit triggered for SELL Grid (Close %.5f > MA %.5f + Buf %.5f). Closing all %d positions.",
+                           closePrice, maVal, exitBufferDist, openSellCount);
+               exitSell = true;
+            }
          }
 
          if(exitSell)
          {
             g_trade.ClosePositionsByType(POSITION_TYPE_SELL);
             openSellCount = 0;
+            g_dailyCutsCount++;
+            g_lastExitTime = now;
          }
       }
    }
@@ -316,6 +343,17 @@ void OnTick()
    if(!g_risk.IsSpreadOk(_Symbol)) return;
    if(!g_risk.IsMarginLevelOk()) return;
    if(now - g_lastOrderTime < 5) return; // Cooldown ป้องกันยิงรัวซ้ำ
+
+   // Circuit Breaker ประจำวัน: พักรบทันทีถ้าโดนคัท Trend Exit เกินกำหนดในวันเดียว
+   if(Inp_MaxDailyTrendCuts > 0 && g_dailyCutsCount >= Inp_MaxDailyTrendCuts)
+      return;
+
+   // แท่งพักรบหลังคัทลอส (Post-Exit Cooldown ป้องกันการรีบเข้าซ้ำในตลาด Choppy)
+   if(Inp_ExitCooldownBars > 0 && g_lastExitTime > 0)
+   {
+      if((now - g_lastExitTime) < (Inp_ExitCooldownBars * PeriodSeconds(Inp_Timeframe)))
+         return;
+   }
 
    double currentAsk = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double currentBid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
