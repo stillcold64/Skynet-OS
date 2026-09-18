@@ -39,12 +39,12 @@ if (Test-Path $terminalsDir) {
             $copiedFiles++
         }
 
-        # Check Experts folder for custom EAs (e.g. DCASnowball)
-        $customExperts = Get-ChildItem -Path (Join-Path $termDir "MQL5\Experts\DCASnowball") -Recurse -Include *.mq5,*.ex5 -ErrorAction SilentlyContinue
+        # Check Experts folder for custom EAs in BS AUTOBOT
+        $customExperts = Get-ChildItem -Path (Join-Path $termDir "MQL5\Experts\BS AUTOBOT") -Recurse -Include *.mq5,*.ex5 -ErrorAction SilentlyContinue
         foreach ($eaFile in $customExperts) {
             $dest = Join-Path $forwardDir $eaFile.Name
             Copy-Item -Path $eaFile.FullName -Destination $dest -Force
-            Write-Host " [+] Found Forward-Test EA: $($eaFile.Name)" -ForegroundColor Green
+            Write-Host " [+] Found Forward-Test EA in BS AUTOBOT: $($eaFile.Name)" -ForegroundColor Green
             $copiedFiles++
         }
     }

@@ -1,0 +1,33 @@
+; Alpha Asymmetric DCA Snowball EA - [ALPHA PLAN: 10-40-60 SNOWBALL]
+; Focus: Asymmetric Upward Snowball (10% -> 40% -> 60%), Free-Roll BE Lock, 200 EMA Cut, Target $150
+;
+Inp_Timeframe=16385||16385||0||0||N
+Inp_EntryBars=20||20||10||50||N
+Inp_UseMAFilter=true||true||0||1||N
+Inp_MAPeriod=200||200||50||300||N
+Inp_MAMethod=1||1||0||3||N
+Inp_CloseOnMATrendExit=true||true||0||1||N
+Inp_ExitATRBuffer=0.2||0.2||0.0||1.0||Y
+Inp_ExitCooldownBars=4||4||0||16||Y
+Inp_MaxDailyTrendCuts=2||2||0||5||Y
+Inp_UseTRIXFilter=true||true||0||1||N
+Inp_TRIXPeriod=14||14||7||28||N
+Inp_TRIXSlopeFilter=true||true||0||1||N
+Inp_StepPoints=500||500||200||1000||Y
+Inp_WeightLayer1=0.10||0.10||0.05||0.30||N
+Inp_WeightLayer2=0.40||0.40||0.20||0.50||N
+Inp_WeightLayer3=0.60||0.60||0.40||0.80||N
+Inp_GridOnBarClose=true||true||0||1||N
+Inp_UseFreeRoll=true||true||0||1||N
+Inp_FreeRollTriggerUSD=50.0||50.0||20.0||100.0||Y
+Inp_BufferPoints=20||20||10||50||N
+Inp_CashflowTargetUSD=150.0||150.0||50.0||500.0||Y
+Inp_ScaleTargetWithLot=false||false||0||1||N
+Inp_LotMode=2||2||0||2||N
+Inp_FixedLot=1.00||1.00||0.10||5.00||Y
+Inp_BaseCapitalUSD=10000.0||10000.0||1000.0||50000.0||N
+Inp_BaseLotPerCapital=1.00||1.00||0.10||5.00||Y
+Inp_MaxSpread=500||500||100||1000||N
+Inp_MinMarginLevel=200.0||200.0||100.0||500.0||N
+Inp_MaxDrawdownPct=50.0||50.0||10.0||50.0||N
+Inp_MagicNumber=88827000||88827000||0||0||N
