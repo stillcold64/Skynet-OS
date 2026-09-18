@@ -366,6 +366,22 @@ public:
       return NormalizeDouble(calculatedLot, 2);
    }
 
+   // ปรับแต่งขนาด Lot ให้อยู่ในช่วง Min, Max และ Step ของโบรกเกอร์อย่างถูกต้อง
+   double NormalizeLot(double rawLot)
+   {
+      double minLot  = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN);
+      double maxLot  = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MAX);
+      double stepLot = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_STEP);
+
+      if(stepLot > 0.0)
+         rawLot = MathFloor(rawLot / stepLot) * stepLot;
+
+      if(rawLot < minLot) rawLot = minLot;
+      if(rawLot > maxLot) rawLot = maxLot;
+
+      return NormalizeDouble(rawLot, 2);
+   }
+
    // เปิดไม้ Buy ใหม่ โดยระบุระยะ SL เป็น Points (สำหรับ DCASnowball)
    bool OpenBuy(double lotSize, int initialSLPoints, string comment = "DCA_Snowball")
    {

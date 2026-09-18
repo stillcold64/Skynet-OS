@@ -14,8 +14,9 @@
 
 enum ENUM_LOT_MODE
 {
-   LOT_MODE_RISK_PCT, // คำนวณ Lot อัตโนมัติจาก % ความเสี่ยงต่อไม้
-   LOT_MODE_FIXED     // ใช้ Fixed Lot ต่อไม้
+   LOT_MODE_RISK_PCT,       // คำนวณ Lot อัตโนมัติจาก % ความเสี่ยงต่อไม้
+   LOT_MODE_FIXED,          // ใช้ Fixed Lot ต่อไม้
+   LOT_MODE_CAPITAL_SCALED  // คำนวณ Lot และสเกลตามสัดส่วนเงินทุน (เช่น 1.00 Lot ต่อ $10,000 หรือ 0.10 Lot ต่อ $1,000)
 };
 
 enum ENUM_TRADE_DIRECTION
@@ -71,8 +72,11 @@ input bool                 Inp_GridOnBarClose    = true;                  // เ
 
 sinput group "=== 5. การบริหารเงินทุน (Money Management) ==="
 input bool                 Inp_UseOrderSL        = false;                 // เปิดใช้งาน Stop Loss แต่ละไม้ (false = ไม่มี SL รายไม้ มีแค่ Hard SL -50%)
-input ENUM_LOT_MODE        Inp_LotMode           = LOT_MODE_FIXED;        // โหมดคำนวณ Lot Size (แนะนำ Fixed Lot เมื่อไม่มี SL รายไม้)
-input double               Inp_FixedLot          = 0.03;                  // ขนาด Lot ต่อไม้ (0.03 lot ทองคำวิ่ง $17 = $50)
+input ENUM_LOT_MODE        Inp_LotMode           = LOT_MODE_CAPITAL_SCALED;// โหมดคำนวณ Lot Size (แนะนำ Capital-Scaled)
+input double               Inp_FixedLot          = 1.00;                  // ขนาด Lot ต่อไม้ เมื่อเลือก Fixed Lot
+input double               Inp_BaseCapitalUSD    = 10000.0;               // ขนาดทุนอ้างอิงสำหรับสเกล Lot (เช่น ทุกๆ $10,000)
+input double               Inp_BaseLotPerCapital = 1.00;                  // Lot ฐานต่อขนาดทุนอ้างอิง (เช่น $10,000 = 1.00 Lot, $1,000 = 0.10 Lot)
+input bool                 Inp_ScaleTargetWithLot= false;                 // สเกลเป้า Cashflow ตามขนาดทุนด้วยหรือไม่ (false = ฟิกตาม Inp_CashflowTargetUSD)
 input double               Inp_RiskPctPerOrder   = 0.4;                   // เปอร์เซ็นต์ความเสี่ยงต่อไม้ (กรณีเลือกโหมด Risk %)
 input int                  Inp_ATRPeriod         = 14;                    // คาบ ATR
 input double               Inp_ATRMultiplierSL   = 3.0;                   // ตัวคูณ ATR สำหรับ Initial Stop Loss (หากเปิดใช้ SL รายไม้)
@@ -146,6 +150,42 @@ bool CheckTRIXSignal(bool isBuyCheck)
 }
 
 //+------------------------------------------------------------------+
+//| คำนวณขนาด Lot ตามโหมดที่เลือก (รองรับ Capital-Scaled)              |
+//+------------------------------------------------------------------+
+double GetGridLot(double slPoints = 0.0)
+{
+   if(Inp_LotMode == LOT_MODE_CAPITAL_SCALED)
+   {
+      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      if(Inp_BaseCapitalUSD <= 0.0) return g_trade.NormalizeLot(Inp_FixedLot);
+      double rawLot = (balance / Inp_BaseCapitalUSD) * Inp_BaseLotPerCapital;
+      return g_trade.NormalizeLot(rawLot);
+   }
+   else if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
+   {
+      return g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
+   }
+   return g_trade.NormalizeLot(Inp_FixedLot);
+}
+
+//+------------------------------------------------------------------+
+//| คำนวณเป้า Cashflow ที่อาจสเกลตามขนาดทุน                           |
+//+------------------------------------------------------------------+
+double GetCurrentCashflowTarget()
+{
+   if(Inp_LotMode == LOT_MODE_CAPITAL_SCALED && Inp_ScaleTargetWithLot)
+   {
+      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      if(Inp_BaseCapitalUSD > 0.0)
+      {
+         double factor = balance / Inp_BaseCapitalUSD;
+         return MathMax(10.0, Inp_CashflowTargetUSD * factor);
+      }
+   }
+   return Inp_CashflowTargetUSD;
+}
+
+//+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -216,19 +256,20 @@ void OnTick()
    }
 
    // 2. ระบบ Cashflow Harvesting ($50 - $100 เป้าหมายกระแสเงินสด)
-   if(Inp_HarvestMode == HARVEST_BASKET && Inp_CashflowTargetUSD > 0.0)
+   double cashflowTarget = GetCurrentCashflowTarget();
+   if(Inp_HarvestMode == HARVEST_BASKET && cashflowTarget > 0.0)
    {
       double totalFloating = g_trade.GetTotalFloatingProfit();
-      if(totalFloating >= Inp_CashflowTargetUSD)
+      if(totalFloating >= cashflowTarget)
       {
          PrintFormat("[DavidDruzGrid] 💰 Cashflow Harvested (Basket)! Total Profit $%.2f >= Target $%.2f. Closing all positions.",
-                     totalFloating, Inp_CashflowTargetUSD);
+                     totalFloating, cashflowTarget);
          g_trade.CloseAllPositions();
          g_lastOrderTime = now;
          return;
       }
    }
-   else if(Inp_HarvestMode == HARVEST_PER_ORDER && Inp_CashflowTargetUSD > 0.0)
+   else if(Inp_HarvestMode == HARVEST_PER_ORDER && cashflowTarget > 0.0)
    {
       int totalPos = PositionsTotal();
       for(int i = totalPos - 1; i >= 0; i--)
@@ -240,10 +281,10 @@ void OnTick()
                PositionGetInteger(POSITION_MAGIC) == (long)Inp_MagicNumber)
             {
                double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
-               if(pnl >= Inp_CashflowTargetUSD)
+               if(pnl >= cashflowTarget)
                {
                   PrintFormat("[DavidDruzGrid] 💰 Cashflow Harvested (Per-Order)! Ticket #%I64u reached $%.2f >= Target $%.2f",
-                              ticket, pnl, Inp_CashflowTargetUSD);
+                              ticket, pnl, cashflowTarget);
                   g_trade.ClosePositionByTicket(ticket);
                   g_lastOrderTime = now;
                }
@@ -384,9 +425,7 @@ void OnTick()
                   slPoints  = slDist / point;
                }
 
-               double lot = Inp_FixedLot;
-               if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
-                  lot = g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
+               double lot = GetGridLot(slPoints);
 
                if(g_trade.OpenBuy(lot, initialSL, 0.0, "DruzGrid_B1"))
                {
@@ -414,9 +453,7 @@ void OnTick()
                      slPoints  = slDist / point;
                   }
 
-                  double lot = Inp_FixedLot;
-                  if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
-                     lot = g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
+                  double lot = GetGridLot(slPoints);
 
                   string comment = StringFormat("DruzGrid_B%d", openBuyCount + 1);
                   if(g_trade.OpenBuy(lot, initialSL, 0.0, comment))
@@ -450,9 +487,7 @@ void OnTick()
                   slPoints  = slDist / point;
                }
 
-               double lot = Inp_FixedLot;
-               if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
-                  lot = g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
+               double lot = GetGridLot(slPoints);
 
                if(g_trade.OpenSell(lot, initialSL, 0.0, "DruzGrid_S1"))
                {
@@ -480,9 +515,7 @@ void OnTick()
                      slPoints  = slDist / point;
                   }
 
-                  double lot = Inp_FixedLot;
-                  if(Inp_LotMode == LOT_MODE_RISK_PCT && Inp_UseOrderSL)
-                     lot = g_trade.CalculateLotSizeFromRisk(Inp_RiskPctPerOrder, slPoints, Inp_FixedLot);
+                  double lot = GetGridLot(slPoints);
 
                   string comment = StringFormat("DruzGrid_S%d", openSellCount + 1);
                   if(g_trade.OpenSell(lot, initialSL, 0.0, comment))
