@@ -298,5 +298,92 @@ if (tradeCount === 0) {
   );
 }
 
+// 9. Playbook Setups Table (Master Setup Library & Trading Blueprints)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS playbook_setups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    grade TEXT DEFAULT 'A+',
+    direction TEXT DEFAULT 'BOTH',
+    timeframe TEXT DEFAULT '15M - 1H',
+    session TEXT DEFAULT 'London / NY',
+    target_rr REAL DEFAULT 3.0,
+    thesis TEXT NOT NULL,
+    entry_rules TEXT NOT NULL,
+    invalidation_rules TEXT,
+    exit_rules TEXT,
+    risk_rules TEXT,
+    mistakes_to_avoid TEXT,
+    chart_blueprint_url TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed 3 default master setups if empty
+const setupCount = db.prepare('SELECT COUNT(*) as count FROM playbook_setups').get().count;
+if (setupCount === 0) {
+  const insertSetup = db.prepare(`
+    INSERT INTO playbook_setups (
+      code, title, grade, direction, timeframe, session, target_rr,
+      thesis, entry_rules, invalidation_rules, exit_rules, risk_rules, mistakes_to_avoid, chart_blueprint_url
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  insertSetup.run(
+    'SETUP-01',
+    'Liquidity Sweep & Market Structure Shift (MSS)',
+    'A+',
+    'BOTH',
+    '15M - 1H',
+    'London / New York',
+    3.0,
+    'ราคาวิ่งกวาดสภาพคล่อง (Liquidity Grab) เหนือ/ใต้ระดับ Swing High/Low สำคัญเพื่อดูดซับสภาพคล่องของรายย่อย (Stop Hunt) จากนั้นเกิด Market Structure Shift หักตัวกลับอย่างรุนแรง เป็นจังหวะที่รายใหญ่ (Smart Money) ได้ของครบและพร้อมดันราคาไปอีกฝั่ง',
+    '1. เกิด Liquidity Sweep ชัดเจนที่ Key Level (Asian H/L, Previous Day H/L, Equal H/L)\n2. มีสัญญาณ Market Structure Shift (แท่งเทียนปิดทะลุ Swing สำคัญใน 15M/5M)\n3. ราคาย่อกลับมาทดสอบโซน Imbalance / FVG หรือ Order Block (OB)\n4. Risk:Reward คำนวณแล้วต้องได้อย่างน้อย 1:2.5R ขึ้นไป',
+    '• ราคาปิดแท่งเทียนทะลุจุดสูงสุด/ต่ำสุดของแท่งที่กวาดสภาพคล่อง (Invalidation Point)\n• เกิดข่าวด่วนหรือ High Impact News (CPI, FOMC, NFP) ระหว่างรอเข้า',
+    '• TP1: อัตราส่วน 2.0R แบ่งปิด 50% และเลื่อน Stop Loss บังทุน (Breakeven)\n• TP2 / Final TP: จุดสภาพคล่องฝั่งตรงข้าม (Opposite Liquidity Pool หรือ Swing High/Low เดิม)',
+    '• เสี่ยง 1.0% - 1.5% ของพอร์ต (Grade A+ อนุญาตให้ใส่ขนาดเต็ม Max Risk ของระบบ)',
+    '• ห้ามเข้าทันทีก่อนเห็นแท่งปิดคอนเฟิร์ม MSS (อย่าวัดใจรับมีดตอนกำลัง Sweep)\n• ห้ามไล่ราคาถ้าพลาดจังหวะ Retest เข้า FVG/OB ให้รอรอบใหม่',
+    ''
+  );
+
+  insertSetup.run(
+    'SETUP-02',
+    'Trend Continuation Pullback to Key Level / EMA',
+    'A',
+    'BOTH',
+    '1H - 4H',
+    'Any Active Session',
+    2.5,
+    'ในตลาดที่มีแนวโน้มชัดเจน (Strong Trend) การย่อตัวกลับมาทดสอบแนวรับ/แนวต้านเดิมที่สอดคล้องกับแนวเส้น Moving Average (EMA 20/50) หรือ Golden Fibonacci Retracement (50-61.8%) เป็นจุดที่มีแรงซื้อ/แรงขายตามน้ำหนุนต่อด้วยความเสี่ยงต่ำ',
+    '1. โครงสร้าง High Timeframe (4H/D1) ทำ Higher Highs หรือ Lower Lows ต่อเนื่อง\n2. ราคาย่อตัวแบบ Volume หดตัว (Healthy Pullback) เข้าหา Key Level / EMA Zone\n3. เกิดแท่งเทียนกลับตัว (Pin Bar, Bullish/Bearish Engulfing) ใน Timeframe รอง\n4. R:R ขั้นต่ำ 1:2R ไปยัง High/Low ล่าสุด',
+    '• ราคาหลุดทะลุแนวรับ/ต้านสำคัญ และปิดแท่งหลุดเส้นโครงสร้างเทรนด์\n• โมเมนตัม RSI ทำ Divergence ขัดแย้งกับทิศทางเทรนด์อย่างรุนแรง',
+    '• TP1: จุดทดสอบ High/Low เดิมของรอบเทรนด์\n• TP2: รัน Trailing Stop ใต้ Swing Low/High ล่าสุดตามเส้น EMA',
+    '• เสี่ยง 1.0% ของพอร์ต',
+    '• ห้ามเข้าหากตลาดเริ่มเข้าสู่สภาวะ Sideway ไร้ทิศทาง\n• ระวังการซื้อสวนในตอนที่ยังไม่เห็นสัญญาณชะลอตัวของการย่อ',
+    ''
+  );
+
+  insertSetup.run(
+    'SETUP-03',
+    'Range High/Low Reversal & Deviation',
+    'B',
+    'BOTH',
+    '15M - 1H',
+    'Asian / London Pre-market',
+    2.0,
+    'เมื่อตลาดอยู่ในกรอบ Sideway Range ราคาที่เบรกหลอกออกนอกกรอบ (Deviation / Fakeout) แล้วกลับเข้ามาปิดข้างในกรอบได้ทันที มักจะวิ่งกลับไปทดสอบขอบกรอบฝั่งตรงข้าม (Mean Reversion to Range Opposite Side)',
+    '1. กรอบ Range Bound ชัดเจน มีการทดสอบ High และ Low อย่างน้อยด้านละ 2 ครั้ง\n2. ราคาแทงทะลุกรอบออกไปแต่ไม่มีแรงส่งต่อ (Low Volume Fakeout)\n3. แท่งเทียนกลับเข้ามาปิดข้างในกรอบ Range ชัดเจน\n4. เป้าหมายกำไรอย่างน้อยกึ่งกลางกรอบ (Mid-Range) หรือขอบฝั่งตรงข้าม',
+    '• ราคาปิดแท่งนอกกรอบและมีการเปิดแท่งถัดไปรันต่อ (กลายเป็นการ Breakout จริง)',
+    '• TP1: Mid-Range (เส้นกึ่งกลาง 50% ของกรอบ)\n• TP2: ขอบกรอบฝั่งตรงข้าม (Range High หรือ Range Low)',
+    '• เสี่ยง 0.5% ของพอร์ต (Grade B ควรลดความเสี่ยงครึ่งหนึ่ง)',
+    '• ห้ามเล่นเซ็ตอัพนี้ในช่วงที่ตลาดมีข่าวใหญ่กำลังจะประกาศ\n• อย่าถือออเดอร์หวังรันเทรนด์ เพราะสภาวะตลาดเป็น Sideway',
+    ''
+  );
+}
+
 export default db;
+
 

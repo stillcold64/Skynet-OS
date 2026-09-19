@@ -2173,4 +2173,177 @@ body {
   text-decoration: underline;
 }
 
+/* ========================================================
+   PLAYBOOK SETUPS BLUEPRINTS STYLES
+   ======================================================== */
+
+.setup-code-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.setup-code-badge.large {
+  font-size: 15px;
+  padding: 4px 10px;
+  background: rgba(191, 90, 242, 0.15);
+  border-color: rgba(191, 90, 242, 0.4);
+  color: #d69eff;
+}
+
+.grade-pill {
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.direction-badge.both {
+  background: rgba(10, 132, 255, 0.15);
+  color: #64d2ff;
+  border: 1px solid rgba(10, 132, 255, 0.3);
+}
+
+.setup-specs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.spec-pill {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+.spec-pill.rr-spec {
+  background: rgba(255, 214, 10, 0.1);
+  border-color: rgba(255, 214, 10, 0.3);
+  color: #ffd60a;
+}
+
+.spec-pill.rr-spec strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.blueprint-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.blueprint-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+}
+
+.blueprint-thesis {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  font-style: italic;
+  position: relative;
+  padding-left: 2px;
+}
+
+.blueprint-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rule-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.rule-item .check-icon {
+  color: #30d158;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.blueprint-content {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.invalidation-highlight {
+  border-left: 3px solid #ff453a;
+  background: rgba(255, 69, 58, 0.05);
+}
+
+.invalidation-highlight .blueprint-label {
+  color: #ff756d;
+}
+
+.warning-highlight {
+  border-left: 3px solid #ff9f0a;
+  background: rgba(255, 159, 10, 0.05);
+}
+
+.warning-highlight .blueprint-label {
+  color: #ffb340;
+}
+
+.invalidation-text {
+  border-left: 3px solid #ff453a;
+  padding-left: 10px;
+  color: #ff857d !important;
+}
+
+.warning-text {
+  border-left: 3px solid #ff9f0a;
+  padding-left: 10px;
+  color: #ffc066 !important;
+}
+
+.copy-link-btn {
+  background: rgba(191, 90, 242, 0.12);
+  border-color: rgba(191, 90, 242, 0.3);
+  color: #d69eff;
+  font-size: 12px;
+}
+
+.copy-link-btn:hover {
+  background: rgba(191, 90, 242, 0.25);
+  border-color: rgba(191, 90, 242, 0.5);
+}
+
+.form-row.three-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 600px) {
+  .form-row.three-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+
 

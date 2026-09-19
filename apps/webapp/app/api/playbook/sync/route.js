@@ -29,42 +29,33 @@ export async function POST(request) {
       );
     }
 
-    const strategy = db.prepare('SELECT * FROM playbook_strategy WHERE id = 1').get();
-    const trades = db.prepare('SELECT * FROM playbook_trades ORDER BY date DESC, id DESC').all();
+    const setups = db.prepare('SELECT * FROM playbook_setups ORDER BY id ASC').all();
 
-    const formattedTrades = trades.map((t) => {
-      let checklist = [];
-      try {
-        if (t.checklist) checklist = JSON.parse(t.checklist);
-      } catch (e) {
-        checklist = [];
-      }
-      return {
-        id: t.id,
-        date: t.date,
-        title: t.title,
-        symbol: t.symbol || '-',
-        direction: t.direction,
-        status: t.status,
-        entry_price: t.entry_price || '-',
-        sl_price: t.sl_price || '-',
-        tp_price: t.tp_price || '-',
-        rr_ratio: t.rr_ratio || '-',
-        risk_usd: t.risk_usd || '-',
-        thesis: t.thesis || '',
-        checklist: checklist.join(', '),
-        chart_url: t.chart_url || '',
-        realized_r: t.realized_r !== null ? t.realized_r : '-',
-        review_notes: t.review_notes || '',
-      };
-    });
+    const formattedSetups = setups.map((s) => ({
+      id: s.id,
+      code: s.code,
+      title: s.title,
+      grade: s.grade || 'A+',
+      direction: s.direction || 'BOTH',
+      timeframe: s.timeframe || '-',
+      session: s.session || '-',
+      target_rr: s.target_rr || 3.0,
+      thesis: s.thesis || '',
+      entry_rules: s.entry_rules || '',
+      invalidation_rules: s.invalidation_rules || '',
+      exit_rules: s.exit_rules || '',
+      risk_rules: s.risk_rules || '',
+      mistakes_to_avoid: s.mistakes_to_avoid || '',
+      chart_blueprint_url: s.chart_blueprint_url || '',
+      updated_at: s.updated_at || '',
+    }));
 
     const payload = {
-      action: 'sync_playbook',
-      type: 'PLAYBOOK',
-      strategy,
-      items: formattedTrades,
-      rawMessage: `Playbook Backup: ${formattedTrades.length} trades & master plan`,
+      action: 'sync_playbook_setups',
+      type: 'PLAYBOOK_SETUPS',
+      setups: formattedSetups,
+      items: formattedSetups, // fallback compatibility
+      rawMessage: `Playbook Setups Backup: ${formattedSetups.length} blueprints`,
       timestamp: new Date().toISOString(),
     };
 
@@ -99,10 +90,10 @@ export async function POST(request) {
     if (res.ok) {
       return NextResponse.json({
         success: true,
-        count: formattedTrades.length,
+        count: formattedSetups.length,
         timestamp: payload.timestamp,
         response: json,
-        message: `สำรองข้อมูล Playbook ${formattedTrades.length} รายการลง Google (GGD) สำเร็จ!`,
+        message: `สำรองข้อมูล Playbook Setups ทั้งหมด ${formattedSetups.length} ท่าเทรดลง Google (GGD) สำเร็จ!`,
       });
     } else {
       return NextResponse.json(
@@ -114,7 +105,7 @@ export async function POST(request) {
       );
     }
   } catch (error) {
-    console.error('Error syncing Playbook to GGD:', error);
+    console.error('Error syncing Playbook Setups to GGD:', error);
     return NextResponse.json(
       {
         success: false,

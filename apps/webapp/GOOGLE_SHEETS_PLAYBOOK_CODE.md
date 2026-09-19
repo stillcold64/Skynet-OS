@@ -1,14 +1,14 @@
-# ☁️ Google Apps Script Webhook Code สำหรับ Skynet OS Playbook
+# ☁️ Google Apps Script Webhook Code สำหรับ Skynet OS Playbook Setups
 
-โค้ดนี้ใช้สำหรับอัปเดตบน **Google Apps Script** ที่เชื่อมกับ Google Sheet ของคุณ เพื่อให้รองรับการสำรองข้อมูล Playbook (Trade Setups, Plans & Master Thesis) ลงในแท็บ `Playbook` อัตโนมัติ
+โค้ดนี้ใช้สำหรับติดตั้งบน **Google Apps Script** ที่เชื่อมกับ Google Sheet ของคุณ เพื่อให้รองรับการสำรองข้อมูล **Playbook Setups Library (คลังพิมพ์เขียวและกฎเซ็ตอัพท่าเทรด)** ลงในแท็บ `Playbook_Setups` โดยอัตโนมัติ
 
 ---
 
 ## วิธีนำไปติดตั้งใน Google Sheets
 
-1. เปิด Google Sheet ที่คุณใช้เก็บข้อมูลธุรกรรมการเงินของ Skynet OS
+1. เปิด Google Sheet ที่คุณใช้เก็บข้อมูลของ Skynet OS
 2. ไปที่เมนูด้านบน: **ส่วนขยาย (Extensions)** > **Apps Script**
-3. แทนที่ฟังก์ชัน `doPost(e)` หรือรวมโค้ดด้านล่างนี้เข้าไปใน Script เดิม
+3. แทนที่หรือเพิ่มฟังก์ชัน `doPost(e)` ด้านล่างนี้ลงในไฟล์ Script
 4. กด **บันทึก (Save)**
 5. กด **ปรับใช้ (Deploy)** > **จัดการการปรับใช้ (Manage Deployments)** > กดรูปดินสอแก้ไข (Edit) > เลือกเวอร์ชัน **"ใหม่ (New version)"** > กด **ปรับใช้ (Deploy)**
 
@@ -22,55 +22,55 @@ function doPost(e) {
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // ==========================================
-    // CASE 1: ซิงค์ข้อมูล Playbook & Thesis
-    // ==========================================
-    if (data.action === "sync_playbook" || data.type === "PLAYBOOK") {
-      var sheetName = "Playbook";
+    // ========================================================
+    // CASE 1: ซิงค์คลัง Playbook Setups Library (พิมพ์เขียวท่าเทรด)
+    // ========================================================
+    if (data.action === "sync_playbook_setups" || data.type === "PLAYBOOK_SETUPS") {
+      var sheetName = "Playbook_Setups";
       var sheet = ss.getSheetByName(sheetName);
       
-      // ถ้ายังไม่มีแท็บ Playbook ให้สร้างใหม่อัตโนมัติ
+      // ถ้ายังไม่มีแท็บ Playbook_Setups ให้สร้างใหม่อัตโนมัติ
       if (!sheet) {
         sheet = ss.insertSheet(sheetName);
         var header = [
-          "ID", "วันที่", "ชื่อ Setup / แผน", "สัญลักษณ์", "ทิศทาง (L/S)", "สถานะ",
-          "ราคาเข้า (Entry)", "Stop Loss", "Take Profit", "R:R แผน", "ความเสี่ยง ($)",
-          "Thesis (สมมติฐานการเทรด)", "เงื่อนไขที่คอนเฟิร์ม (Checklist)", "ลิงก์ชาร์ต",
-          "Realized R", "Post-Trade Review / ข้อคิด"
+          "ID", "รหัส Setup (Code)", "ชื่อเซ็ตอัพ (Title)", "เกรด (Grade)", "ทิศทาง",
+          "Timeframe", "Session", "เป้าหมาย R:R", "Core Thesis & Edge (สมมติฐาน)",
+          "Entry Checklist (กฎการเข้า)", "Stop Loss & Invalidation", "Exit Strategy (เป้าหมาย)",
+          "Risk Rules (การคุมความเสี่ยง)", "ข้อควรระวัง (Do's & Don'ts)", "ลิงก์รูปชาร์ตพิมพ์เขียว", "อัปเดตล่าสุด"
         ];
         sheet.appendRow(header);
         sheet.getRange(1, 1, 1, header.length).setBackground("#1a1d26").setFontColor("#f5f5f7").setFontWeight("bold");
         sheet.setFrozenRows(1);
       }
 
-      // ล้างข้อมูลเก่า (ยกเว้น Header) แล้วเขียนข้อมูลใหม่ล่าสุดทั้งหมด
+      // ล้างข้อมูลเดิม แล้วเขียนชุดข้อมูลพิมพ์เขียวทั้งหมดลงไปใหม่
       var lastRow = sheet.getLastRow();
       if (lastRow > 1) {
         sheet.getRange(2, 1, lastRow - 1, 16).clearContent();
       }
 
-      var items = data.items || [];
+      var setups = data.setups || data.items || [];
       var rows = [];
 
-      for (var i = 0; i < items.length; i++) {
-        var item = items[i];
+      for (var i = 0; i < setups.length; i++) {
+        var s = setups[i];
         rows.push([
-          item.id || (i + 1),
-          item.date || "",
-          item.title || "",
-          item.symbol || "-",
-          item.direction || "LONG",
-          item.status || "WATCHLIST",
-          item.entry_price || "",
-          item.sl_price || "",
-          item.tp_price || "",
-          item.rr_ratio || "",
-          item.risk_usd || "",
-          item.thesis || "",
-          item.checklist || "",
-          item.chart_url || "",
-          item.realized_r || "",
-          item.review_notes || ""
+          s.id || (i + 1),
+          s.code || "",
+          s.title || "",
+          s.grade || "A+",
+          s.direction || "BOTH",
+          s.timeframe || "-",
+          s.session || "-",
+          s.target_rr || 3.0,
+          s.thesis || "",
+          s.entry_rules || "",
+          s.invalidation_rules || "",
+          s.exit_rules || "",
+          s.risk_rules || "",
+          s.mistakes_to_avoid || "",
+          s.chart_blueprint_url || "",
+          s.updated_at || new Date().toISOString()
         ]);
       }
 
@@ -78,26 +78,18 @@ function doPost(e) {
         sheet.getRange(2, 1, rows.length, 16).setValues(rows);
       }
 
-      // บันทึก Master Plan ลงใน Note ของเซลล์ A1 เพื่อเก็บสำรอง Strategy ไว้ด้วย
-      if (data.strategy) {
-        var strat = data.strategy;
-        var note = "=== MASTER TRADING PLAN ===\n" +
-                   "Title: " + strat.title + "\n\n" +
-                   "Core Thesis:\n" + strat.core_thesis + "\n\n" +
-                   "Entry Rules:\n" + strat.entry_rules + "\n\n" +
-                   "Invalidation:\n" + strat.invalidation_rules + "\n\n" +
-                   "Risk Rules:\n" + strat.risk_rules;
-        sheet.getRange("A1").setNote(note);
-      }
-
       return ContentService.createTextOutput(
-        JSON.stringify({ success: true, count: rows.length, message: "Synced Playbook to Google Sheet successfully!" })
+        JSON.stringify({
+          success: true,
+          count: rows.length,
+          message: "Synced Playbook Setups Library (" + rows.length + " setups) successfully!"
+        })
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // ==========================================
-    // CASE 2: ซิงค์ธุรกรรมการเงินปกติ (Transactions)
-    // ==========================================
+    // ========================================================
+    // CASE 2: ซิงค์ธุรกรรมการเงิน (Transactions)
+    // ========================================================
     var txSheet = ss.getSheetByName("Transactions") || ss.getActiveSheet();
     var txItems = data.items || [];
     for (var j = 0; j < txItems.length; j++) {

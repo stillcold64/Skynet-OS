@@ -2,102 +2,86 @@
 
 import { useState, useEffect } from 'react';
 
-const STATUS_CONFIG = {
-  WATCHLIST: { label: 'เฝ้าระวัง / แผนรอ', color: '#ff9f0a', bg: 'rgba(255, 159, 10, 0.15)', border: 'rgba(255, 159, 10, 0.3)', emoji: '🟡' },
-  ACTIVE: { label: 'เข้าออเดอร์แล้ว / รันอยู่', color: '#0a84ff', bg: 'rgba(10, 132, 255, 0.15)', border: 'rgba(10, 132, 255, 0.3)', emoji: '🔵' },
-  WIN: { label: 'ชนเป้า (WIN)', color: '#30d158', bg: 'rgba(48, 209, 88, 0.15)', border: 'rgba(48, 209, 88, 0.3)', emoji: '🟢' },
-  LOSS: { label: 'โดนตัดขาดทุน (LOSS)', color: '#ff453a', bg: 'rgba(255, 69, 58, 0.15)', border: 'rgba(255, 69, 58, 0.3)', emoji: '🔴' },
-  BREAKEVEN: { label: 'เสมอทุน (BE)', color: '#98989d', bg: 'rgba(152, 152, 157, 0.15)', border: 'rgba(152, 152, 157, 0.3)', emoji: '⚪' },
-  CANCELLED: { label: 'ยกเลิกแผน', color: '#636366', bg: 'rgba(99, 99, 102, 0.15)', border: 'rgba(99, 99, 102, 0.3)', emoji: '⚫' },
+const GRADE_CONFIG = {
+  'A+': {
+    label: 'Grade A+ ⭐⭐⭐ (High Conviction)',
+    color: '#bf5af2',
+    bg: 'rgba(191, 90, 242, 0.15)',
+    border: 'rgba(191, 90, 242, 0.4)',
+    badgeText: 'A+ ⭐⭐⭐',
+  },
+  'A': {
+    label: 'Grade A ⭐⭐ (Standard Core)',
+    color: '#0a84ff',
+    bg: 'rgba(10, 132, 255, 0.15)',
+    border: 'rgba(10, 132, 255, 0.4)',
+    badgeText: 'A ⭐⭐',
+  },
+  'B': {
+    label: 'Grade B ⭐ (Secondary / Reduced Size)',
+    color: '#ff9f0a',
+    bg: 'rgba(255, 159, 10, 0.15)',
+    border: 'rgba(255, 159, 10, 0.4)',
+    badgeText: 'B ⭐',
+  },
 };
 
 export default function PlaybookTab() {
-  const [strategy, setStrategy] = useState(null);
-  const [trades, setTrades] = useState([]);
+  const [setups, setSetups] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [copyToast, setCopyToast] = useState('');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [gradeFilter, setGradeFilter] = useState('ALL');
   const [directionFilter, setDirectionFilter] = useState('ALL');
 
   // Modals
-  const [showTradeModal, setShowTradeModal] = useState(false);
-  const [editingTrade, setEditingTrade] = useState(null);
-  const [showStrategyModal, setShowStrategyModal] = useState(false);
-  const [viewDetailTrade, setViewDetailTrade] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingSetup, setEditingSetup] = useState(null);
+  const [viewDetailSetup, setViewDetailSetup] = useState(null);
 
-  // Trade Form State
+  // Setup Form State
   const initialForm = {
-    date: new Date().toISOString().split('T')[0],
+    code: '',
     title: '',
-    symbol: 'BTC',
-    direction: 'LONG',
-    status: 'WATCHLIST',
-    entry_price: '',
-    sl_price: '',
-    tp_price: '',
-    rr_ratio: '',
-    risk_usd: '100',
+    grade: 'A+',
+    direction: 'BOTH',
+    timeframe: '15M - 1H',
+    session: 'London / NY',
+    target_rr: '3.0',
     thesis: '',
-    checklist: ['HTF Trend In Favor', 'Key Level Rejection', 'R:R >= 2.0', 'Risk <= 1%'],
-    chart_url: '',
-    realized_r: '',
-    review_notes: '',
+    entry_rules: '',
+    invalidation_rules: '',
+    exit_rules: '',
+    risk_rules: 'เสี่ยง 1.0% ของพอร์ต',
+    mistakes_to_avoid: '',
+    chart_blueprint_url: '',
   };
   const [formData, setFormData] = useState(initialForm);
 
-  // Strategy Form State
-  const [strategyForm, setStrategyForm] = useState({
-    title: '',
-    core_thesis: '',
-    entry_rules: '',
-    invalidation_rules: '',
-    risk_rules: '',
-  });
-
-  const fetchData = async () => {
+  const fetchSetups = async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/playbook');
       if (res.ok) {
         const data = await res.json();
-        setStrategy(data.strategy || null);
-        setTrades(data.trades || []);
+        setSetups(data.setups || []);
         setStats(data.stats || null);
-        if (data.strategy) {
-          setStrategyForm(data.strategy);
-        }
       }
     } catch (err) {
-      console.error('Failed to load playbook data:', err);
+      console.error('Failed to load playbook setups:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchSetups();
   }, []);
-
-  // Calculate R:R automatically when entry, sl, tp change
-  useEffect(() => {
-    const entry = parseFloat(formData.entry_price);
-    const sl = parseFloat(formData.sl_price);
-    const tp = parseFloat(formData.tp_price);
-
-    if (entry && sl && tp) {
-      const risk = Math.abs(entry - sl);
-      const reward = Math.abs(tp - entry);
-      if (risk > 0) {
-        const ratio = Math.round((reward / risk) * 10) / 10;
-        setFormData((prev) => ({ ...prev, rr_ratio: ratio }));
-      }
-    }
-  }, [formData.entry_price, formData.sl_price, formData.tp_price]);
 
   // Handle Sync to GGD (Google Sheets / Drive)
   const handleSyncGgd = async () => {
@@ -120,51 +104,51 @@ export default function PlaybookTab() {
 
   // Open Add Modal
   const handleOpenAdd = () => {
-    setEditingTrade(null);
+    setEditingSetup(null);
+    const nextCode = `SETUP-${String(setups.length + 1).padStart(2, '0')}`;
     setFormData({
       ...initialForm,
-      date: new Date().toISOString().split('T')[0],
+      code: nextCode,
     });
-    setShowTradeModal(true);
+    setShowModal(true);
   };
 
   // Open Edit Modal
-  const handleOpenEdit = (trade) => {
-    setEditingTrade(trade);
+  const handleOpenEdit = (s) => {
+    setEditingSetup(s);
     setFormData({
-      date: trade.date || new Date().toISOString().split('T')[0],
-      title: trade.title || '',
-      symbol: trade.symbol || '',
-      direction: trade.direction || 'LONG',
-      status: trade.status || 'WATCHLIST',
-      entry_price: trade.entry_price !== null ? String(trade.entry_price) : '',
-      sl_price: trade.sl_price !== null ? String(trade.sl_price) : '',
-      tp_price: trade.tp_price !== null ? String(trade.tp_price) : '',
-      rr_ratio: trade.rr_ratio !== null ? String(trade.rr_ratio) : '',
-      risk_usd: trade.risk_usd !== null ? String(trade.risk_usd) : '',
-      thesis: trade.thesis || '',
-      checklist: Array.isArray(trade.checklist) ? trade.checklist : [],
-      chart_url: trade.chart_url || '',
-      realized_r: trade.realized_r !== null ? String(trade.realized_r) : '',
-      review_notes: trade.review_notes || '',
+      code: s.code || '',
+      title: s.title || '',
+      grade: s.grade || 'A+',
+      direction: s.direction || 'BOTH',
+      timeframe: s.timeframe || '',
+      session: s.session || '',
+      target_rr: s.target_rr !== null ? String(s.target_rr) : '3.0',
+      thesis: s.thesis || '',
+      entry_rules: s.entry_rules || '',
+      invalidation_rules: s.invalidation_rules || '',
+      exit_rules: s.exit_rules || '',
+      risk_rules: s.risk_rules || '',
+      mistakes_to_avoid: s.mistakes_to_avoid || '',
+      chart_blueprint_url: s.chart_blueprint_url || '',
     });
-    setShowTradeModal(true);
+    setShowModal(true);
   };
 
-  // Save Trade (Create or Update)
-  const handleSaveTrade = async (e) => {
+  // Save Setup (Create or Update)
+  const handleSaveSetup = async (e) => {
     e.preventDefault();
     try {
-      if (editingTrade) {
+      if (editingSetup) {
         // Update
         const res = await fetch('/api/playbook', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingTrade.id, ...formData }),
+          body: JSON.stringify({ id: editingSetup.id, ...formData }),
         });
         if (res.ok) {
-          setShowTradeModal(false);
-          await fetchData();
+          setShowModal(false);
+          await fetchSetups();
         }
       } else {
         // Create
@@ -174,151 +158,80 @@ export default function PlaybookTab() {
           body: JSON.stringify(formData),
         });
         if (res.ok) {
-          setShowTradeModal(false);
-          await fetchData();
+          setShowModal(false);
+          await fetchSetups();
         }
       }
     } catch (err) {
-      console.error('Error saving trade:', err);
+      console.error('Error saving playbook setup:', err);
     }
   };
 
-  // Quick Change Status
-  const handleQuickStatus = async (trade, newStatus) => {
-    try {
-      let realized_r = trade.realized_r;
-      if (newStatus === 'WIN' && (realized_r === null || realized_r === undefined)) {
-        realized_r = trade.rr_ratio || 2.0;
-      } else if (newStatus === 'LOSS' && (realized_r === null || realized_r === undefined)) {
-        realized_r = -1.0;
-      } else if (newStatus === 'BREAKEVEN') {
-        realized_r = 0.0;
-      }
-
-      const res = await fetch('/api/playbook', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: trade.id, status: newStatus, realized_r }),
-      });
-      if (res.ok) {
-        await fetchData();
-      }
-    } catch (err) {
-      console.error('Error updating trade status:', err);
-    }
-  };
-
-  // Delete Trade
-  const handleDeleteTrade = async (id) => {
-    if (!confirm('ยืนยันลบแผนการเทรดนี้ออกจาก Playbook?')) return;
+  // Delete Setup
+  const handleDeleteSetup = async (id, code) => {
+    if (!confirm(`ยืนยันลบพิมพ์เขียวเซ็ตอัพ ${code} ออกจาก Playbook?`)) return;
     try {
       const res = await fetch(`/api/playbook?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
-        if (viewDetailTrade && viewDetailTrade.id === id) setViewDetailTrade(null);
-        await fetchData();
+        if (viewDetailSetup && viewDetailSetup.id === id) setViewDetailSetup(null);
+        await fetchSetups();
       }
     } catch (err) {
-      console.error('Error deleting trade:', err);
+      console.error('Error deleting setup:', err);
     }
   };
 
-  // Save Strategy
-  const handleSaveStrategy = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('/api/playbook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update_strategy',
-          strategy: strategyForm,
-        }),
-      });
-      if (res.ok) {
-        setShowStrategyModal(false);
-        await fetchData();
-      }
-    } catch (err) {
-      console.error('Error updating strategy:', err);
+  // Copy Tag to Clipboard for future trade linking
+  const handleCopyTag = (s) => {
+    const tag = `Playbook Setup: [${s.code}: ${s.title}]`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(tag);
+      setCopyToast(`คัดลอก "${tag}" เรียบร้อยแล้ว!`);
+      setTimeout(() => setCopyToast(''), 3500);
     }
   };
 
-  // Toggle Checklist item in Trade Form
-  const toggleChecklist = (item) => {
-    setFormData((prev) => {
-      const current = prev.checklist || [];
-      if (current.includes(item)) {
-        return { ...prev, checklist: current.filter((x) => x !== item) };
-      } else {
-        return { ...prev, checklist: [...current, item] };
-      }
-    });
-  };
-
-  // Filter Trades
-  const filteredTrades = trades.filter((t) => {
-    if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
-    if (directionFilter !== 'ALL' && t.direction !== directionFilter) return false;
+  // Filter Setups
+  const filteredSetups = setups.filter((s) => {
+    if (gradeFilter !== 'ALL' && (s.grade || '').toUpperCase() !== gradeFilter) return false;
+    if (directionFilter !== 'ALL' && (s.direction || '').toUpperCase() !== directionFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchTitle = (t.title || '').toLowerCase().includes(q);
-      const matchSymbol = (t.symbol || '').toLowerCase().includes(q);
-      const matchThesis = (t.thesis || '').toLowerCase().includes(q);
-      if (!matchTitle && !matchSymbol && !matchThesis) return false;
+      const matchTitle = (s.title || '').toLowerCase().includes(q);
+      const matchCode = (s.code || '').toLowerCase().includes(q);
+      const matchThesis = (s.thesis || '').toLowerCase().includes(q);
+      const matchRules = (s.entry_rules || '').toLowerCase().includes(q);
+      if (!matchTitle && !matchCode && !matchThesis && !matchRules) return false;
     }
     return true;
   });
 
   return (
     <div className="playbook-container">
-      {/* 1. MASTER UNIFIED PLAN & THESIS BANNER */}
+      {/* 1. HERO MASTER PLAYBOOK HEADER */}
       <div className="glass-panel playbook-master-card">
         <div className="playbook-master-header">
           <div className="master-badge-title">
-            <span className="master-icon">🎯</span>
+            <span className="master-icon">📖</span>
             <div>
-              <h3>{strategy?.title || 'Skynet Unified Trading Plan & Thesis'}</h3>
-              <p className="master-subtitle">แผนหลักหนึ่งเดียว — ใช้เกณฑ์เดียวกันกับทุกเหรียญและทุกการเทรด</p>
+              <h3>Trading Playbook — Setups & Theses Library</h3>
+              <p className="master-subtitle">
+                คลังพิมพ์เขียวและกฎเซ็ตอัพการเทรด — กำหนดมาตรฐานท่าเทรดเพื่อใช้เชื่อมโยงกับหน้าบันทึกการเทรด (Trade Log)
+              </p>
             </div>
           </div>
           <div className="master-actions">
-            <button
-              className="action-btn edit-strategy-btn"
-              onClick={() => {
-                if (strategy) setStrategyForm(strategy);
-                setShowStrategyModal(true);
-              }}
-            >
-              <span>⚙️ ปรับแต่งแผนหลัก & เกณฑ์</span>
+            <button className="primary-btn add-trade-btn" onClick={handleOpenAdd}>
+              <span>➕ สร้าง Setup ท่าเทรดใหม่</span>
             </button>
             <button
               className={`action-btn sync-ggd-btn ${syncing ? 'loading' : ''}`}
               onClick={handleSyncGgd}
               disabled={syncing}
-              title="ส่งสำรองข้อมูลทั้งหมดขึ้น Google Sheets/Drive"
+              title="ส่งสำรองคลัง Playbook Setups ขึ้น Google Sheets/Drive"
             >
-              <span>☁️ {syncing ? 'กำลังซิงค์ GGD...' : 'ซิงค์ไป Google (GGD)'}</span>
+              <span>☁️ {syncing ? 'กำลังซิงค์ GGD...' : 'ซิงค์ Playbook ไป Google (GGD)'}</span>
             </button>
-          </div>
-        </div>
-
-        {/* Master Rules Highlights */}
-        <div className="master-rules-grid">
-          <div className="rule-box thesis-box">
-            <div className="rule-label">💡 Core Thesis (สมมติฐานหลัก)</div>
-            <div className="rule-content">{strategy?.core_thesis || '-'}</div>
-          </div>
-          <div className="rule-box entry-box">
-            <div className="rule-label">✅ Entry Checklist (เงื่อนไขการเข้า)</div>
-            <div className="rule-content rule-multiline">{strategy?.entry_rules || '-'}</div>
-          </div>
-          <div className="rule-box invalidation-box">
-            <div className="rule-label">⚠️ Invalidation (จุดผิดทาง)</div>
-            <div className="rule-content rule-multiline">{strategy?.invalidation_rules || '-'}</div>
-          </div>
-          <div className="rule-box risk-box">
-            <div className="rule-label">⚖️ Risk Rules (การคุมความเสี่ยง)</div>
-            <div className="rule-content rule-multiline">{strategy?.risk_rules || '-'}</div>
           </div>
         </div>
 
@@ -330,55 +243,59 @@ export default function PlaybookTab() {
             {syncResult.time && <span className="sync-time">({syncResult.time})</span>}
           </div>
         )}
+
+        {/* Copy to clipboard toast */}
+        {copyToast && (
+          <div className="sync-toast success" style={{ marginTop: '10px' }}>
+            <span>📋</span>
+            <span>{copyToast}</span>
+          </div>
+        )}
       </div>
 
-      {/* 2. STATS OVERVIEW BAR */}
+      {/* 2. STATS BAR */}
       <div className="playbook-stats-grid">
         <div className="stat-card glass-panel">
           <div className="stat-icon">📚</div>
           <div>
-            <div className="stat-value">{stats?.totalTrades || 0}</div>
-            <div className="stat-label">บันทึกทั้งหมด</div>
-          </div>
-        </div>
-        <div className="stat-card glass-panel highlight-active">
-          <div className="stat-icon">⚡</div>
-          <div>
-            <div className="stat-value">{stats?.activeCount || 0}</div>
-            <div className="stat-label">กำลังเทรด (Active)</div>
-          </div>
-        </div>
-        <div className="stat-card glass-panel">
-          <div className="stat-icon">🎯</div>
-          <div>
-            <div className="stat-value">{stats?.winRate || 0}%</div>
-            <div className="stat-label">Win Rate ({stats?.winCount || 0}W / {stats?.lossCount || 0}L)</div>
+            <div className="stat-value">{stats?.totalSetups || 0}</div>
+            <div className="stat-label">พิมพ์เขียวท่าเทรดทั้งหมด</div>
           </div>
         </div>
         <div className="stat-card glass-panel highlight-r">
-          <div className="stat-icon">📈</div>
+          <div className="stat-icon">⭐</div>
           <div>
-            <div className="stat-value" style={{ color: (stats?.totalRealizedR || 0) >= 0 ? 'var(--life-color)' : 'var(--extravagant-color)' }}>
-              {(stats?.totalRealizedR || 0) >= 0 ? `+${stats?.totalRealizedR || 0}` : stats?.totalRealizedR || 0} R
+            <div className="stat-value" style={{ color: '#bf5af2' }}>{stats?.gradeAPlusCount || 0}</div>
+            <div className="stat-label">Grade A+ (ท่าไม้ตายหลัก)</div>
+          </div>
+        </div>
+        <div className="stat-card glass-panel highlight-active">
+          <div className="stat-icon">🎯</div>
+          <div>
+            <div className="stat-value">{stats?.gradeACount || 0}</div>
+            <div className="stat-label">Grade A (ท่าเทรดมาตรฐาน)</div>
+          </div>
+        </div>
+        <div className="stat-card glass-panel">
+          <div className="stat-icon">📐</div>
+          <div>
+            <div className="stat-value" style={{ color: '#ffd60a' }}>
+              1 : {stats?.avgTargetRR || 0} R
             </div>
-            <div className="stat-label">Net Realized R</div>
+            <div className="stat-label">Avg. Target Risk:Reward</div>
           </div>
         </div>
       </div>
 
-      {/* 3. TOOLBAR & CONTROLS */}
+      {/* 3. TOOLBAR & FILTERS */}
       <div className="playbook-toolbar glass-panel">
         <div className="toolbar-left">
-          <button className="primary-btn add-trade-btn" onClick={handleOpenAdd}>
-            <span>➕ จดบันทึก Setup ใหม่</span>
-          </button>
-
           {/* Search Box */}
           <div className="search-box">
             <span className="search-icon">🔍</span>
             <input
               type="text"
-              placeholder="ค้นหาชื่อแผน, เหรียญ, หรือ Thesis..."
+              placeholder="ค้นหารหัส, ชื่อเซ็ตอัพ, หรือ Thesis..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -389,197 +306,171 @@ export default function PlaybookTab() {
         </div>
 
         <div className="toolbar-right">
-          {/* Direction Filter */}
+          {/* Grade Filter */}
           <div className="pill-group">
             <button
-              className={`pill-btn ${directionFilter === 'ALL' ? 'active' : ''}`}
-              onClick={() => setDirectionFilter('ALL')}
+              className={`pill-btn ${gradeFilter === 'ALL' ? 'active' : ''}`}
+              onClick={() => setGradeFilter('ALL')}
             >
-              All
+              All Grades
             </button>
             <button
-              className={`pill-btn long ${directionFilter === 'LONG' ? 'active' : ''}`}
-              onClick={() => setDirectionFilter('LONG')}
+              className={`pill-btn ${gradeFilter === 'A+' ? 'active' : ''}`}
+              style={{ color: gradeFilter === 'A+' ? '#bf5af2' : '' }}
+              onClick={() => setGradeFilter('A+')}
             >
-              LONG 🟢
+              Grade A+ ⭐⭐⭐
             </button>
             <button
-              className={`pill-btn short ${directionFilter === 'SHORT' ? 'active' : ''}`}
-              onClick={() => setDirectionFilter('SHORT')}
+              className={`pill-btn ${gradeFilter === 'A' ? 'active' : ''}`}
+              style={{ color: gradeFilter === 'A' ? '#0a84ff' : '' }}
+              onClick={() => setGradeFilter('A')}
             >
-              SHORT 🔴
+              Grade A ⭐⭐
+            </button>
+            <button
+              className={`pill-btn ${gradeFilter === 'B' ? 'active' : ''}`}
+              style={{ color: gradeFilter === 'B' ? '#ff9f0a' : '' }}
+              onClick={() => setGradeFilter('B')}
+            >
+              Grade B ⭐
             </button>
           </div>
 
-          {/* Status Filter */}
+          {/* Direction Filter */}
           <select
             className="status-dropdown-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            value={directionFilter}
+            onChange={(e) => setDirectionFilter(e.target.value)}
           >
-            <option value="ALL">สถานะทั้งหมด</option>
-            <option value="WATCHLIST">🟡 เฝ้าระวัง / แผนรอ</option>
-            <option value="ACTIVE">🔵 เข้าออเดอร์แล้ว (Active)</option>
-            <option value="WIN">🟢 ชนเป้า (WIN)</option>
-            <option value="LOSS">🔴 โดน SL (LOSS)</option>
-            <option value="BREAKEVEN">⚪ เสมอทุน (BE)</option>
-            <option value="CANCELLED">⚫ ยกเลิกแผน</option>
+            <option value="ALL">ทิศทางทั้งหมด (All)</option>
+            <option value="BOTH">🔄 เล่นได้ทั้ง LONG & SHORT</option>
+            <option value="LONG">🟢 LONG เท่านั้น</option>
+            <option value="SHORT">🔴 SHORT เท่านั้น</option>
           </select>
         </div>
       </div>
 
-      {/* 4. TRADES GRID */}
+      {/* 4. SETUPS BLUEPRINT GRID */}
       {loading ? (
         <div className="empty-state glass-panel">
           <div className="pulse-dot" style={{ margin: '0 auto 16px auto' }}></div>
-          <p>กำลังโหลด Playbook...</p>
+          <p>กำลังโหลด Playbook Setups...</p>
         </div>
-      ) : filteredTrades.length === 0 ? (
+      ) : filteredSetups.length === 0 ? (
         <div className="empty-state glass-panel">
           <div className="empty-icon">📖</div>
-          <h3>ยังไม่มีรายการบันทึกในมุมมองนี้</h3>
-          <p>กดปุ่ม <strong>"➕ จดบันทึก Setup ใหม่"</strong> เพื่อเริ่มบันทึกแผนตาม Master Strategy ได้เลย</p>
+          <h3>ยังไม่มีเซ็ตอัพท่าเทรดในมุมมองนี้</h3>
+          <p>กดปุ่ม <strong>"➕ สร้าง Setup ท่าเทรดใหม่"</strong> เพื่อบันทึกพิมพ์เขียวการเทรดแรกของคุณ</p>
         </div>
       ) : (
-        <div className="trades-grid">
-          {filteredTrades.map((t) => {
-            const statusCfg = STATUS_CONFIG[t.status] || STATUS_CONFIG.WATCHLIST;
-            const isLong = t.direction === 'LONG';
+        <div className="trades-grid playbook-setups-grid">
+          {filteredSetups.map((s) => {
+            const gradeCfg = GRADE_CONFIG[s.grade] || GRADE_CONFIG['A+'];
+            const entryRulesList = (s.entry_rules || '').split('\n').filter(Boolean);
 
             return (
-              <div key={t.id} className="trade-card glass-panel">
-                {/* Top Row: Symbol, Direction, Date & Status */}
+              <div key={s.id} className="trade-card playbook-card glass-panel">
+                {/* Header Row: Code, Direction & Grade Badge */}
                 <div className="card-top-row">
                   <div className="card-symbol-badge">
-                    <span className={`direction-badge ${isLong ? 'long' : 'short'}`}>
-                      {isLong ? '🟢 LONG' : '🔴 SHORT'}
+                    <span className="setup-code-badge">{s.code}</span>
+                    <span className={`direction-badge ${s.direction === 'LONG' ? 'long' : s.direction === 'SHORT' ? 'short' : 'both'}`}>
+                      {s.direction === 'LONG' ? '🟢 LONG' : s.direction === 'SHORT' ? '🔴 SHORT' : '🔄 BOTH'}
                     </span>
-                    <strong className="symbol-name">{t.symbol || 'ASSET'}</strong>
-                    <span className="card-date">{t.date}</span>
                   </div>
 
                   <span
-                    className="status-badge-pill"
+                    className="status-badge-pill grade-pill"
                     style={{
-                      backgroundColor: statusCfg.bg,
-                      color: statusCfg.color,
-                      borderColor: statusCfg.border,
+                      backgroundColor: gradeCfg.bg,
+                      color: gradeCfg.color,
+                      borderColor: gradeCfg.border,
                     }}
                   >
-                    {statusCfg.emoji} {statusCfg.label}
+                    {gradeCfg.badgeText}
                   </span>
                 </div>
 
-                {/* Card Title */}
-                <h4 className="card-title" onClick={() => setViewDetailTrade(t)} title="คลิกเพื่อดูรายละเอียด">
-                  {t.title}
+                {/* Setup Title */}
+                <h4 className="card-title" onClick={() => setViewDetailSetup(s)} title="คลิกเพื่อดูพิมพ์เขียวเต็มจอ">
+                  {s.title}
                 </h4>
 
-                {/* Price & RR Highlights */}
-                <div className="card-price-grid">
-                  <div className="price-item">
-                    <span className="p-label">Entry</span>
-                    <span className="p-val">{t.entry_price ? t.entry_price.toLocaleString() : '-'}</span>
-                  </div>
-                  <div className="price-item sl">
-                    <span className="p-label">Stop Loss</span>
-                    <span className="p-val">{t.sl_price ? t.sl_price.toLocaleString() : '-'}</span>
-                  </div>
-                  <div className="price-item tp">
-                    <span className="p-label">Take Profit</span>
-                    <span className="p-val">{t.tp_price ? t.tp_price.toLocaleString() : '-'}</span>
-                  </div>
-                  <div className="price-item rr">
-                    <span className="p-label">R:R Planned</span>
-                    <span className="p-val bold">{t.rr_ratio ? `1 : ${t.rr_ratio}R` : '-'}</span>
+                {/* Quick Specs Pill Bar */}
+                <div className="setup-specs-bar">
+                  <span className="spec-pill rr-spec">🎯 Target R:R: <strong>1 : {s.target_rr}R</strong></span>
+                  <span className="spec-pill">⏱️ {s.timeframe || 'Any TF'}</span>
+                  <span className="spec-pill">🌍 {s.session || 'All Sessions'}</span>
+                </div>
+
+                {/* 1. Core Thesis & Market Edge */}
+                <div className="blueprint-section">
+                  <div className="blueprint-label">💡 Core Thesis & Market Edge</div>
+                  <p className="blueprint-thesis">{s.thesis}</p>
+                </div>
+
+                {/* 2. Entry Checklist */}
+                <div className="blueprint-section">
+                  <div className="blueprint-label">✅ Entry Checklist (กฎที่ต้องครบ)</div>
+                  <div className="blueprint-rules-list">
+                    {entryRulesList.map((rule, idx) => (
+                      <div key={idx} className="rule-item">
+                        <span className="check-icon">✓</span>
+                        <span>{rule.replace(/^[0-9]+\.\s*/, '')}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Thesis Snippet */}
-                {t.thesis && (
-                  <div className="card-thesis-snippet" onClick={() => setViewDetailTrade(t)}>
-                    <span className="thesis-quote-icon">“</span>
-                    <span className="thesis-text">{t.thesis}</span>
+                {/* 3. Invalidation & Stop Loss */}
+                {s.invalidation_rules && (
+                  <div className="blueprint-section invalidation-highlight">
+                    <div className="blueprint-label">🛑 Stop Loss & Invalidation Criteria</div>
+                    <div className="blueprint-content rule-multiline">{s.invalidation_rules}</div>
                   </div>
                 )}
 
-                {/* Checklist Chips */}
-                {t.checklist && t.checklist.length > 0 && (
-                  <div className="card-chips-wrap">
-                    {t.checklist.map((item, idx) => (
-                      <span key={idx} className="confluence-chip">✓ {item}</span>
-                    ))}
+                {/* 4. Exit / Target Rules */}
+                {s.exit_rules && (
+                  <div className="blueprint-section">
+                    <div className="blueprint-label">🎯 Exit Strategy & Targets</div>
+                    <div className="blueprint-content rule-multiline">{s.exit_rules}</div>
                   </div>
                 )}
 
-                {/* Outcome & Review (if closed) */}
-                {(t.status === 'WIN' || t.status === 'LOSS' || t.status === 'BREAKEVEN') && (
-                  <div className={`card-outcome-banner ${t.status.toLowerCase()}`}>
-                    <div className="outcome-r">
-                      <strong>ผลลัพธ์:</strong>{' '}
-                      <span className="r-tag">
-                        {t.realized_r !== null && t.realized_r !== undefined
-                          ? t.realized_r >= 0
-                            ? `+${t.realized_r} R`
-                            : `${t.realized_r} R`
-                          : '-'}
-                      </span>
-                    </div>
-                    {t.review_notes && (
-                      <div className="outcome-review">
-                        📝 <em>{t.review_notes}</em>
-                      </div>
-                    )}
+                {/* 5. Mistakes to Avoid */}
+                {s.mistakes_to_avoid && (
+                  <div className="blueprint-section warning-highlight">
+                    <div className="blueprint-label">⚠️ ข้อควรระวัง / สิ่งที่ห้ามทำ</div>
+                    <div className="blueprint-content rule-multiline">{s.mistakes_to_avoid}</div>
                   </div>
                 )}
 
-                {/* Chart Link if available */}
-                {t.chart_url && (
+                {/* 6. Chart Blueprint Link */}
+                {s.chart_blueprint_url && (
                   <div className="card-chart-link">
-                    <a href={t.chart_url} target="_blank" rel="noopener noreferrer">
-                      📈 ดูรูปชาร์ตการเทรด ↗
+                    <a href={s.chart_blueprint_url} target="_blank" rel="noopener noreferrer">
+                      📈 ดูรูปชาร์ตพิมพ์เขียวตัวอย่างในอุดมคติ ↗
                     </a>
                   </div>
                 )}
 
-                {/* Card Footer: Quick Status Toggles & Actions */}
+                {/* Card Footer Actions */}
                 <div className="card-footer">
-                  <div className="quick-status-buttons">
-                    <button
-                      className={`qs-btn ${t.status === 'ACTIVE' ? 'active' : ''}`}
-                      onClick={() => handleQuickStatus(t, 'ACTIVE')}
-                      title="กำลังเทรด"
-                    >
-                      🔵 Active
-                    </button>
-                    <button
-                      className={`qs-btn win ${t.status === 'WIN' ? 'active' : ''}`}
-                      onClick={() => handleQuickStatus(t, 'WIN')}
-                      title="ชนะเป้า"
-                    >
-                      🟢 Win
-                    </button>
-                    <button
-                      className={`qs-btn loss ${t.status === 'LOSS' ? 'active' : ''}`}
-                      onClick={() => handleQuickStatus(t, 'LOSS')}
-                      title="แพ้ SL"
-                    >
-                      🔴 Loss
-                    </button>
-                    <button
-                      className={`qs-btn be ${t.status === 'BREAKEVEN' ? 'active' : ''}`}
-                      onClick={() => handleQuickStatus(t, 'BREAKEVEN')}
-                      title="เสมอทุน"
-                    >
-                      ⚪ BE
-                    </button>
-                  </div>
+                  <button
+                    className="action-btn copy-link-btn"
+                    onClick={() => handleCopyTag(s)}
+                    title="คัดลอก Tag เซ็ตอัพนี้สำหรับใช้อ้างอิงในบันทึกการเทรด"
+                  >
+                    <span>📋 คัดลอก Link/Tag</span>
+                  </button>
 
                   <div className="card-actions">
-                    <button className="icon-action-btn" onClick={() => handleOpenEdit(t)} title="แก้ไข">
+                    <button className="icon-action-btn" onClick={() => handleOpenEdit(s)} title="แก้ไขพิมพ์เขียว">
                       ✏️
                     </button>
-                    <button className="icon-action-btn delete" onClick={() => handleDeleteTrade(t.id)} title="ลบ">
+                    <button className="icon-action-btn delete" onClick={() => handleDeleteSetup(s.id, s.code)} title="ลบ">
                       🗑️
                     </button>
                   </div>
@@ -590,233 +481,180 @@ export default function PlaybookTab() {
         </div>
       )}
 
-      {/* 5. ADD / EDIT TRADE MODAL */}
-      {showTradeModal && (
-        <div className="modal-overlay" onClick={() => setShowTradeModal(false)}>
+      {/* 5. ADD / EDIT SETUP MODAL */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-wrap">
-                <span className="modal-icon">{editingTrade ? '✏️' : '➕'}</span>
+                <span className="modal-icon">{editingSetup ? '✏️' : '➕'}</span>
                 <div>
-                  <h3>{editingTrade ? 'แก้ไขแผนการเทรด' : 'จดบันทึก Setup ใหม่ตามแผนหลัก'}</h3>
-                  <p className="modal-subtitle">บันทึกรายละเอียด แผนการเข้า และ Thesis เฉพาะไม้นี้</p>
+                  <h3>{editingSetup ? 'แก้ไขพิมพ์เขียว Playbook Setup' : 'สร้าง Playbook Setup ท่าเทรดใหม่'}</h3>
+                  <p className="modal-subtitle">กำหนดเกณฑ์ สมมติฐาน และกฎการเทรดเพื่อใช้เป็นมาตรฐานในการเทรด</p>
                 </div>
               </div>
-              <button className="modal-close-btn" onClick={() => setShowTradeModal(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setShowModal(false)}>✕</button>
             </div>
 
-            <form onSubmit={handleSaveTrade} className="trade-modal-form">
-              {/* Row 1: Symbol & Direction */}
+            <form onSubmit={handleSaveSetup} className="trade-modal-form">
+              {/* Row 1: Code & Title */}
               <div className="form-row two-cols">
                 <div className="form-field">
-                  <label>สัญลักษณ์ / เหรียญ (Symbol)</label>
-                  <div className="symbol-input-group">
-                    <input
-                      type="text"
-                      placeholder="เช่น BTC, ETH, XAUUSD, EURUSD"
-                      value={formData.symbol}
-                      onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
-                      required
-                    />
-                    <div className="quick-symbol-chips">
-                      {['BTC', 'ETH', 'SOL', 'XAUUSD', 'EURUSD'].map((sym) => (
-                        <button
-                          key={sym}
-                          type="button"
-                          className={`chip-btn ${formData.symbol === sym ? 'active' : ''}`}
-                          onClick={() => setFormData({ ...formData, symbol: sym })}
-                        >
-                          {sym}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="form-field">
-                  <label>ทิศทาง (Direction)</label>
-                  <div className="direction-toggle-group">
-                    <button
-                      type="button"
-                      className={`dir-btn long ${formData.direction === 'LONG' ? 'active' : ''}`}
-                      onClick={() => setFormData({ ...formData, direction: 'LONG' })}
-                    >
-                      🟢 LONG (ซื้อ)
-                    </button>
-                    <button
-                      type="button"
-                      className={`dir-btn short ${formData.direction === 'SHORT' ? 'active' : ''}`}
-                      onClick={() => setFormData({ ...formData, direction: 'SHORT' })}
-                    >
-                      🔴 SHORT (ขาย)
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 2: Title & Date */}
-              <div className="form-row two-cols">
-                <div className="form-field">
-                  <label>ชื่อเซ็ตอัพ / หัวข้อแผน</label>
+                  <label>รหัสเซ็ตอัพ (Setup Code เช่น SETUP-01)</label>
                   <input
                     type="text"
-                    placeholder="เช่น HTF Key Support Sweep & Rejection"
+                    placeholder="SETUP-01"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>ชื่อเซ็ตอัพ / ท่าเทรด (Setup Title)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น Liquidity Sweep & MSS, Trend Pullback to EMA"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     required
                   />
                 </div>
-                <div className="form-field">
-                  <label>วันที่วางแผน / เข้าเทรด</label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    required
-                  />
-                </div>
               </div>
 
-              {/* Row 3: Prices & Auto R:R */}
-              <div className="form-row four-cols prices-row">
-                <div className="form-field">
-                  <label>ราคาเข้า (Entry)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="0.00"
-                    value={formData.entry_price}
-                    onChange={(e) => setFormData({ ...formData, entry_price: e.target.value })}
-                  />
-                </div>
-                <div className="form-field">
-                  <label>Stop Loss (SL)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="0.00"
-                    value={formData.sl_price}
-                    onChange={(e) => setFormData({ ...formData, sl_price: e.target.value })}
-                  />
-                </div>
-                <div className="form-field">
-                  <label>Take Profit (TP)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="0.00"
-                    value={formData.tp_price}
-                    onChange={(e) => setFormData({ ...formData, tp_price: e.target.value })}
-                  />
-                </div>
-                <div className="form-field rr-field">
-                  <label>R:R คำนวณอัตโนมัติ</label>
-                  <div className="auto-rr-box">
-                    <strong>{formData.rr_ratio ? `1 : ${formData.rr_ratio} R` : '-'}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Confluence Checklist */}
-              <div className="form-field">
-                <label>เงื่อนไขคอนเฟิร์มตามแผนหลัก (Checklist)</label>
-                <div className="checklist-toggle-wrap">
-                  {[
-                    'HTF Trend In Favor',
-                    'Key Level Rejection',
-                    'Liquidity Swept',
-                    'Momentum / Divergence',
-                    'R:R >= 2.0',
-                    'Risk <= 1%',
-                  ].map((rule) => {
-                    const checked = formData.checklist.includes(rule);
-                    return (
-                      <button
-                        key={rule}
-                        type="button"
-                        className={`checklist-tag ${checked ? 'checked' : ''}`}
-                        onClick={() => toggleChecklist(rule)}
-                      >
-                        {checked ? '✓ ' : '+ '} {rule}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Specific Trade Thesis */}
-              <div className="form-field">
-                <label>สมมติฐานการเทรดเฉพาะไม้นี้ (Thesis)</label>
-                <textarea
-                  rows="2"
-                  placeholder="เหตุผลทำไมถึงเปิดออเดอร์ไม้นี้? พฤติกรรมราคาหรือข่าวอะไรที่สนับสนุน?"
-                  value={formData.thesis}
-                  onChange={(e) => setFormData({ ...formData, thesis: e.target.value })}
-                />
-              </div>
-
-              {/* Chart URL & Status */}
+              {/* Row 2: Grade & Direction */}
               <div className="form-row two-cols">
                 <div className="form-field">
-                  <label>ลิงก์ภาพชาร์ต (Chart URL / TradingView)</label>
-                  <input
-                    type="url"
-                    placeholder="https://www.tradingview.com/x/... หรือ Google Drive link"
-                    value={formData.chart_url}
-                    onChange={(e) => setFormData({ ...formData, chart_url: e.target.value })}
-                  />
-                </div>
-                <div className="form-field">
-                  <label>สถานะของออเดอร์</label>
+                  <label>เกรดความมั่นใจ (Setup Grade)</label>
                   <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    value={formData.grade}
+                    onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
                   >
-                    <option value="WATCHLIST">🟡 เฝ้าระวัง / แผนรอ</option>
-                    <option value="ACTIVE">🔵 เข้าออเดอร์แล้ว (Active)</option>
-                    <option value="WIN">🟢 ชนเป้า (WIN)</option>
-                    <option value="LOSS">🔴 โดน SL (LOSS)</option>
-                    <option value="BREAKEVEN">⚪ เสมอทุน (BE)</option>
-                    <option value="CANCELLED">⚫ ยกเลิกแผน</option>
+                    <option value="A+">⭐ Grade A+ (ท่าไม้ตายหลัก / High Conviction / ใส่เต็ม Size)</option>
+                    <option value="A">⭐ Grade A (ท่าเทรดมาตรฐาน / Standard Size)</option>
+                    <option value="B">⭐ Grade B (ท่าเทรดเสริม / ลดขนาดความเสี่ยงครึ่งหนึ่ง)</option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label>ทิศทางที่ใช้ได้ (Direction)</label>
+                  <select
+                    value={formData.direction}
+                    onChange={(e) => setFormData({ ...formData, direction: e.target.value })}
+                  >
+                    <option value="BOTH">🔄 เล่นได้ทั้งสองฝั่ง (LONG & SHORT)</option>
+                    <option value="LONG">🟢 LONG (ซื้ออย่างเดียว)</option>
+                    <option value="SHORT">🔴 SHORT (ขายอย่างเดียว)</option>
                   </select>
                 </div>
               </div>
 
-              {/* Post-Trade Outcome (Collapsible / Visible when closed) */}
-              {(formData.status === 'WIN' || formData.status === 'LOSS' || formData.status === 'BREAKEVEN') && (
-                <div className="post-trade-section glass-panel">
-                  <h5>📝 บันทึกผลลัพธ์หลังปิดออเดอร์ (Post-Trade Review)</h5>
-                  <div className="form-row two-cols">
-                    <div className="form-field">
-                      <label>Realized R (ผลตอบแทนจริง)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        placeholder="เช่น 3.0 หรือ -1.0 หรือ 0"
-                        value={formData.realized_r}
-                        onChange={(e) => setFormData({ ...formData, realized_r: e.target.value })}
-                      />
-                    </div>
-                    <div className="form-field">
-                      <label>บทเรียน / สิ่งที่ทำได้ดี / ข้อผิดพลาด</label>
-                      <input
-                        type="text"
-                        placeholder="เช่น รันตามแผนได้ดี, ไม่ขยับ SL สุ่มสี่สุ่มห้า"
-                        value={formData.review_notes}
-                        onChange={(e) => setFormData({ ...formData, review_notes: e.target.value })}
-                      />
-                    </div>
-                  </div>
+              {/* Row 3: Target R:R, Timeframe, Session */}
+              <div className="form-row three-cols">
+                <div className="form-field">
+                  <label>R:R เป้าหมาย (Target R:R)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    placeholder="3.0"
+                    value={formData.target_rr}
+                    onChange={(e) => setFormData({ ...formData, target_rr: e.target.value })}
+                  />
                 </div>
-              )}
+                <div className="form-field">
+                  <label>Timeframe ที่เหมาะสม</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น 15M - 1H, 4H"
+                    value={formData.timeframe}
+                    onChange={(e) => setFormData({ ...formData, timeframe: e.target.value })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>ช่วงเวลา / Session</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น London / New York"
+                    value={formData.session}
+                    onChange={(e) => setFormData({ ...formData, session: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Core Thesis */}
+              <div className="form-field">
+                <label>💡 Core Thesis & Market Edge (ทำไมท่านี้ถึงชนะในตลาด / กลไกราคาคืออะไร?)</label>
+                <textarea
+                  rows="3"
+                  placeholder="อธิบายเหตุผลทางพฤติกรรมราคา การกระทำของ Smart Money หรือความได้เปรียบทางสถิติ..."
+                  value={formData.thesis}
+                  onChange={(e) => setFormData({ ...formData, thesis: e.target.value })}
+                  required
+                />
+              </div>
+
+              {/* Entry Rules Checklist */}
+              <div className="form-field">
+                <label>✅ Entry Checklist (เงื่อนไขและกฎการเข้าออเดอร์ — พิมพ์แยกข้อละ 1 บรรทัด)</label>
+                <textarea
+                  rows="4"
+                  placeholder="1. สภาพคล่อง High/Low เดิมถูกกวาด&#10;2. เกิดแท่งเทียน Rejection ใน 15M&#10;3. ย่อเข้าโซน FVG/OB&#10;4. Risk:Reward ขั้นต่ำ 1:2.5R"
+                  value={formData.entry_rules}
+                  onChange={(e) => setFormData({ ...formData, entry_rules: e.target.value })}
+                  required
+                />
+              </div>
+
+              {/* Stop Loss & Invalidation */}
+              <div className="form-field">
+                <label>🛑 Stop Loss & Invalidation Criteria (จุดตัดขาดทุน / เงื่อนไขที่บอกว่าท่านี้พัง)</label>
+                <textarea
+                  rows="2"
+                  placeholder="วาง SL ตรงไหน และอะไรคือสิ่งที่บอกว่าท่านี้ผิดทางให้รีบตัดขาดทุน..."
+                  value={formData.invalidation_rules}
+                  onChange={(e) => setFormData({ ...formData, invalidation_rules: e.target.value })}
+                />
+              </div>
+
+              {/* Exit Rules */}
+              <div className="form-field">
+                <label>🎯 Exit & Take Profit Strategy (กฎการทำกำไร & Trailing Stop)</label>
+                <textarea
+                  rows="2"
+                  placeholder="เช่น TP1 ที่ 2.0R แบ่งปิด 50% เลื่อน SL บังทุน, TP2 ที่ขอบ Liquidity Pool ฝั่งตรงข้าม"
+                  value={formData.exit_rules}
+                  onChange={(e) => setFormData({ ...formData, exit_rules: e.target.value })}
+                />
+              </div>
+
+              {/* Mistakes to Avoid */}
+              <div className="form-field">
+                <label>⚠️ สิ่งที่ห้ามทำ / ข้อควรระวัง (Do's & Don'ts)</label>
+                <textarea
+                  rows="2"
+                  placeholder="เช่น ห้ามเข้าก่อนเห็นแท่งปิดคอนเฟิร์ม, ห้ามเล่นช่วงข่าวกล่องแดง..."
+                  value={formData.mistakes_to_avoid}
+                  onChange={(e) => setFormData({ ...formData, mistakes_to_avoid: e.target.value })}
+                />
+              </div>
+
+              {/* Chart URL */}
+              <div className="form-field">
+                <label>📈 ลิงก์รูปชาร์ตพิมพ์เขียวตัวอย่างในอุดมคติ (Ideal Chart URL / TradingView)</label>
+                <input
+                  type="url"
+                  placeholder="https://www.tradingview.com/x/... หรือ Google Drive link"
+                  value={formData.chart_blueprint_url}
+                  onChange={(e) => setFormData({ ...formData, chart_blueprint_url: e.target.value })}
+                />
+              </div>
 
               {/* Modal Footer */}
               <div className="modal-footer">
-                <button type="button" className="action-btn cancel-btn" onClick={() => setShowTradeModal(false)}>
+                <button type="button" className="action-btn cancel-btn" onClick={() => setShowModal(false)}>
                   ยกเลิก
                 </button>
                 <button type="submit" className="primary-btn save-trade-btn">
-                  💾 {editingTrade ? 'บันทึกการแก้ไข' : 'บันทึกแผนลง Playbook'}
+                  💾 {editingSetup ? 'บันทึกการแก้ไขพิมพ์เขียว' : 'บันทึก Setup ลง Playbook'}
                 </button>
               </div>
             </form>
@@ -824,175 +662,78 @@ export default function PlaybookTab() {
         </div>
       )}
 
-      {/* 6. EDIT MASTER STRATEGY MODAL */}
-      {showStrategyModal && (
-        <div className="modal-overlay" onClick={() => setShowStrategyModal(false)}>
-          <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title-wrap">
-                <span className="modal-icon">🎯</span>
-                <div>
-                  <h3>ปรับแต่ง Master Trading Plan & Unified Thesis</h3>
-                  <p className="modal-subtitle">ตั้งค่าเกณฑ์และสมมติฐานหลักหนึ่งเดียวที่จะนำไปใช้กับทุกการเทรด</p>
-                </div>
-              </div>
-              <button className="modal-close-btn" onClick={() => setShowStrategyModal(false)}>✕</button>
-            </div>
-
-            <form onSubmit={handleSaveStrategy} className="strategy-modal-form">
-              <div className="form-field">
-                <label>ชื่อแผนการเทรดหลัก (Master Plan Title)</label>
-                <input
-                  type="text"
-                  value={strategyForm.title}
-                  onChange={(e) => setStrategyForm({ ...strategyForm, title: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-field">
-                <label>💡 Core Thesis (สมมติฐานหลัก / ทำไมระบบนี้ถึงมี Edge ในตลาด)</label>
-                <textarea
-                  rows="3"
-                  value={strategyForm.core_thesis}
-                  onChange={(e) => setStrategyForm({ ...strategyForm, core_thesis: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-field">
-                <label>✅ Entry Rules & Checklist (เงื่อนไขและเกณฑ์การเข้าออเดอร์)</label>
-                <textarea
-                  rows="4"
-                  value={strategyForm.entry_rules}
-                  onChange={(e) => setStrategyForm({ ...strategyForm, entry_rules: e.target.value })}
-                  placeholder="แยกข้อละ 1 บรรทัด..."
-                />
-              </div>
-
-              <div className="form-field">
-                <label>⚠️ Invalidation Criteria (จุดหรือสัญญาณที่บ่งบอกว่าสมมติฐานพัง)</label>
-                <textarea
-                  rows="3"
-                  value={strategyForm.invalidation_rules}
-                  onChange={(e) => setStrategyForm({ ...strategyForm, invalidation_rules: e.target.value })}
-                  placeholder="แยกข้อละ 1 บรรทัด..."
-                />
-              </div>
-
-              <div className="form-field">
-                <label>⚖️ Risk Management Rules (กฎการบริหารความเสี่ยง & การคุม Drawdown)</label>
-                <textarea
-                  rows="3"
-                  value={strategyForm.risk_rules}
-                  onChange={(e) => setStrategyForm({ ...strategyForm, risk_rules: e.target.value })}
-                  placeholder="เช่น เสี่ยงไม่เกิน 1% ต่อไม้, R:R >= 2.0 เสมอ"
-                />
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="action-btn cancel-btn" onClick={() => setShowStrategyModal(false)}>
-                  ยกเลิก
-                </button>
-                <button type="submit" className="primary-btn save-trade-btn">
-                  💾 บันทึกแผนหลัก
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 7. TRADE DETAIL INSPECTOR MODAL */}
-      {viewDetailTrade && (
-        <div className="modal-overlay" onClick={() => setViewDetailTrade(null)}>
+      {/* 6. DETAIL INSPECTOR MODAL */}
+      {viewDetailSetup && (
+        <div className="modal-overlay" onClick={() => setViewDetailSetup(null)}>
           <div className="modal-content detail-inspector glass-panel" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-wrap">
-                <span className={`direction-badge ${viewDetailTrade.direction === 'LONG' ? 'long' : 'short'}`}>
-                  {viewDetailTrade.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT'}
-                </span>
+                <span className="setup-code-badge large">{viewDetailSetup.code}</span>
                 <div>
-                  <h3>{viewDetailTrade.title}</h3>
-                  <p className="modal-subtitle">{viewDetailTrade.symbol || 'ASSET'} • {viewDetailTrade.date}</p>
+                  <h3>{viewDetailSetup.title}</h3>
+                  <p className="modal-subtitle">
+                    {GRADE_CONFIG[viewDetailSetup.grade]?.label} • {viewDetailSetup.direction}
+                  </p>
                 </div>
               </div>
-              <button className="modal-close-btn" onClick={() => setViewDetailTrade(null)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setViewDetailSetup(null)}>✕</button>
             </div>
 
             <div className="detail-body">
-              {/* Status & RR */}
-              <div className="detail-pills-row">
-                <span className="status-badge-pill">
-                  {STATUS_CONFIG[viewDetailTrade.status]?.emoji} {STATUS_CONFIG[viewDetailTrade.status]?.label}
-                </span>
-                {viewDetailTrade.rr_ratio && (
-                  <span className="rr-badge-pill">
-                    🎯 R:R Planned: 1 : {viewDetailTrade.rr_ratio}R
-                  </span>
-                )}
-                {viewDetailTrade.realized_r !== null && viewDetailTrade.realized_r !== undefined && (
-                  <span className={`rr-badge-pill ${viewDetailTrade.realized_r >= 0 ? 'win' : 'loss'}`}>
-                    📊 Realized: {viewDetailTrade.realized_r >= 0 ? `+${viewDetailTrade.realized_r}` : viewDetailTrade.realized_r} R
-                  </span>
-                )}
+              <div className="setup-specs-bar" style={{ marginBottom: '14px' }}>
+                <span className="spec-pill rr-spec">🎯 Target R:R: <strong>1 : {viewDetailSetup.target_rr}R</strong></span>
+                <span className="spec-pill">⏱️ {viewDetailSetup.timeframe}</span>
+                <span className="spec-pill">🌍 {viewDetailSetup.session}</span>
               </div>
 
-              {/* Price Details */}
-              <div className="card-price-grid detail-price-grid">
-                <div className="price-item">
-                  <span className="p-label">Entry</span>
-                  <span className="p-val">{viewDetailTrade.entry_price ? viewDetailTrade.entry_price.toLocaleString() : '-'}</span>
-                </div>
-                <div className="price-item sl">
-                  <span className="p-label">Stop Loss</span>
-                  <span className="p-val">{viewDetailTrade.sl_price ? viewDetailTrade.sl_price.toLocaleString() : '-'}</span>
-                </div>
-                <div className="price-item tp">
-                  <span className="p-label">Take Profit</span>
-                  <span className="p-val">{viewDetailTrade.tp_price ? viewDetailTrade.tp_price.toLocaleString() : '-'}</span>
+              <div className="detail-section">
+                <div className="detail-section-title">💡 Core Thesis & Market Edge</div>
+                <p className="detail-text">{viewDetailSetup.thesis}</p>
+              </div>
+
+              <div className="detail-section">
+                <div className="detail-section-title">✅ Entry Checklist</div>
+                <div className="blueprint-rules-list">
+                  {(viewDetailSetup.entry_rules || '').split('\n').filter(Boolean).map((rule, idx) => (
+                    <div key={idx} className="rule-item">
+                      <span className="check-icon">✓</span>
+                      <span>{rule}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Thesis */}
-              {viewDetailTrade.thesis && (
+              {viewDetailSetup.invalidation_rules && (
                 <div className="detail-section">
-                  <div className="detail-section-title">💡 Trade Thesis</div>
-                  <p className="detail-text">{viewDetailTrade.thesis}</p>
+                  <div className="detail-section-title">🛑 Stop Loss & Invalidation Criteria</div>
+                  <p className="detail-text invalidation-text">{viewDetailSetup.invalidation_rules}</p>
                 </div>
               )}
 
-              {/* Checklist */}
-              {viewDetailTrade.checklist && viewDetailTrade.checklist.length > 0 && (
+              {viewDetailSetup.exit_rules && (
                 <div className="detail-section">
-                  <div className="detail-section-title">✅ Confirmed Criteria</div>
-                  <div className="card-chips-wrap">
-                    {viewDetailTrade.checklist.map((item, idx) => (
-                      <span key={idx} className="confluence-chip">✓ {item}</span>
-                    ))}
-                  </div>
+                  <div className="detail-section-title">🎯 Exit Strategy & Targets</div>
+                  <p className="detail-text">{viewDetailSetup.exit_rules}</p>
                 </div>
               )}
 
-              {/* Post-Trade Review */}
-              {viewDetailTrade.review_notes && (
+              {viewDetailSetup.mistakes_to_avoid && (
                 <div className="detail-section">
-                  <div className="detail-section-title">📝 Post-Trade Reflection & Review</div>
-                  <p className="detail-text review-box">{viewDetailTrade.review_notes}</p>
+                  <div className="detail-section-title">⚠️ ข้อควรระวัง / สิ่งที่ห้ามทำ</div>
+                  <p className="detail-text warning-text">{viewDetailSetup.mistakes_to_avoid}</p>
                 </div>
               )}
 
-              {/* Chart Link */}
-              {viewDetailTrade.chart_url && (
+              {viewDetailSetup.chart_blueprint_url && (
                 <div className="detail-section">
-                  <div className="detail-section-title">📈 Chart Snapshot</div>
+                  <div className="detail-section-title">📈 Reference Chart</div>
                   <a
-                    href={viewDetailTrade.chart_url}
+                    href={viewDetailSetup.chart_blueprint_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="chart-open-link"
                   >
-                    เปิดดูชาร์ตการเทรดในแท็บใหม่ ↗
+                    เปิดดูชาร์ตพิมพ์เขียวตัวอย่างในแท็บใหม่ ↗
                   </a>
                 </div>
               )}
@@ -1001,15 +742,22 @@ export default function PlaybookTab() {
             <div className="modal-footer">
               <button
                 type="button"
+                className="action-btn"
+                onClick={() => handleCopyTag(viewDetailSetup)}
+              >
+                📋 คัดลอก Link/Tag
+              </button>
+              <button
+                type="button"
                 className="action-btn edit-strategy-btn"
                 onClick={() => {
-                  setViewDetailTrade(null);
-                  handleOpenEdit(viewDetailTrade);
+                  setViewDetailSetup(null);
+                  handleOpenEdit(viewDetailSetup);
                 }}
               >
-                ✏️ แก้ไขแผนนี้
+                ✏️ แก้ไขพิมพ์เขียวนี้
               </button>
-              <button type="button" className="primary-btn" onClick={() => setViewDetailTrade(null)}>
+              <button type="button" className="primary-btn" onClick={() => setViewDetailSetup(null)}>
                 ปิด
               </button>
             </div>
