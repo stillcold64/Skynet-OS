@@ -198,4 +198,105 @@ if (drawdownCount === 0) {
   `).run();
 }
 
+// 7. Playbook Unified Strategy (Master Plan & Core Thesis)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS playbook_strategy (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    core_thesis TEXT NOT NULL,
+    entry_rules TEXT,
+    invalidation_rules TEXT,
+    risk_rules TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default unified strategy if empty
+const strategyCount = db.prepare('SELECT COUNT(*) as count FROM playbook_strategy').get().count;
+if (strategyCount === 0) {
+  db.prepare(`
+    INSERT INTO playbook_strategy (id, title, core_thesis, entry_rules, invalidation_rules, risk_rules)
+    VALUES (1, ?, ?, ?, ?, ?)
+  `).run(
+    'Skynet Unified Trading Plan & Thesis',
+    'เข้าเทรดเฉพาะเมื่อโครงสร้างตลาด High Timeframe ชัดเจน เกิดการดึงสภาพคล่อง (Liquidity Sweep) หรือย่อทดสอบจุดรับสำคัญ ไม่ไล่ราคา รอให้ตลาดวิ่งเข้าหาโซน และรักษา R:R ขั้นต่ำ 1:2 เสมอ',
+    '1. HTF Trend & Market Structure ตรงทิศทาง\n2. เกิด Liquidity Grab หรือ Rejection ในโซนที่ได้เปรียบ\n3. มีสัญญาณแท่งเทียนกลับตัวหรือคอนเฟิร์มใน Lower Timeframe\n4. อัตราส่วน Risk:Reward ขั้นต่ำ 1:2 R ขึ้นไป',
+    '1. ราคาปิดทะลุ Invalid Level (ระดับโครงสร้างเสีย)\n2. เกิดข่าวด่วนหรือ Event กระทบพื้นฐานอย่างมีนัยสำคัญที่ขัดแย้งกับ Thesis\n3. โครงสร้างเปลี่ยนเป็นฝั่งตรงข้ามก่อนถึงจุดเข้า',
+    '• เสี่ยงไม่เกิน 1-2% ของพอร์ตต่อไม้เด็ดขาด\n• ห้าม Overtrade หรือ Revenge trade\n• เมื่อกำไรถึง 1.5R พิจารณาขยับ SL บังทุน (BE)'
+  );
+}
+
+// 8. Playbook Trades Table (Individual Trade Setups & Execution Logs)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS playbook_trades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    title TEXT NOT NULL,
+    symbol TEXT,
+    direction TEXT NOT NULL DEFAULT 'LONG',
+    status TEXT NOT NULL DEFAULT 'WATCHLIST',
+    entry_price REAL,
+    sl_price REAL,
+    tp_price REAL,
+    rr_ratio REAL,
+    risk_usd REAL,
+    thesis TEXT,
+    checklist TEXT,
+    chart_url TEXT,
+    realized_r REAL,
+    realized_pnl REAL,
+    review_notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed 2 sample trades if empty
+const tradeCount = db.prepare('SELECT COUNT(*) as count FROM playbook_trades').get().count;
+if (tradeCount === 0) {
+  const insertTrade = db.prepare(`
+    INSERT INTO playbook_trades (date, title, symbol, direction, status, entry_price, sl_price, tp_price, rr_ratio, risk_usd, thesis, checklist, chart_url, realized_r, review_notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  insertTrade.run(
+    todayStr,
+    'HTF Key Level Sweep & Rejection Setup',
+    'BTC',
+    'LONG',
+    'WIN',
+    64200,
+    63400,
+    66600,
+    3.0,
+    100,
+    'ราคาลงมากวาดสภาพคล่องจุดต่ำสุดของสัปดาห์ก่อนหน้า แล้วเกิด Rejection แท่งเขียวกลืนกินใน TF 1H ตรงตามเงื่อนไขแผนหลัก',
+    JSON.stringify(['HTF Trend In Favor', 'Liquidity Swept', 'R:R >= 2.0', 'Risk <= 1%']),
+    '',
+    3.0,
+    'เข้าตามแผนเป๊ะ ไม่กลัวตอนย่อ ปล่อยรันจนถึงเป้า TP แรก 3R สำเร็จ'
+  );
+
+  insertTrade.run(
+    todayStr,
+    'Trend Continuation Pullback',
+    'XAUUSD',
+    'LONG',
+    'ACTIVE',
+    2580,
+    2565,
+    2625,
+    3.0,
+    100,
+    'ทองคำอยู่ในแนวโน้มขาขึ้นแข็งแกร่ง ย่อลงมาทดสอบแนวรับเส้น EMA และ Demand zone รอแรงซื้อหนุนต่อ',
+    JSON.stringify(['HTF Trend In Favor', 'R:R >= 2.0', 'Risk <= 1%']),
+    '',
+    null,
+    null
+  );
+}
+
 export default db;
+

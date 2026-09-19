@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import PlaybookTab from './components/PlaybookTab';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -243,6 +244,13 @@ export default function Home() {
         >
           <span>💳</span>
           <span>หนี้สิน & พอร์ตติดลบ</span>
+        </button>
+        <button
+          className={`segmented-button ${activeTab === 'playbook' ? 'active' : ''}`}
+          onClick={() => setActiveTab('playbook')}
+        >
+          <span>🎯</span>
+          <span>Playbook & Thesis</span>
         </button>
       </div>
 
@@ -697,51 +705,56 @@ export default function Home() {
         </>
       )}
 
+      {/* TAB 3: PLAYBOOK & UNIFIED THESIS */}
+      {activeTab === 'playbook' && <PlaybookTab />}
+
       {/* Bot Audit & Activity Log */}
-      <section className="glass-panel audit-log-card">
-        <div className="audit-log-header">
-          <div className="audit-log-title">
-            <span>🛡️</span>
-            <span>Bot Audit Log (ประวัติข้อความจาก Telegram และผลการแยกแยะ)</span>
+      {activeTab !== 'playbook' && (
+        <section className="glass-panel audit-log-card">
+          <div className="audit-log-header">
+            <div className="audit-log-title">
+              <span>🛡️</span>
+              <span>Bot Audit Log (ประวัติข้อความจาก Telegram และผลการแยกแยะ)</span>
+            </div>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              ล่าสุด 20 รายการ
+            </span>
           </div>
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            ล่าสุด 20 รายการ
-          </span>
-        </div>
 
-        {botLogs.length === 0 ? (
-          <div className="empty-placeholder">ยังไม่มีประวัติการส่งข้อมูลจาก Telegram</div>
-        ) : (
-          <div className="audit-log-list">
-            {botLogs.map((log) => {
-              let parsedItems = [];
-              try {
-                parsedItems = JSON.parse(log.parsed_data || '[]');
-              } catch (e) {}
+          {botLogs.length === 0 ? (
+            <div className="empty-placeholder">ยังไม่มีประวัติการส่งข้อมูลจาก Telegram</div>
+          ) : (
+            <div className="audit-log-list">
+              {botLogs.map((log) => {
+                let parsedItems = [];
+                try {
+                  parsedItems = JSON.parse(log.parsed_data || '[]');
+                } catch (e) {}
 
-              return (
-                <div key={log.id} className="audit-log-item">
-                  <div className="log-item-top">
-                    <span>Log #{log.id} • บันทึกสำเร็จ {log.parsed_count} รายการ</span>
-                    <span>{log.created_at}</span>
-                  </div>
-                  <div className="log-item-raw">"{log.raw_message}"</div>
-                  {parsedItems.length > 0 && (
-                    <div className="log-item-summary">
-                      <strong>ผลการจำแนก:</strong>{' '}
-                      {parsedItems.map((p, i) => (
-                        <span key={i} style={{ marginRight: '10px' }}>
-                          [{p.date}] {CATEGORY_META[p.category_group]?.emoji} {p.category}: {formatCurrency(p.amount)} ฿
-                        </span>
-                      ))}
+                return (
+                  <div key={log.id} className="audit-log-item">
+                    <div className="log-item-top">
+                      <span>Log #{log.id} • บันทึกสำเร็จ {log.parsed_count} รายการ</span>
+                      <span>{log.created_at}</span>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                    <div className="log-item-raw">"{log.raw_message}"</div>
+                    {parsedItems.length > 0 && (
+                      <div className="log-item-summary">
+                        <strong>ผลการจำแนก:</strong>{' '}
+                        {parsedItems.map((p, i) => (
+                          <span key={i} style={{ marginRight: '10px' }}>
+                            [{p.date}] {CATEGORY_META[p.category_group]?.emoji} {p.category}: {formatCurrency(p.amount)} ฿
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* DRILLDOWN INSPECTOR MODAL */}
       {drilldownModal && (
