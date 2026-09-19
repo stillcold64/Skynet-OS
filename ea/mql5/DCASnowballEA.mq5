@@ -19,6 +19,12 @@ enum ENUM_LOT_MODE
    LOT_MODE_CAPITAL_SCALED  // คำนวณ Lot อัตโนมัติตามสัดส่วนเงินทุน (เช่น 1.00 Lot ต่อ $10,000)
 };
 
+enum ENUM_SNOWBALL_STEP_MODE
+{
+   SNOWBALL_STEP_POINTS,    // ระบุระยะเป็น Points (เช่น 500 = $5.00 ทองคำ)
+   SNOWBALL_STEP_USD        // ระบุระยะเป็นราคา Dollar USD ($) (แนะนำสำหรับ BTC เช่น $1,000 หรือ $1,200)
+};
+
 //--- INPUT PARAMETERS ---
 sinput group "=== 1. กลยุทธ์ตามเทรนด์หลัก (Trend Strategy) ==="
 input ENUM_TIMEFRAMES      Inp_Timeframe         = PERIOD_M15;            // Timeframe หลักในการเทรด
@@ -37,7 +43,9 @@ input int                  Inp_TRIXPeriod        = 14;                    // ค
 input bool                 Inp_TRIXSlopeFilter   = true;                  // ต้องมี Slope เชิดหัวขึ้น (Buy)
 
 sinput group "=== 3. ระบบสโนว์บอลตามเทรนด์ (Asymmetric 10-40-60 Snowball) ==="
-input int                  Inp_StepPoints        = 500;                   // ระยะห่างราคาเพื่อเปิดไม้สโนว์บอลถัดไป (Points) (เช่น 500 = $5.00 ทองคำ)
+input ENUM_SNOWBALL_STEP_MODE Inp_StepMode       = SNOWBALL_STEP_POINTS;  // โหมดระยะห่างสโนว์บอล (Points หรือ USD)
+input int                  Inp_StepPoints        = 500;                   // ระยะห่างราคาแบบ Points (เช่น 500 = $5.00 ทองคำ)
+input double               Inp_StepUSD           = 1200.0;                // ระยะห่างราคาแบบ USD ($) (เช่น 1200.0 = $1,200 บน BTC)
 input double               Inp_WeightLayer1      = 0.10;                  // สัดส่วนไม้ที่ 1 (10% - หยั่งเชิงยอด Breakout)
 input double               Inp_WeightLayer2      = 0.40;                  // สัดส่วนไม้ที่ 2 (40% - โมเมนตัมเริ่มมา)
 input double               Inp_WeightLayer3      = 0.60;                  // สัดส่วนไม้ที่ 3 (60% - อัดเต็มเหนี่ยวตามเทรนด์ใหญ่)
@@ -368,7 +376,7 @@ void OnTick()
    }
 
    double currentAsk = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-   double stepDistance = Inp_StepPoints * pipPoint;
+   double stepDistance = (Inp_StepMode == SNOWBALL_STEP_USD) ? Inp_StepUSD : (Inp_StepPoints * pipPoint);
 
    // --- 6. จัดการสโนว์บอลขาขึ้น (Asymmetric Upward Snowball) ---
    // ชั้นที่ 1: ไม้หยั่งเชิง (10% Lot) เปิดเมื่อ Donchian Breakout + TRIX ยืนยัน
