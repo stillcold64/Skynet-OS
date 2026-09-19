@@ -39,19 +39,19 @@ if (Test-Path $terminalsDir) {
             $copiedFiles++
         }
 
-        # Check Experts folder for custom EAs in BS AUTOBOT
-        $customExperts = Get-ChildItem -Path (Join-Path $termDir "MQL5\Experts\BS AUTOBOT") -Recurse -Include *.mq5,*.ex5 -ErrorAction SilentlyContinue
+        # Check Experts folder for custom EAs
+        $customExperts = Get-ChildItem -Path (Join-Path $termDir "MQL5\Experts") -Recurse -Include *.mq5,*.ex5 -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "Snowball|DavidDruz" }
         foreach ($eaFile in $customExperts) {
             $dest = Join-Path $forwardDir $eaFile.Name
             Copy-Item -Path $eaFile.FullName -Destination $dest -Force
-            Write-Host " [+] Found Forward-Test EA in BS AUTOBOT: $($eaFile.Name)" -ForegroundColor Green
+            Write-Host " [+] Found Forward-Test EA: $($eaFile.Name)" -ForegroundColor Green
             $copiedFiles++
         }
     }
 }
 
 # 2. Also ensure current repo MQL5 code is mirrored to forward_test as snapshot
-$allEAs = @("DCASnowballEA", "DavidDruzTrendEA", "DavidDruzGridEA")
+$allEAs = @("DCASnowballEA", "BTCSnowballEA", "DavidDruzTrendEA", "DavidDruzGridEA")
 foreach ($ea in $allEAs) {
     $eaMQ5 = Join-Path $repoPath "ea\mql5\$ea.mq5"
     if (Test-Path $eaMQ5) {
