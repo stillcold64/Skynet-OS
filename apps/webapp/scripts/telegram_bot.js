@@ -73,6 +73,7 @@ async function syncToGoogleSheets(items, rawMessage) {
         timestamp: new Date().toISOString(),
       }),
       redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
     });
     if (res.ok) {
       console.log(`☁️ [Google Sheets] สำรองข้อมูล ${items.length} รายการสำเร็จ (Status: ${res.status})`);
@@ -94,6 +95,7 @@ async function sendMessage(chatId, text, retries = 3) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text }),
+        signal: AbortSignal.timeout(10000),
       });
       if (res.ok) return true;
       const errData = await res.json();
@@ -116,15 +118,29 @@ const CATEGORY_EMOJI = {
   ETC: '📦',
 };
 
+let isPolling = false;
+let lastPollActivity = Date.now();
+
 async function poll() {
+  if (isPolling) return;
+  isPolling = true;
+
   try {
-    const res = await fetch(`${API_BASE}/getUpdates?offset=${offset}&timeout=30`);
+    lastPollActivity = Date.now();
+    const res = await fetch(`${API_BASE}/getUpdates?offset=${offset}&timeout=30`, {
+      signal: AbortSignal.timeout(35000),
+    });
+
     if (!res.ok) {
+      console.warn(`[WARN] Telegram getUpdates returned HTTP ${res.status}`);
+      isPolling = false;
       setTimeout(poll, 5000);
       return;
     }
 
     const data = await res.json();
+    lastPollActivity = Date.now();
+
     if (data.ok && Array.isArray(data.result)) {
       for (const update of data.result) {
         offset = update.update_id + 1;
@@ -165,9 +181,26 @@ async function poll() {
       }
     }
   } catch (err) {
-    console.error('Polling loop error:', err);
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      // Normal long-poll cycle completion or timeout
+    } else {
+      console.error(`Polling loop warning (${err.code || err.name}):`, err.message);
+    }
+  } finally {
+    isPolling = false;
+    lastPollActivity = Date.now();
+    setTimeout(poll, 1000);
   }
-  setTimeout(poll, 1500);
 }
 
+// Watchdog: If no poll activity for 60 seconds (e.g. PC sleep/wake or hung socket), force restart poll
+setInterval(() => {
+  if (Date.now() - lastPollActivity > 50000) {
+    console.warn('⚠️ [WATCHDOG] Polling cycle inactive for >50s. Restarting poll loop...');
+    isPolling = false;
+    poll();
+  }
+}, 20000);
+
 poll();
+

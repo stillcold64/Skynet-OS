@@ -1,14 +1,37 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import http from 'http';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webappDir = path.resolve(__dirname, '..');
+const logsDir = path.join(webappDir, 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
-console.log('===================================================');
-console.log('      ⚡ Skynet OS - Master Process Launcher');
-console.log('===================================================');
+const logFilePath = path.join(logsDir, 'launcher.log');
+const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
+function log(msg) {
+  const line = `[${new Date().toLocaleString('th-TH')}] ${msg}`;
+  console.log(line);
+  try {
+    logStream.write(line + '\n');
+  } catch (e) {}
+}
+
+log('===================================================');
+log('      ⚡ Skynet OS - Master Process Launcher');
+log('===================================================');
+
+process.on('uncaughtException', (err) => {
+  log(`[CRITICAL] Uncaught Exception in launcher: ${err.stack || err.message}`);
+});
+process.on('unhandledRejection', (reason) => {
+  log(`[CRITICAL] Unhandled Rejection in launcher: ${reason}`);
+});
 
 let webProcess = null;
 let botProcess = null;
@@ -18,7 +41,7 @@ let browserOpened = false;
 // 1. Start Next.js Server
 function startWebServer() {
   if (isShuttingDown) return;
-  console.log('[*] Starting Next.js Web Server on http://localhost:3000...');
+  log('[*] Starting Next.js Web Server on http://localhost:3000...');
 
   const nextBin = path.join(webappDir, 'node_modules', 'next', 'dist', 'bin', 'next');
   webProcess = spawn(process.execPath, [nextBin, 'start'], {
@@ -29,8 +52,8 @@ function startWebServer() {
 
   webProcess.on('exit', (code, signal) => {
     if (!isShuttingDown) {
-      console.warn(`[WARN] Next.js exited (code: ${code}, signal: ${signal}). Restarting in 2s...`);
-      setTimeout(startWebServer, 2000);
+      log(`[WARN] Next.js exited (code: ${code}, signal: ${signal}). Restarting in 3s...`);
+      setTimeout(startWebServer, 3000);
     }
   });
 }
@@ -38,7 +61,7 @@ function startWebServer() {
 // 2. Start Telegram Bot
 function startTelegramBot() {
   if (isShuttingDown) return;
-  console.log('[*] Starting Telegram Bot Worker...');
+  log('[*] Starting Telegram Bot Worker...');
 
   const botScript = path.join(webappDir, 'scripts', 'telegram_bot.js');
   botProcess = spawn(process.execPath, [botScript], {
@@ -49,8 +72,8 @@ function startTelegramBot() {
 
   botProcess.on('exit', (code, signal) => {
     if (!isShuttingDown) {
-      console.warn(`[WARN] Telegram Bot exited (code: ${code}, signal: ${signal}). Restarting in 2s...`);
-      setTimeout(startTelegramBot, 2000);
+      log(`[WARN] Telegram Bot exited (code: ${code}, signal: ${signal}). Restarting in 3s...`);
+      setTimeout(startTelegramBot, 3000);
     }
   });
 }
@@ -62,17 +85,19 @@ function openBrowserWhenReady(retries = 30) {
   const req = http.get('http://localhost:3000/api/transactions', (res) => {
     if (!browserOpened) {
       browserOpened = true;
-      console.log('===================================================');
-      console.log(' [OK] Skynet OS is Online!');
-      console.log('      - Dashboard : http://localhost:3000');
-      console.log('      - Bot       : @my_skynet_money_bot');
-      console.log('===================================================');
-      spawn('cmd', ['/c', 'start', 'http://localhost:3000'], { stdio: 'ignore' });
+      log('===================================================');
+      log(' [OK] Skynet OS is Online!');
+      log('      - Dashboard : http://localhost:3000');
+      log('      - Bot       : @my_skynet_money_bot');
+      log('===================================================');
+      if (process.env.AUTO_OPEN_BROWSER !== '0') {
+        spawn('cmd', ['/c', 'start', 'http://localhost:3000'], { stdio: 'ignore' });
+      }
     }
   });
 
   req.on('error', () => {
-    setTimeout(() => openBrowserWhenReady(retries - 1), 500);
+    setTimeout(() => openBrowserWhenReady(retries - 1), 1000);
   });
 }
 
@@ -80,7 +105,7 @@ function openBrowserWhenReady(retries = 30) {
 function shutdown() {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  console.log('\n[*] Shutting down Skynet OS services...');
+  log('\n[*] Shutting down Skynet OS services...');
   if (webProcess) webProcess.kill('SIGTERM');
   if (botProcess) botProcess.kill('SIGTERM');
   setTimeout(() => process.exit(0), 1000);
@@ -93,3 +118,4 @@ process.on('SIGTERM', shutdown);
 startWebServer();
 startTelegramBot();
 openBrowserWhenReady();
+

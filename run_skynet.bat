@@ -1,25 +1,31 @@
 @echo off
 setlocal EnableExtensions
 title Skynet OS - Personal Finance System
+color 0b
 
-set "PROJECT_DIR=C:\Users\Win10\Desktop\UHNWI\apps\webapp"
-cd /d "%PROJECT_DIR%"
+echo ===================================================
+echo       ? Skynet OS - Personal Finance System
+echo ===================================================
 
 :: Check if port 3000 is already running
 netstat -ano | findstr :3000 | findstr LISTENING >nul 2>&1
 if %ERRORLEVEL% equ 0 (
-    echo ===================================================
-    echo  [INFO] Skynet OS is already running on port 3000!
-    echo         Opening Web Dashboard in browser...
-    echo ===================================================
+    echo [INFO] Skynet OS is already running!
+    echo Opening Web Dashboard in browser...
     start http://localhost:3000
-    ping 127.0.0.1 -n 2 >nul 2>&1
+    timeout /t 2 >nul
     exit /b 0
 )
 
-echo ===================================================
-echo       Starting Skynet OS (Web + Telegram Bot)...
-echo ===================================================
-start "Skynet_OS_Service" /min cmd /c "node scripts/launcher.js"
-ping 127.0.0.1 -n 3 >nul 2>&1
+echo Starting Skynet OS background services (Web + Telegram Bot)...
+wscript.exe "C:\Users\Win10\Desktop\UHNWI\run_skynet_silent.vbs"
+
+echo Waiting for services to initialize...
+:wait_loop
+timeout /t 1 >nul
+netstat -ano | findstr :3000 | findstr LISTENING >nul 2>&1
+if %ERRORLEVEL% neq 0 goto wait_loop
+
+echo [OK] Skynet OS is online!
+start http://localhost:3000
 exit /b 0
