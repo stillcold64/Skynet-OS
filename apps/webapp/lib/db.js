@@ -325,7 +325,7 @@ db.exec(`
 const setupCount = db.prepare('SELECT COUNT(*) as count FROM playbook_setups').get().count;
 if (setupCount === 0) {
   const insertSetup = db.prepare(`
-    INSERT INTO playbook_setups (
+    INSERT OR IGNORE INTO playbook_setups (
       code, title, grade, direction, timeframe, session, target_rr,
       thesis, entry_rules, invalidation_rules, exit_rules, risk_rules, mistakes_to_avoid, chart_blueprint_url
     )
@@ -384,6 +384,53 @@ if (setupCount === 0) {
   );
 }
 
+// 10. Trade Journal Table (Daily Emotional & Psychological Calendar)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS trade_journal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL UNIQUE,
+    mood TEXT NOT NULL,
+    discipline_score INTEGER DEFAULT 5,
+    notes TEXT,
+    reflection TEXT,
+    synced_to_ggd INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default journal entries if empty
+const journalCount = db.prepare('SELECT COUNT(*) as count FROM trade_journal').get().count;
+if (journalCount === 0) {
+  const insertJournal = db.prepare(`
+    INSERT OR IGNORE INTO trade_journal (date, mood, discipline_score, notes, reflection, synced_to_ggd)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+
+  insertJournal.run(
+    `${y}-${m}-18`,
+    'DISCIPLINED',
+    5,
+    'วันนี้ตลาดเหวี่ยงแรงช่วงข่าว แต่คุมสติได้ดีมาก ไม่ไล่ราคา รอราคาย่อเข้าโซนตามแผน SETUP-01 เท่านั้น รู้สึกสงบและมั่นใจ',
+    'การไม่เทรดตอนไม่มีเซ็ตอัพ คือการเทรดที่ดีที่สุด',
+    1
+  );
+
+  insertJournal.run(
+    `${y}-${m}-19`,
+    'CALM',
+    4,
+    'รู้สึกนิ่งและมีสมาธิดี ตลาดไซด์เวย์เลยปิดจอไปพักผ่อน ไม่ฝืนเล่นในตลาดที่ไม่มี Edge สภาพจิตใจพร้อมสำหรับสัปดาห์หน้า',
+    'รักษาระดับพลังงานและอย่ายึดติดกับการต้องมีออเดอร์ทุกวัน',
+    1
+  );
+}
+
 export default db;
+
 
 

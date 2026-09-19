@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import PlaybookTab from './components/PlaybookTab';
+import JournalTab from './components/JournalTab';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -251,6 +252,13 @@ export default function Home() {
         >
           <span>🎯</span>
           <span>Playbook & Thesis</span>
+        </button>
+        <button
+          className={`segmented-button ${activeTab === 'journal' ? 'active' : ''}`}
+          onClick={() => setActiveTab('journal')}
+        >
+          <span>🧠</span>
+          <span>Trade Journal</span>
         </button>
       </div>
 
@@ -708,8 +716,11 @@ export default function Home() {
       {/* TAB 3: PLAYBOOK & UNIFIED THESIS */}
       {activeTab === 'playbook' && <PlaybookTab />}
 
+      {/* TAB 4: TRADE JOURNAL (EMOTIONS & PSYCHOLOGY) */}
+      {activeTab === 'journal' && <JournalTab />}
+
       {/* Bot Audit & Activity Log */}
-      {activeTab !== 'playbook' && (
+      {activeTab !== 'playbook' && activeTab !== 'journal' && (
         <section className="glass-panel audit-log-card">
           <div className="audit-log-header">
             <div className="audit-log-title">

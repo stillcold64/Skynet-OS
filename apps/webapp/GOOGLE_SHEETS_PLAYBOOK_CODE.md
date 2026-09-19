@@ -88,7 +88,53 @@ function doPost(e) {
     }
 
     // ========================================================
-    // CASE 2: ซิงค์ธุรกรรมการเงิน (Transactions)
+    // CASE 2: ซิงค์บันทึกอารมณ์ Trade Journal (Auto-Sync)
+    // ========================================================
+    if (data.action === "sync_journal" || data.type === "TRADE_JOURNAL") {
+      var jSheetName = "Trade_Journal";
+      var jSheet = ss.getSheetByName(jSheetName);
+      if (!jSheet) {
+        jSheet = ss.insertSheet(jSheetName);
+        var jHeader = ["วันที่", "อารมณ์หลัก", "ระดับวินัย (ดาว)", "บันทึกความรู้สึก (Notes)", "บทเรียนเตือนสติ (Reflection)", "เวลาบันทึก"];
+        jSheet.appendRow(jHeader);
+        jSheet.getRange(1, 1, 1, jHeader.length).setBackground("#1a1d26").setFontColor("#64d2ff").setFontWeight("bold");
+        jSheet.setFrozenRows(1);
+      }
+
+      var entry = data.entry || {};
+      var dateToFind = entry.date;
+      var foundRow = -1;
+      var dataRange = jSheet.getDataRange().getValues();
+
+      for (var r = 1; r < dataRange.length; r++) {
+        if (dataRange[r][0] == dateToFind) {
+          foundRow = r + 1;
+          break;
+        }
+      }
+
+      var rowValues = [
+        entry.date || new Date().toISOString().split("T")[0],
+        entry.mood || "CALM",
+        entry.discipline_score || 5,
+        entry.notes || "",
+        entry.reflection || "",
+        new Date().toISOString()
+      ];
+
+      if (foundRow > 0) {
+        jSheet.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+      } else {
+        jSheet.appendRow(rowValues);
+      }
+
+      return ContentService.createTextOutput(
+        JSON.stringify({ success: true, message: "Auto-synced Trade Journal successfully!" })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ========================================================
+    // CASE 3: ซิงค์ธุรกรรมการเงิน (Transactions)
     // ========================================================
     var txSheet = ss.getSheetByName("Transactions") || ss.getActiveSheet();
     var txItems = data.items || [];
