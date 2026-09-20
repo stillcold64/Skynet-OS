@@ -430,7 +430,76 @@ if (journalCount === 0) {
   );
 }
 
+// 11. Trade Tracker Table (Fast Execution Log: Symbol, Playbook Setup, Outcome - Zero Bloat)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS trade_tracker (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    time TEXT,
+    symbol TEXT NOT NULL,
+    direction TEXT NOT NULL DEFAULT 'LONG',
+    playbook_code TEXT NOT NULL,
+    playbook_title TEXT,
+    outcome TEXT NOT NULL DEFAULT 'RUNNING',
+    notes TEXT,
+    chart_url TEXT,
+    synced_to_ggd INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default trade tracker items if empty
+const trackerCount = db.prepare('SELECT COUNT(*) as count FROM trade_tracker').get().count;
+if (trackerCount === 0) {
+  const insertTracker = db.prepare(`
+    INSERT OR IGNORE INTO trade_tracker (date, time, symbol, direction, playbook_code, playbook_title, outcome, notes, synced_to_ggd)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+
+  insertTracker.run(
+    `${y}-${m}-18`,
+    '14:30',
+    'BTC',
+    'LONG',
+    'SETUP-01',
+    'Liquidity Sweep & Market Structure Shift (MSS)',
+    'WIN',
+    'เข้าจังหวะกวาด Asian Low สวยงาม รันจนจบตามแผนเป๊ะ',
+    1
+  );
+
+  insertTracker.run(
+    `${y}-${m}-19`,
+    '19:45',
+    'XAUUSD',
+    'LONG',
+    'SETUP-02',
+    'Trend Continuation Pullback to Key Level / EMA',
+    'WIN',
+    'ทองคำย่อเข้าแนวรับเส้น EMA 50 เด้งแรงตามเทรนด์',
+    1
+  );
+
+  insertTracker.run(
+    `${y}-${m}-20`,
+    '10:15',
+    'ETH',
+    'SHORT',
+    'SETUP-03',
+    'Range High/Low Reversal & Deviation',
+    'RUNNING',
+    'แทงหลอกนอกกรอบแล้วกลับเข้ามา ปัจจุบันถือรันไปเป้ากึ่งกลางกรอบ',
+    1
+  );
+}
+
 export default db;
+
 
 
 

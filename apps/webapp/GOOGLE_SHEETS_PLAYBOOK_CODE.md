@@ -134,7 +134,62 @@ function doPost(e) {
     }
 
     // ========================================================
-    // CASE 3: ซิงค์ธุรกรรมการเงิน (Transactions)
+    // CASE 3: ซิงค์บันทึกไม้เทรด Trade Tracker (Auto-Sync)
+    // ========================================================
+    if (data.action === "sync_tracker" || data.type === "TRADE_TRACKER") {
+      var tSheetName = "Trade_Tracker";
+      var tSheet = ss.getSheetByName(tSheetName);
+      if (!tSheet) {
+        tSheet = ss.insertSheet(tSheetName);
+        var tHeader = [
+          "ID", "วันที่", "เวลา", "สินทรัพย์ (Symbol)", "ทิศทาง (Direction)",
+          "Setup Code", "ชื่อ Setup", "ผลลัพธ์ (Outcome)", "บันทึกหน้างาน (Notes)",
+          "ลิงก์รูปชาร์ต", "เวลาอัปเดต"
+        ];
+        tSheet.appendRow(tHeader);
+        tSheet.getRange(1, 1, 1, tHeader.length).setBackground("#1a1d26").setFontColor("#30d158").setFontWeight("bold");
+        tSheet.setFrozenRows(1);
+      }
+
+      var trade = data.trade || {};
+      var tradeId = trade.id;
+      var foundRow = -1;
+      var dataRange = tSheet.getDataRange().getValues();
+
+      for (var r = 1; r < dataRange.length; r++) {
+        if (dataRange[r][0] == tradeId) {
+          foundRow = r + 1;
+          break;
+        }
+      }
+
+      var rowValues = [
+        trade.id || "",
+        trade.date || new Date().toISOString().split("T")[0],
+        trade.time || "",
+        trade.symbol || "BTC",
+        trade.direction || "LONG",
+        trade.playbook_code || "SETUP-01",
+        trade.playbook_title || "",
+        trade.outcome || "RUNNING",
+        trade.notes || "",
+        trade.chart_url || "",
+        new Date().toISOString()
+      ];
+
+      if (foundRow > 0) {
+        tSheet.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+      } else {
+        tSheet.appendRow(rowValues);
+      }
+
+      return ContentService.createTextOutput(
+        JSON.stringify({ success: true, message: "Auto-synced Trade Tracker successfully!" })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ========================================================
+    // CASE 4: ซิงค์ธุรกรรมการเงิน (Transactions)
     // ========================================================
     var txSheet = ss.getSheetByName("Transactions") || ss.getActiveSheet();
     var txItems = data.items || [];

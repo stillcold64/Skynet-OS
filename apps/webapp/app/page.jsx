@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import PlaybookTab from './components/PlaybookTab';
 import JournalTab from './components/JournalTab';
+import TradeTrackerTab from './components/TradeTrackerTab';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -18,8 +19,23 @@ export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-12
   const [selectedDateStr, setSelectedDateStr] = useState(null);
 
-  // Tab state: 'calendar' | 'debts'
+  // Mode state: 'finance' | 'trading'
+  const [appMode, setAppMode] = useState('finance');
+  // Tab state: 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal'
   const [activeTab, setActiveTab] = useState('calendar');
+
+  const handleSwitchMode = (mode) => {
+    setAppMode(mode);
+    if (mode === 'finance') {
+      if (activeTab === 'playbook' || activeTab === 'tracker' || activeTab === 'journal') {
+        setActiveTab('calendar');
+      }
+    } else {
+      if (activeTab === 'calendar' || activeTab === 'debts') {
+        setActiveTab('tracker');
+      }
+    }
+  };
 
   // Data states
   const [transactions, setTransactions] = useState([]);
@@ -220,46 +236,84 @@ export default function Home() {
           <div className="brand-icon">⚡</div>
           <div>
             <h1>Skynet OS</h1>
-            <p>ระบบแดชบอร์ดแสดงผลการเงิน (รับข้อมูลอัตโนมัติจาก Telegram @my_skynet_money_bot)</p>
+            <p>
+              {appMode === 'finance'
+                ? 'ระบบบริหารการเงินส่วนตัว & จัดการหนี้สิน (รับข้อมูลอัตโนมัติจาก Telegram @my_skynet_money_bot)'
+                : 'ระบบบริหารการเทรด (Trade Tracker บันทึกไม้เทรด, Playbook พิมพ์เขียว & Emotion Journal)'}
+            </p>
           </div>
         </div>
 
         <div className="status-badge">
           <div className="pulse-dot" />
-          <span>Telegram Sync Live</span>
+          <span>{appMode === 'finance' ? 'Telegram Sync Live' : 'GGD Auto-Sync Active'}</span>
         </div>
       </header>
 
-      {/* iOS Segmented Navigation Tabs */}
-      <div className="ios-segmented-control">
-        <button
-          className={`segmented-button ${activeTab === 'calendar' ? 'active' : ''}`}
-          onClick={() => setActiveTab('calendar')}
-        >
-          <span>📅</span>
-          <span>ปฏิทิน & ค่าใช้จ่าย</span>
-        </button>
-        <button
-          className={`segmented-button ${activeTab === 'debts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('debts')}
-        >
-          <span>💳</span>
-          <span>หนี้สิน & พอร์ตติดลบ</span>
-        </button>
-        <button
-          className={`segmented-button ${activeTab === 'playbook' ? 'active' : ''}`}
-          onClick={() => setActiveTab('playbook')}
-        >
-          <span>🎯</span>
-          <span>Playbook & Thesis</span>
-        </button>
-        <button
-          className={`segmented-button ${activeTab === 'journal' ? 'active' : ''}`}
-          onClick={() => setActiveTab('journal')}
-        >
-          <span>🧠</span>
-          <span>Trade Journal</span>
-        </button>
+      {/* Mode Switcher: Personal Finance vs Trading System */}
+      <div className="mode-switcher-container">
+        <div className="mode-segmented-control">
+          <button
+            className={`mode-tab-btn finance ${appMode === 'finance' ? 'active' : ''}`}
+            onClick={() => handleSwitchMode('finance')}
+          >
+            <span>💰</span>
+            <span>การเงินส่วนตัว</span>
+          </button>
+          <button
+            className={`mode-tab-btn trading ${appMode === 'trading' ? 'active' : ''}`}
+            onClick={() => handleSwitchMode('trading')}
+          >
+            <span>📈</span>
+            <span>ระบบการเทรด</span>
+          </button>
+        </div>
+
+        {/* Sub-tabs for the selected mode */}
+        <div className="ios-segmented-control sub-nav-control">
+          {appMode === 'finance' ? (
+            <>
+              <button
+                className={`segmented-button ${activeTab === 'calendar' ? 'active' : ''}`}
+                onClick={() => setActiveTab('calendar')}
+              >
+                <span>📅</span>
+                <span>ปฏิทิน & ค่าใช้จ่าย</span>
+              </button>
+              <button
+                className={`segmented-button ${activeTab === 'debts' ? 'active' : ''}`}
+                onClick={() => setActiveTab('debts')}
+              >
+                <span>💳</span>
+                <span>หนี้สิน & พอร์ตติดลบ</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className={`segmented-button ${activeTab === 'tracker' ? 'active' : ''}`}
+                onClick={() => setActiveTab('tracker')}
+              >
+                <span>⚡</span>
+                <span>Trade Tracker (บันทึกไม้เทรด)</span>
+              </button>
+              <button
+                className={`segmented-button ${activeTab === 'playbook' ? 'active' : ''}`}
+                onClick={() => setActiveTab('playbook')}
+              >
+                <span>🎯</span>
+                <span>Playbook & Thesis (พิมพ์เขียว)</span>
+              </button>
+              <button
+                className={`segmented-button ${activeTab === 'journal' ? 'active' : ''}`}
+                onClick={() => setActiveTab('journal')}
+              >
+                <span>🧠</span>
+                <span>Emotion Journal (ปฏิทินอารมณ์)</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* TAB 1: CALENDAR & EXPENSES */}
@@ -713,14 +767,13 @@ export default function Home() {
         </>
       )}
 
-      {/* TAB 3: PLAYBOOK & UNIFIED THESIS */}
+      {/* TRADING TABS */}
+      {activeTab === 'tracker' && <TradeTrackerTab />}
       {activeTab === 'playbook' && <PlaybookTab />}
-
-      {/* TAB 4: TRADE JOURNAL (EMOTIONS & PSYCHOLOGY) */}
       {activeTab === 'journal' && <JournalTab />}
 
-      {/* Bot Audit & Activity Log */}
-      {activeTab !== 'playbook' && activeTab !== 'journal' && (
+      {/* Bot Audit & Activity Log (Only in Personal Finance mode) */}
+      {appMode === 'finance' && (
         <section className="glass-panel audit-log-card">
           <div className="audit-log-header">
             <div className="audit-log-title">
