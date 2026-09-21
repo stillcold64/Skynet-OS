@@ -88,33 +88,38 @@ function doPost(e) {
     }
 
     // ========================================================
-    // CASE 2: ซิงค์บันทึกอารมณ์ Trade Journal (Auto-Sync)
+    // CASE 2: ซิงค์บันทึกอารมณ์ Trade Journal (Auto-Sync หลายไม้ต่อวัน)
     // ========================================================
     if (data.action === "sync_journal" || data.type === "TRADE_JOURNAL") {
       var jSheetName = "Trade_Journal";
       var jSheet = ss.getSheetByName(jSheetName);
       if (!jSheet) {
         jSheet = ss.insertSheet(jSheetName);
-        var jHeader = ["วันที่", "อารมณ์หลัก", "ระดับวินัย (ดาว)", "บันทึกความรู้สึก (Notes)", "บทเรียนเตือนสติ (Reflection)", "เวลาบันทึก"];
+        var jHeader = ["ID", "วันที่", "เวลา", "รอบ/ไม้ที่", "อารมณ์หลัก", "ระดับวินัย (ดาว)", "บันทึกความรู้สึก (Notes)", "บทเรียนเตือนสติ (Reflection)", "เวลาอัปเดต"];
         jSheet.appendRow(jHeader);
         jSheet.getRange(1, 1, 1, jHeader.length).setBackground("#1a1d26").setFontColor("#64d2ff").setFontWeight("bold");
         jSheet.setFrozenRows(1);
       }
 
       var entry = data.entry || {};
-      var dateToFind = entry.date;
+      var entryId = entry.id;
       var foundRow = -1;
       var dataRange = jSheet.getDataRange().getValues();
 
-      for (var r = 1; r < dataRange.length; r++) {
-        if (dataRange[r][0] == dateToFind) {
-          foundRow = r + 1;
-          break;
+      if (entryId) {
+        for (var r = 1; r < dataRange.length; r++) {
+          if (dataRange[r][0] == entryId) {
+            foundRow = r + 1;
+            break;
+          }
         }
       }
 
       var rowValues = [
+        entry.id || "",
         entry.date || new Date().toISOString().split("T")[0],
+        entry.time || "",
+        entry.session || "ทั่วไป",
         entry.mood || "CALM",
         entry.discipline_score || 5,
         entry.notes || "",

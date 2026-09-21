@@ -26,13 +26,16 @@ async function autoSyncToGgd(entry) {
       action: 'sync_journal',
       type: 'TRADE_JOURNAL',
       entry: {
+        id: entry.id,
         date: entry.date,
+        time: entry.time || '',
+        session: entry.session || '',
         mood: entry.mood,
         discipline_score: entry.discipline_score,
         notes: entry.notes || '',
         reflection: entry.reflection || '',
       },
-      rawMessage: `Trade Journal Auto-Sync: ${entry.date} [${entry.mood} - ⭐${entry.discipline_score}]`,
+      rawMessage: `Trade Journal Auto-Sync: ${entry.date} ${entry.time ? `[${entry.time}] ` : ''}[${entry.mood} - ⭐${entry.discipline_score}]`,
       timestamp: new Date().toISOString(),
     };
 
@@ -64,20 +67,24 @@ export async function GET(request) {
       params.push(`${month}%`);
     }
 
-    query += ' ORDER BY date ASC';
+    query += ' ORDER BY date ASC, time ASC, id ASC';
 
     const entries = db.prepare(query).all(...params);
 
-    // Build fast daily map for calendar: dailyMap['YYYY-MM-DD'] = entry
+    // Group entries into array per day: dailyMap['YYYY-MM-DD'] = [entry1, entry2, ...]
     const dailyMap = {};
     for (const e of entries) {
-      dailyMap[e.date] = e;
+      if (!dailyMap[e.date]) {
+        dailyMap[e.date] = [];
+      }
+      dailyMap[e.date].push(e);
     }
 
-    // Compute monthly psychology statistics
-    const totalDays = entries.length;
+    // Compute psychology statistics
+    const totalEntries = entries.length;
+    const uniqueDays = Object.keys(dailyMap).length;
     let totalDiscipline = 0;
-    let disciplinedDaysCount = 0;
+    let disciplinedCount = 0;
     let fomoCount = 0;
     let revengeCount = 0;
     let fearCount = 0;
@@ -87,7 +94,7 @@ export async function GET(request) {
       totalDiscipline += e.discipline_score || 0;
       const m = (e.mood || '').toUpperCase();
       if (m === 'CALM' || m === 'DISCIPLINED') {
-        disciplinedDaysCount++;
+        disciplinedCount++;
       } else if (m === 'FOMO') {
         fomoCount++;
       } else if (m === 'REVENGE') {
@@ -99,8 +106,8 @@ export async function GET(request) {
       }
     }
 
-    const avgDiscipline = totalDays > 0 ? Math.round((totalDiscipline / totalDays) * 10) / 10 : 0;
-    const disciplinedPct = totalDays > 0 ? Math.round((disciplinedDaysCount / totalDays) * 100) : 0;
+    const avgDiscipline = totalEntries > 0 ? Math.round((totalDiscipline / totalEntries) * 10) / 10 : 0;
+    const disciplinedPct = totalEntries > 0 ? Math.round((disciplinedCount / totalEntries) * 100) : 0;
     const emotionalTriggersCount = fomoCount + revengeCount;
 
     return NextResponse.json({
@@ -108,9 +115,10 @@ export async function GET(request) {
       entries,
       dailyMap,
       stats: {
-        totalDays,
+        totalEntries,
+        uniqueDays,
         avgDiscipline,
-        disciplinedDaysCount,
+        disciplinedCount,
         disciplinedPct,
         emotionalTriggersCount,
         fomoCount,
@@ -128,7 +136,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { date, mood, discipline_score, notes, reflection } = body;
+    const { date, time, session, mood, discipline_score, notes, reflection } = body;
 
     if (!date || !mood) {
       return NextResponse.json(
@@ -138,22 +146,22 @@ export async function POST(request) {
     }
 
     const score = discipline_score !== undefined ? parseInt(discipline_score, 10) : 5;
+    const entryTime = time || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const entrySession = session || 'ทั่วไป';
 
-    // Upsert into local SQLite
-    db.prepare(`
-      INSERT INTO trade_journal (date, mood, discipline_score, notes, reflection, updated_at)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(date) DO UPDATE SET
-        mood = excluded.mood,
-        discipline_score = excluded.discipline_score,
-        notes = excluded.notes,
-        reflection = excluded.reflection,
-        updated_at = CURRENT_TIMESTAMP
-    `).run(date, mood, score, notes || '', reflection || '');
+    const insertStmt = db.prepare(`
+      INSERT INTO trade_journal (date, time, session, mood, discipline_score, notes, reflection, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+    const info = insertStmt.run(date, entryTime, entrySession, mood, score, notes || '', reflection || '');
+    const newId = info.lastInsertRowid;
 
-    // AUTO-SYNC TO GGD (Google Sheets / Drive Webhook) AUTOMATICALLY!
+    // AUTO-SYNC TO GGD (Google Sheets / Drive Webhook)
     const syncResult = await autoSyncToGgd({
+      id: newId,
       date,
+      time: entryTime,
+      session: entrySession,
       mood,
       discipline_score: score,
       notes,
@@ -161,15 +169,16 @@ export async function POST(request) {
     });
 
     if (syncResult.synced) {
-      db.prepare('UPDATE trade_journal SET synced_to_ggd = 1 WHERE date = ?').run(date);
+      db.prepare('UPDATE trade_journal SET synced_to_ggd = 1 WHERE id = ?').run(newId);
     }
 
     return NextResponse.json({
       success: true,
+      id: newId,
       autoSynced: syncResult.synced,
       message: syncResult.synced
-        ? `บันทึกและซิงค์ GGD อัตโนมัติเรียบร้อย! (${date})`
-        : `บันทึกในเครื่องสำเร็จ (รอซิงค์คลาวด์)`,
+        ? `บันทึกไม้เทรดและซิงค์ GGD เรียบร้อย! (${date} ${entryTime})`
+        : `บันทึกในเครื่องสำเร็จ (${date} ${entryTime})`,
     });
   } catch (error) {
     console.error('Error in Trade Journal POST API:', error);
@@ -177,18 +186,66 @@ export async function POST(request) {
   }
 }
 
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+    const { id, date, time, session, mood, discipline_score, notes, reflection } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Entry ID is required' }, { status: 400 });
+    }
+
+    const score = discipline_score !== undefined ? parseInt(discipline_score, 10) : 5;
+
+    db.prepare(`
+      UPDATE trade_journal
+      SET date = COALESCE(?, date),
+          time = COALESCE(?, time),
+          session = COALESCE(?, session),
+          mood = COALESCE(?, mood),
+          discipline_score = ?,
+          notes = ?,
+          reflection = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(date, time, session, mood, score, notes || '', reflection || '', id);
+
+    const updated = db.prepare('SELECT * FROM trade_journal WHERE id = ?').get(id);
+
+    if (updated) {
+      autoSyncToGgd(updated).then((syncResult) => {
+        if (syncResult.synced) {
+          db.prepare('UPDATE trade_journal SET synced_to_ggd = 1 WHERE id = ?').run(id);
+        }
+      }).catch((e) => console.error('PUT background sync error:', e));
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `อัปเดตบันทึกไม้เทรด #${id} สำเร็จ`,
+      entry: updated,
+    });
+  } catch (error) {
+    console.error('Error in Trade Journal PUT API:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
     const date = searchParams.get('date');
 
-    if (!date) {
-      return NextResponse.json({ success: false, error: 'Date is required' }, { status: 400 });
+    if (id) {
+      db.prepare('DELETE FROM trade_journal WHERE id = ?').run(id);
+      return NextResponse.json({ success: true, message: `ลบบันทึกไม้ #${id} สำเร็จ` });
+    } else if (date) {
+      db.prepare('DELETE FROM trade_journal WHERE date = ?').run(date);
+      return NextResponse.json({ success: true, message: `ลบบันทึกวันที่ ${date} สำเร็จ` });
+    } else {
+      return NextResponse.json({ success: false, error: 'ID or Date is required' }, { status: 400 });
     }
-
-    db.prepare('DELETE FROM trade_journal WHERE date = ?').run(date);
-
-    return NextResponse.json({ success: true, message: `ลบบันทึกวันที่ ${date} สำเร็จ` });
   } catch (error) {
     console.error('Error in Trade Journal DELETE API:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

@@ -384,11 +384,13 @@ if (setupCount === 0) {
   );
 }
 
-// 10. Trade Journal Table (Daily Emotional & Psychological Calendar)
+// 10. Trade Journal Table (Multiple Emotional & Psychological Entries per Day)
 db.exec(`
   CREATE TABLE IF NOT EXISTS trade_journal (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL UNIQUE,
+    date TEXT NOT NULL,
+    time TEXT,
+    session TEXT,
     mood TEXT NOT NULL,
     discipline_score INTEGER DEFAULT 5,
     notes TEXT,
@@ -397,14 +399,68 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+  CREATE INDEX IF NOT EXISTS idx_trade_journal_date ON trade_journal(date);
 `);
+
+// Migration: Ensure trade_journal supports multiple entries per day (drop UNIQUE(date) and add time/session)
+try {
+  const journalTableInfo = db.prepare('PRAGMA table_info(trade_journal)').all();
+  const hasTimeCol = journalTableInfo.some((c) => c.name === 'time');
+  const indexList = db.prepare('PRAGMA index_list(trade_journal)').all();
+  const hasUniqueDate = indexList.some((idx) => idx.unique === 1 && idx.name.includes('autoindex_trade_journal'));
+
+  if (!hasTimeCol || hasUniqueDate) {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS trade_journal_v2 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          time TEXT,
+          session TEXT,
+          mood TEXT NOT NULL,
+          discipline_score INTEGER DEFAULT 5,
+          notes TEXT,
+          reflection TEXT,
+          synced_to_ggd INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      db.exec(`
+        INSERT INTO trade_journal_v2 (id, date, time, session, mood, discipline_score, notes, reflection, synced_to_ggd, created_at, updated_at)
+        SELECT 
+          id, 
+          date, 
+          '07:35' as time,
+          'ทั่วไป' as session,
+          mood, 
+          discipline_score, 
+          notes, 
+          reflection, 
+          synced_to_ggd, 
+          created_at, 
+          updated_at 
+        FROM trade_journal;
+      `);
+
+      db.exec(`
+        DROP TABLE trade_journal;
+        ALTER TABLE trade_journal_v2 RENAME TO trade_journal;
+        CREATE INDEX IF NOT EXISTS idx_trade_journal_date ON trade_journal(date);
+      `);
+    })();
+  }
+} catch (e) {
+  console.error('Migration error on trade_journal table:', e);
+}
 
 // Seed default journal entries if empty
 const journalCount = db.prepare('SELECT COUNT(*) as count FROM trade_journal').get().count;
 if (journalCount === 0) {
   const insertJournal = db.prepare(`
-    INSERT OR IGNORE INTO trade_journal (date, mood, discipline_score, notes, reflection, synced_to_ggd)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO trade_journal (date, time, session, mood, discipline_score, notes, reflection, synced_to_ggd)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const now = new Date();
@@ -413,6 +469,8 @@ if (journalCount === 0) {
 
   insertJournal.run(
     `${y}-${m}-18`,
+    '14:30',
+    'London Session',
     'DISCIPLINED',
     5,
     'วันนี้ตลาดเหวี่ยงแรงช่วงข่าว แต่คุมสติได้ดีมาก ไม่ไล่ราคา รอราคาย่อเข้าโซนตามแผน SETUP-01 เท่านั้น รู้สึกสงบและมั่นใจ',
@@ -422,6 +480,8 @@ if (journalCount === 0) {
 
   insertJournal.run(
     `${y}-${m}-19`,
+    '10:00',
+    'Asian Session',
     'CALM',
     4,
     'รู้สึกนิ่งและมีสมาธิดี ตลาดไซด์เวย์เลยปิดจอไปพักผ่อน ไม่ฝืนเล่นในตลาดที่ไม่มี Edge สภาพจิตใจพร้อมสำหรับสัปดาห์หน้า',
