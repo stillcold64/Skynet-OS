@@ -76,6 +76,7 @@ int            g_dailyCutsCount = 0;
 int            g_currentTradingDay = -1;
 datetime       g_lastExitTime = 0;
 bool           g_isFreeRollActive = false;
+bool           g_isHalted = false;
 
 //+------------------------------------------------------------------+
 //| ตรวจสอบแท่งเทียนใหม่ (Bar Close Detection)                         |
@@ -198,6 +199,7 @@ int OnInit()
    g_dailyCutsCount = 0;
    g_lastExitTime = 0;
    g_isFreeRollActive = false;
+   g_isHalted = false;
 
    MqlDateTime dt;
    TimeCurrent(dt);
@@ -246,6 +248,8 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   if(g_isHalted) return;
+
    datetime now = TimeCurrent();
 
    // 0. ตรวจสอบขึ้นวันใหม่เพื่อรีเซ็ต Daily Cuts Counter
@@ -260,8 +264,10 @@ void OnTick()
    // 1. ตรวจสอบเงื่อนไขฉุกเฉินระดับพอร์ต (Drawdown Cut ป้องกัน DD เกิน 50% เด็ดขาด)
    if(g_risk.IsDrawdownExceeded(g_initialBalance))
    {
-      Print("[DCASnowball] Max Drawdown reached! Closing all positions to protect capital.");
+      Print("[DCASnowball] 🚨 Max Portfolio Drawdown reached! Closing all positions and halting EA.");
       g_trade.CloseAllPositions();
+      g_isHalted = true;
+      ExpertRemove();
       return;
    }
 

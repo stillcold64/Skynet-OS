@@ -104,6 +104,7 @@ double         g_initialBalance = 0.0;
 int            g_dailyCutsCount = 0;
 int            g_currentTradingDay = -1;
 datetime       g_lastExitTime = 0;
+bool           g_isHalted = false;
 
 //+------------------------------------------------------------------+
 //| ตรวจสอบแท่งเทียนใหม่ (Bar Close Detection)                         |
@@ -191,6 +192,7 @@ double GetCurrentCashflowTarget()
 int OnInit()
 {
    g_initialBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+   g_isHalted = false;
 
    g_risk.Init(Inp_MaxSpread, Inp_MaxDrawdownPct, Inp_MinMarginLevel);
    g_trade.Init(_Symbol, Inp_MagicNumber, Inp_BEPoints, Inp_BufferPoints, 0);
@@ -236,6 +238,8 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   if(g_isHalted) return;
+
    datetime now = TimeCurrent();
 
    // 0. ตรวจสอบขึ้นวันใหม่เพื่อรีเซ็ต Daily Trend Cuts Circuit Breaker
@@ -250,8 +254,10 @@ void OnTick()
    // 1. ตรวจสอบเงื่อนไขฉุกเฉินระดับพอร์ต (Drawdown Cut ป้องกัน DD เกิน 50% เด็ดขาด)
    if(g_risk.IsDrawdownExceeded(g_initialBalance))
    {
-      Print("[DavidDruzGrid] Max Drawdown reached! Closing all grid positions to protect capital.");
+      Print("[DavidDruzGrid] 🚨 Max Portfolio Drawdown reached! Closing all grid positions and halting EA.");
       g_trade.CloseAllPositions();
+      g_isHalted = true;
+      ExpertRemove();
       return;
    }
 

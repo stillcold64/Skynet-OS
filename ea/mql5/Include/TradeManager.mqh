@@ -563,6 +563,7 @@ public:
    void CloseAllPositions()
    {
       int totalPos = PositionsTotal();
+      int closedCount = 0;
       for(int i = totalPos - 1; i >= 0; i--)
       {
          ulong ticket = PositionGetTicket(i);
@@ -571,11 +572,13 @@ public:
             if(PositionGetString(POSITION_SYMBOL) == m_symbol &&
                PositionGetInteger(POSITION_MAGIC) == (long)m_magicNumber)
             {
-               ClosePositionByTicket(ticket);
+               if(ClosePositionByTicket(ticket))
+                  closedCount++;
             }
          }
       }
-      Print("[TradeManager] All positions closed.");
+      if(closedCount > 0)
+         PrintFormat("[TradeManager] All positions closed (%d closed).", closedCount);
    }
 
    // ปิดทำกำไรไม้ที่ดีที่สุด (Trim)

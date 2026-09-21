@@ -13,9 +13,10 @@ private:
    int      m_maxSpreadPoints;
    double   m_maxDrawdownPct;
    double   m_minMarginLevel;
+   bool     m_drawdownLogged;
 
 public:
-   CRiskManager() : m_maxSpreadPoints(500), m_maxDrawdownPct(50.0), m_minMarginLevel(200.0) {}
+   CRiskManager() : m_maxSpreadPoints(500), m_maxDrawdownPct(50.0), m_minMarginLevel(200.0), m_drawdownLogged(false) {}
    ~CRiskManager() {}
 
    void Init(int maxSpreadPoints, double maxDrawdownPct, double minMarginLevel)
@@ -23,6 +24,7 @@ public:
       m_maxSpreadPoints = maxSpreadPoints;
       m_maxDrawdownPct  = maxDrawdownPct;
       m_minMarginLevel  = minMarginLevel;
+      m_drawdownLogged  = false;
    }
 
    // ตรวจสอบว่าค่า Spread อยู่ในเกณฑ์ที่ปลอดภัยหรือไม่
@@ -62,7 +64,11 @@ public:
 
       if(currentDdPct >= m_maxDrawdownPct)
       {
-         PrintFormat("[RiskManager] Max Drawdown reached: %.2f%% >= %.2f%%", currentDdPct, m_maxDrawdownPct);
+         if(!m_drawdownLogged)
+         {
+            PrintFormat("[RiskManager] 🚨 Max Drawdown reached: %.2f%% >= %.2f%%", currentDdPct, m_maxDrawdownPct);
+            m_drawdownLogged = true;
+         }
          return true;
       }
       return false;
