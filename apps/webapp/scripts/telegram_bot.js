@@ -68,6 +68,8 @@ async function syncToGoogleSheets(items, rawMessage) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        action: 'sync_transactions',
+        type: 'TRANSACTIONS',
         items,
         rawMessage,
         timestamp: new Date().toISOString(),

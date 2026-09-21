@@ -33,6 +33,8 @@ export async function backupAllToGoogleSheets(customUrl) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        action: 'sync_transactions',
+        type: 'TRANSACTIONS',
         items,
         rawMessage: `Full Backup: ${items.length} records`,
         timestamp: new Date().toISOString(),

@@ -54,7 +54,6 @@ export async function POST(request) {
       action: 'sync_playbook_setups',
       type: 'PLAYBOOK_SETUPS',
       setups: formattedSetups,
-      items: formattedSetups, // fallback compatibility
       rawMessage: `Playbook Setups Backup: ${formattedSetups.length} blueprints`,
       timestamp: new Date().toISOString(),
     };
