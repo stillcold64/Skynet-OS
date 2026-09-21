@@ -10,6 +10,8 @@ const MOODS = {
     color: '#30d158',
     bg: 'rgba(48, 209, 88, 0.15)',
     border: 'rgba(48, 209, 88, 0.4)',
+    score: 5,
+    evaluation: '🌟 ยอดเยี่ยมมาก! วินัย 100% เทรดตามแผนเป๊ะ ไม่มีหลุด',
   },
   CALM: {
     key: 'CALM',
@@ -18,6 +20,8 @@ const MOODS = {
     color: '#64d2ff',
     bg: 'rgba(100, 210, 255, 0.15)',
     border: 'rgba(100, 210, 255, 0.4)',
+    score: 5,
+    evaluation: '✨ มีสติดีเยี่ยม จิตใจสงบนิ่ง พร้อมตัดสินใจอย่างสุขุมรอบคอบ',
   },
   FOMO: {
     key: 'FOMO',
@@ -26,6 +30,8 @@ const MOODS = {
     color: '#ff9f0a',
     bg: 'rgba(255, 159, 10, 0.15)',
     border: 'rgba(255, 159, 10, 0.4)',
+    score: 2,
+    evaluation: '⚠️ เสี่ยงหลุดวินัย! มีอาการกลัวตกรถหรือคันมือ ระวังไล่ราคานอกแผน',
   },
   REVENGE: {
     key: 'REVENGE',
@@ -34,6 +40,8 @@ const MOODS = {
     color: '#ff453a',
     bg: 'rgba(255, 69, 58, 0.15)',
     border: 'rgba(255, 69, 58, 0.4)',
+    score: 1,
+    evaluation: '🚨 อันตรายสูงสุด! กำลังตกอยู่ในสภาวะอยากเอาคืน (Revenge) แนะนำหยุดเทรดทันที',
   },
   FEAR: {
     key: 'FEAR',
@@ -42,6 +50,8 @@ const MOODS = {
     color: '#bf5af2',
     bg: 'rgba(191, 90, 242, 0.15)',
     border: 'rgba(191, 90, 242, 0.4)',
+    score: 2,
+    evaluation: '⚖️ จิตใจลังเลและมีความกลัว ไม่มั่นใจในระบบแผนเทรด ควรโฟกัสความเสี่ยง',
   },
   TIRED: {
     key: 'TIRED',
@@ -50,6 +60,8 @@ const MOODS = {
     color: '#98989d',
     bg: 'rgba(152, 152, 157, 0.15)',
     border: 'rgba(152, 152, 157, 0.4)',
+    score: 2,
+    evaluation: '💤 สภาพร่างกายเหนื่อยล้า ขาดสมาธิ โฟกัสลดลง ควรพักผ่อนไม่ควรฝืนเทรดต่อ',
   },
 };
 
@@ -73,9 +85,7 @@ export default function JournalTab() {
 
   const initialForm = {
     time: '',
-    session: 'ทั่วไป',
     mood: 'CALM',
-    discipline_score: 5,
     notes: '',
     reflection: '',
   };
@@ -154,12 +164,9 @@ export default function JournalTab() {
     const targetDate = dateStr || activeDate;
     setEditingEntryId(null);
     const currentTime = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-    const existingCount = (dailyMap[targetDate] || []).length;
     setModalForm({
       time: currentTime,
-      session: `ไม้ที่ ${existingCount + 1}`,
       mood: 'CALM',
-      discipline_score: 5,
       notes: '',
       reflection: '',
     });
@@ -171,19 +178,20 @@ export default function JournalTab() {
     setEditingEntryId(entry.id);
     setModalForm({
       time: entry.time || '',
-      session: entry.session || 'ทั่วไป',
       mood: entry.mood || 'CALM',
-      discipline_score: entry.discipline_score !== undefined ? entry.discipline_score : 5,
       notes: entry.notes || '',
       reflection: entry.reflection || '',
     });
     setIsFormOpen(true);
   };
 
-  // Save Entry (Create new or Update existing)
+  // Save Entry (Create new or Update existing with AI score evaluation)
   const handleSaveEntry = async (e) => {
     e.preventDefault();
     if (!activeDate) return;
+
+    const currentMoodCfg = MOODS[modalForm.mood] || MOODS.CALM;
+    const aiDisciplineScore = currentMoodCfg.score || 5;
 
     try {
       setSaving(true);
@@ -196,7 +204,11 @@ export default function JournalTab() {
           body: JSON.stringify({
             id: editingEntryId,
             date: activeDate,
-            ...modalForm,
+            time: modalForm.time,
+            mood: modalForm.mood,
+            discipline_score: aiDisciplineScore,
+            notes: modalForm.notes,
+            reflection: modalForm.reflection,
           }),
         });
       } else {
@@ -206,7 +218,11 @@ export default function JournalTab() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             date: activeDate,
-            ...modalForm,
+            time: modalForm.time,
+            mood: modalForm.mood,
+            discipline_score: aiDisciplineScore,
+            notes: modalForm.notes,
+            reflection: modalForm.reflection,
           }),
         });
       }
@@ -484,10 +500,10 @@ export default function JournalTab() {
               <div className="journal-day-view">
                 <div className="day-modal-top-bar">
                   <div className="day-modal-count-title">
-                    📋 บันทึกไม้เทรดในวันนี้ ({activeDayEntries.length} ไม้)
+                    📋 บันทึกอารมณ์ในวันนี้ ({activeDayEntries.length} รายการ)
                   </div>
                   <button className="add-entry-btn" onClick={() => handleOpenAdd(activeDate)}>
-                    <span>➕ จดบันทึกไม้ใหม่ในวันนี้</span>
+                    <span>➕ จดบันทึกอารมณ์ใหม่</span>
                   </button>
                 </div>
 
@@ -495,12 +511,12 @@ export default function JournalTab() {
                   <div className="empty-state" style={{ padding: '24px 0' }}>
                     <p>ยังไม่มีบันทึกอารมณ์สำหรับวันนี้</p>
                     <button className="primary-btn" style={{ marginTop: '10px' }} onClick={() => handleOpenAdd(activeDate)}>
-                      ➕ เริ่มต้นจดบันทึกไม้นี้
+                      ➕ เริ่มต้นจดบันทึกอารมณ์
                     </button>
                   </div>
                 ) : (
                   <div className="journal-entries-list">
-                    {activeDayEntries.map((item, idx) => {
+                    {activeDayEntries.map((item) => {
                       const moodCfg = MOODS[item.mood] || MOODS.CALM;
                       return (
                         <div
@@ -510,23 +526,24 @@ export default function JournalTab() {
                         >
                           <div className="entry-card-header">
                             <div className="entry-meta-left">
-                              <span className="entry-num-badge">ไม้ที่ {idx + 1}</span>
                               {item.time && <span className="entry-time-tag">⏰ {item.time}</span>}
-                              {item.session && <span className="entry-session-tag">🏷️ {item.session}</span>}
+                              <span className="entry-ai-score-tag" style={{ color: moodCfg.color, fontSize: '11.5px', fontWeight: '700' }}>
+                                🤖 AI: {'⭐'.repeat(item.discipline_score || moodCfg.score)} ({item.discipline_score || moodCfg.score}/5)
+                              </span>
                             </div>
 
                             <div className="entry-actions">
                               <button
                                 className="icon-action-btn"
                                 onClick={() => handleOpenEdit(item)}
-                                title="แก้ไขไม้นี้"
+                                title="แก้ไขบันทึกนี้"
                               >
                                 ✏️
                               </button>
                               <button
                                 className="icon-action-btn delete"
                                 onClick={() => handleDeleteEntry(item.id)}
-                                title="ลบไม้นี้"
+                                title="ลบบันทึกนี้"
                               >
                                 🗑️
                               </button>
@@ -545,9 +562,6 @@ export default function JournalTab() {
                               <span>{moodCfg.emoji}</span>
                               <span>{moodCfg.label}</span>
                             </span>
-                            <div className="cell-stars">
-                              {'⭐'.repeat(item.discipline_score || 5)}
-                            </div>
                           </div>
 
                           {item.notes && (
@@ -575,7 +589,7 @@ export default function JournalTab() {
               <form onSubmit={handleSaveEntry} className="trade-modal-form">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <strong style={{ color: '#64d2ff', fontSize: '13.5px' }}>
-                    {editingEntryId ? `✏️ แก้ไขบันทึกไม้ #${editingEntryId}` : `➕ เพิ่มบันทึกอารมณ์ไม้ใหม่`}
+                    {editingEntryId ? `✏️ แก้ไขบันทึก #${editingEntryId}` : `➕ บันทึกอารมณ์ตอนเทรด`}
                   </strong>
                   {activeDayEntries.length > 0 && (
                     <button
@@ -584,37 +598,26 @@ export default function JournalTab() {
                       style={{ fontSize: '12px', color: 'var(--text-secondary)' }}
                       onClick={() => { setIsFormOpen(false); setEditingEntryId(null); }}
                     >
-                      ◀ กลับหน้ารวมไม้ ({activeDayEntries.length})
+                      ◀ กลับหน้ารวมบันทึก ({activeDayEntries.length})
                     </button>
                   )}
                 </div>
 
-                {/* Row 1: Time & Session / Trade label */}
-                <div className="form-row two-cols">
-                  <div className="form-field">
-                    <label>เวลาที่เทรด / รู้สึก (Time)</label>
-                    <input
-                      type="text"
-                      placeholder="เช่น 07:35, 14:20"
-                      value={modalForm.time}
-                      onChange={(e) => setModalForm({ ...modalForm, time: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="form-field">
-                    <label>รอบ / ไม้ที่ (Session / Trade Tag)</label>
-                    <input
-                      type="text"
-                      placeholder="เช่น ไม้ที่ 1, รอบเช้า, London, US"
-                      value={modalForm.session}
-                      onChange={(e) => setModalForm({ ...modalForm, session: e.target.value })}
-                    />
-                  </div>
+                {/* Row 1: Time (Clean single field, no session/tag) */}
+                <div className="form-field">
+                  <label>เวลาที่เทรด / บันทึกความรู้สึก (Time)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น 07:35, 14:20, 21:47"
+                    value={modalForm.time}
+                    onChange={(e) => setModalForm({ ...modalForm, time: e.target.value })}
+                    required
+                  />
                 </div>
 
                 {/* Row 2: Emotion Selector */}
                 <div className="form-field">
-                  <label>อารมณ์และสภาวะจิตใจของไม้นี้</label>
+                  <label>อารมณ์และสภาวะจิตใจขณะเทรด</label>
                   <div className="mood-buttons-grid">
                     {Object.values(MOODS).map((m) => {
                       const isSelected = modalForm.mood === m.key;
@@ -637,36 +640,30 @@ export default function JournalTab() {
                   </div>
                 </div>
 
-                {/* Row 3: Discipline Star Rating */}
-                <div className="form-field">
-                  <label>คะแนนความมีสติ / รักษาวินัยตามแผน (Discipline Score)</label>
-                  <div className="stars-input-wrap">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        className={`star-select-btn ${star <= modalForm.discipline_score ? 'active' : ''}`}
-                        onClick={() => setModalForm({ ...modalForm, discipline_score: star })}
-                      >
-                        ⭐
-                      </button>
-                    ))}
-                    <span className="score-desc">
-                      {modalForm.discipline_score === 5 && '🌟 วินัย 100% ไม่หลุดแผนเลยแม้แต่น้อย'}
-                      {modalForm.discipline_score === 4 && '✨ มีวินัยดีมาก ทำตามแผนเกือบสมบูรณ์'}
-                      {modalForm.discipline_score === 3 && '⚖️ พอใช้ได้ มีความรู้สึกลังเลนิดหน่อย'}
-                      {modalForm.discipline_score === 2 && '⚠️ เผลอตามอารมณ์ คันมือ หรือเทรดนอกแผน'}
-                      {modalForm.discipline_score === 1 && '🚨 หลุดวินัยหนักมาก / หัวร้อน / FOMO'}
-                    </span>
-                  </div>
-                </div>
+                {/* Row 3: Automated AI Discipline Evaluation (System scores the user) */}
+                {(() => {
+                  const curCfg = MOODS[modalForm.mood] || MOODS.CALM;
+                  return (
+                    <div className="form-field">
+                      <div className="ai-score-eval-box">
+                        <div className="ai-score-header">
+                          <span className="ai-badge">🤖 ระบบ AI ให้คะแนนสติ & วินัย:</span>
+                          <span className="ai-score-tag" style={{ color: curCfg.color }}>
+                            {'⭐'.repeat(curCfg.score)} ({curCfg.score}/5)
+                          </span>
+                        </div>
+                        <p className="ai-evaluation-text">{curCfg.evaluation}</p>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Row 4: Notes */}
                 <div className="form-field">
-                  <label>💭 ความรู้สึกและสิ่งที่เกิดขึ้นในใจของไม้นี้ (Journal Note)</label>
+                  <label>💭 ความรู้สึกและสิ่งที่เกิดขึ้นในใจ (Journal Note)</label>
                   <textarea
                     rows="3"
-                    placeholder="ไม้นี้รู้สึกอย่างไร? สภาพจิตใจก่อน-ระหว่าง-หลังเทรดเป็นอย่างไร? มีความกลัวหรือโลภเกิดขึ้นไหม?"
+                    placeholder="รู้สึกอย่างไรตอนเทรดไม้นี้? สภาพจิตใจก่อน-ระหว่าง-หลังเทรดเป็นอย่างไร? มีความกลัวหรือโลภเกิดขึ้นไหม?"
                     value={modalForm.notes}
                     onChange={(e) => setModalForm({ ...modalForm, notes: e.target.value })}
                   />
@@ -674,7 +671,7 @@ export default function JournalTab() {
 
                 {/* Row 5: Reflection / Lesson */}
                 <div className="form-field">
-                  <label>💡 บทเรียนเตือนสติสำหรับไม้นี้ / ครั้งถัดไป (Emotional Lesson)</label>
+                  <label>💡 บทเรียนเตือนสติสำหรับครั้งถัดไป (Emotional Lesson)</label>
                   <textarea
                     rows="2"
                     placeholder="เช่น เสี่ยงได้แต่ต้องรู้ข้อจำกัดตัวเอง, ต้องรอให้แท่งเทียนปิดก่อนเสมอ..."
@@ -698,7 +695,7 @@ export default function JournalTab() {
                         className="action-btn cancel-btn"
                         onClick={() => { setIsFormOpen(false); setEditingEntryId(null); }}
                       >
-                        ◀ ยกเลิกกลับหน้ารวมไม้
+                        ◀ ยกเลิกกลับหน้ารวมบันทึก
                       </button>
                     )}
                   </div>
@@ -716,7 +713,7 @@ export default function JournalTab() {
                       className="primary-btn"
                       disabled={saving}
                     >
-                      {saving ? 'กำลังบันทึก & ซิงค์...' : (editingEntryId ? '💾 บันทึกการแก้ไข (Auto-Sync GGD)' : '💾 บันทึกไม้นี้ (Auto-Sync GGD)')}
+                      {saving ? 'กำลังบันทึก & ซิงค์...' : (editingEntryId ? '💾 บันทึกการแก้ไข (Auto-Sync GGD)' : '💾 บันทึกอารมณ์ (Auto-Sync GGD)')}
                     </button>
                   </div>
                 </div>

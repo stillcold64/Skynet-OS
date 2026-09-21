@@ -133,6 +133,22 @@ export async function GET(request) {
   }
 }
 
+function getAiDisciplineScore(mood) {
+  switch ((mood || '').toUpperCase()) {
+    case 'DISCIPLINED':
+    case 'CALM':
+      return 5;
+    case 'FOMO':
+    case 'FEAR':
+    case 'TIRED':
+      return 2;
+    case 'REVENGE':
+      return 1;
+    default:
+      return 5;
+  }
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -145,9 +161,9 @@ export async function POST(request) {
       );
     }
 
-    const score = discipline_score !== undefined ? parseInt(discipline_score, 10) : 5;
+    const score = discipline_score !== undefined ? parseInt(discipline_score, 10) : getAiDisciplineScore(mood);
     const entryTime = time || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-    const entrySession = session || 'ทั่วไป';
+    const entrySession = session || '';
 
     const insertStmt = db.prepare(`
       INSERT INTO trade_journal (date, time, session, mood, discipline_score, notes, reflection, updated_at)
@@ -177,7 +193,7 @@ export async function POST(request) {
       id: newId,
       autoSynced: syncResult.synced,
       message: syncResult.synced
-        ? `บันทึกไม้เทรดและซิงค์ GGD เรียบร้อย! (${date} ${entryTime})`
+        ? `บันทึกอารมณ์และซิงค์ GGD เรียบร้อย! (${date} ${entryTime})`
         : `บันทึกในเครื่องสำเร็จ (${date} ${entryTime})`,
     });
   } catch (error) {
@@ -195,7 +211,8 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, error: 'Entry ID is required' }, { status: 400 });
     }
 
-    const score = discipline_score !== undefined ? parseInt(discipline_score, 10) : 5;
+    const score = discipline_score !== undefined ? parseInt(discipline_score, 10) : getAiDisciplineScore(mood);
+    const entrySession = session || '';
 
     db.prepare(`
       UPDATE trade_journal
@@ -208,7 +225,7 @@ export async function PUT(request) {
           reflection = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(date, time, session, mood, score, notes || '', reflection || '', id);
+    `).run(date, time, entrySession, mood, score, notes || '', reflection || '', id);
 
     const updated = db.prepare('SELECT * FROM trade_journal WHERE id = ?').get(id);
 
@@ -222,7 +239,7 @@ export async function PUT(request) {
 
     return NextResponse.json({
       success: true,
-      message: `อัปเดตบันทึกไม้เทรด #${id} สำเร็จ`,
+      message: `อัปเดตบันทึกอารมณ์ #${id} สำเร็จ`,
       entry: updated,
     });
   } catch (error) {
