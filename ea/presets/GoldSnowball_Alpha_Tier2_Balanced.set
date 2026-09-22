@@ -1,0 +1,18 @@
+; ==============================================================================
+; Skynet OS - Alpha Portfolio: Gold Tuesday Snowball
+; Preset: Tier 2 - Balanced Alpha Champion (Sweet Spot: Max DD <= 28.4%, 11.7x Return)
+; Starting Capital: $2,000 -> $23,342 | CAGR: 32.6% | Calmar: 5.68
+; ==============================================================================
+InpMagicNumber=992202
+InpTradeComment=GoldSnowball_Alpha_T2
+InpMinPriorWeekGainPct=1.5
+InpRequireFridayGreen=1
+InpStepPriceUSD=7.5
+InpInitialSLUSD=25.0
+InpBreakevenBufferUSD=1.0
+InpLayer1Lot=0.10
+InpLayer2Lot=0.15
+InpLayer3Lot=0.20
+InpLayer4Lot=0.30
+InpExitHour=22
+InpExitMinute=0
