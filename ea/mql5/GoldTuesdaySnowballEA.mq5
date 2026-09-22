@@ -23,17 +23,17 @@ input string               InpTradeComment         = "GoldSnowball_Alpha"; // �
 input ENUM_TIMEFRAMES      InpWorkingTF            = PERIOD_H1;         // Timeframe อ้างอิงหลัก
 
 sinput group "=== 2. ตัวกรองสัปดาห์ก่อนหน้า (Prior Week Macro Setup) ==="
-input double               InpMinPriorWeekGainPct  = 1.5;               // อัตราการขึ้นขั้นต่ำของสัปดาห์ก่อนหน้า (% Gain) (เช่น 1.5%)
+input double               InpMinPriorWeekGainPct  = 0.8;               // อัตราการขึ้นขั้นต่ำของสัปดาห์ก่อนหน้า (% Gain) (เช่น 0.8%)
 input bool                 InpRequireFridayGreen   = true;              // สัปดาห์ก่อนหน้าวันศุกร์ต้องปิดสูงกว่าราคาเปิดวันจันทร์
 
 sinput group "=== 3. การสเกลสโนว์บอลขาลง (Downward Pyramiding Schedule) ==="
 input double               InpStepPriceUSD         = 7.5;               // ระยะห่างราคาเพื่อเปิดไม้สโนว์บอลถัดไป ($ USD) (เช่น $7.5)
-input double               InpInitialSLUSD         = 25.0;              // Stop Loss เริ่มต้นของไม้แรก ($ USD เหนือราคาเปิด)
+input double               InpInitialSLUSD         = 15.0;              // Stop Loss เริ่มต้นของไม้แรก ($ USD เหนือราคาเปิด)
 input double               InpBreakevenBufferUSD   = 1.0;               // กำไรกันชนล็อกหน้าทุน (Freeroll Buffer $ USD)
-input double               InpLayer1Lot            = 0.10;              // ขนาดไม้ที่ 1 (ไม้หยั่งเชิง Open อังคาร)
-input double               InpLayer2Lot            = 0.15;              // ขนาดไม้ที่ 2 (ดิ่ง -$7.5)
-input double               InpLayer3Lot            = 0.20;              // ขนาดไม้ที่ 3 (ดิ่ง -$15.0)
-input double               InpLayer4Lot            = 0.30;              // ขนาดไม้ที่ 4 (ดิ่ง -$22.5 เต็มกำลัง)
+input double               InpLayer1Lot            = 0.20;              // ขนาดไม้ที่ 1 (ไม้หยั่งเชิง Open อังคาร)
+input double               InpLayer2Lot            = 0.40;              // ขนาดไม้ที่ 2 (ดิ่ง -$7.5)
+input double               InpLayer3Lot            = 0.60;              // ขนาดไม้ที่ 3 (ดิ่ง -$15.0)
+input double               InpLayer4Lot            = 1.00;              // ขนาดไม้ที่ 4 (ดิ่ง -$22.5 เต็มกำลัง)
 
 sinput group "=== 4. การปิดรอบวันอังคาร (Tuesday EOD Harvest) ==="
 input int                  InpExitHour             = 22;                // ชั่วโมงปิดรวบกำไรวันอังคาร (Server Time Hour เช่น 22:00)

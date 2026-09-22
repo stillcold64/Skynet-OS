@@ -1,0 +1,19 @@
+; ==============================================================================
+; Skynet OS - Alpha Portfolio: Gold Tuesday Snowball
+; Preset: The Supreme Alpha (Pure Growth / External MM Architecture)
+; Capital Target: $1,000 - $2,000 Initial Bullet -> $80,000+ Compounded Potential
+; Sizing Schedule: [0.20 -> 0.40 -> 0.60 -> 1.00] | Step: $7.5 | SL: $15.0
+; ==============================================================================
+InpMagicNumber=992201
+InpTradeComment=GoldSnowball_Alpha
+InpMinPriorWeekGainPct=0.8
+InpRequireFridayGreen=1
+InpStepPriceUSD=7.5
+InpInitialSLUSD=15.0
+InpBreakevenBufferUSD=1.0
+InpLayer1Lot=0.20
+InpLayer2Lot=0.40
+InpLayer3Lot=0.60
+InpLayer4Lot=1.00
+InpExitHour=22
+InpExitMinute=0
