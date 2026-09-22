@@ -1,7 +1,7 @@
 ; David Druz Trend-Following Grid EA - [PROP FIRM & HANDS-FREE CASHFLOW]
-; Focus: 100% Compliant with Prop Firm Rules (Daily DD < 4%, Total DD < 8%), Constant $50 Harvest
+; Focus: Strict Risk Control (Risk 0.4% per order with ATR SL), Both Directions, Cashflow $50 Harvest
 ;
-Inp_TradeDirection=1||1||0||2||N
+Inp_TradeDirection=0||0||0||2||N
 Inp_Timeframe=16385||16385||0||0||N
 Inp_EntryBars=20||20||10||50||N
 Inp_ExitBars=0||0||0||20||N
@@ -19,24 +19,24 @@ Inp_HarvestMode=1||1||0||2||N
 Inp_CashflowTargetUSD=50.0||50.0||20.0||200.0||Y
 Inp_MaxGridOrders=3||3||2||5||N
 Inp_GridStepMode=0||0||0||1||N
-Inp_GridStepPoints=500||500||200||1000||Y
+Inp_GridStepPoints=400||400||200||1000||Y
 Inp_GridStepATRMult=1.0||1.0||0.5||2.0||N
-Inp_RequirePriorBE=false||false||0||1||N
+Inp_RequirePriorBE=true||true||0||1||N
 Inp_GridOnBarClose=true||true||0||1||N
-Inp_UseOrderSL=false||false||0||1||N
-Inp_LotMode=1||1||0||1||N
+Inp_UseOrderSL=true||true||0||1||N
+Inp_LotMode=0||0||0||1||N
+Inp_RiskPctPerOrder=0.40||0.40||0.1||1.0||N
 Inp_FixedLot=0.03||0.03||0.01||0.5||Y
 Inp_BaseCapitalUSD=10000.0||10000.0||1000.0||50000.0||N
 Inp_BaseLotPerCapital=1.00||1.00||0.10||5.00||Y
 Inp_ScaleTargetWithLot=false||false||0||1||N
-Inp_RiskPctPerOrder=0.40||0.40||0.1||1.0||N
 Inp_ATRPeriod=14||14||7||28||N
 Inp_ATRMultiplierSL=3.0||3.0||1.5||4.0||N
 Inp_MinSLPoints=150||150||50||500||N
-Inp_ATRTrailMult=0.0||0.0||0.0||4.0||N
-Inp_BEPoints=0||0||0||500||N
+Inp_ATRTrailMult=2.5||2.5||0.0||4.0||N
+Inp_BEPoints=250||250||0||500||N
 Inp_BufferPoints=30||30||10||50||N
 Inp_MaxSpread=500||500||100||1000||N
 Inp_MinMarginLevel=300.0||300.0||100.0||500.0||N
-Inp_MaxDrawdownPct=8.0||8.0||5.0||10.0||N
+Inp_MaxDrawdownPct=25.0||25.0||5.0||50.0||N
 Inp_MagicNumber=88829100||88829100||0||0||N
