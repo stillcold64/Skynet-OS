@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Skynet OS / UHNWI"
 #property link      "https://github.com/stillcold64/Skynet-OS"
-#property version   "2.00"
+#property version   "2.10"
 #property description "Alpha Portfolio: Gold Tuesday Asymmetric Downward Pyramiding Snowball EA"
 
 #include <Trade\Trade.mqh>
@@ -23,7 +23,7 @@ sinput group "=== 1. การตั้งค่าระบบหลัก (Cor
 input ulong                InpMagicNumber          = 992201;               // Magic Number ประจำระบบ (แยกอิสระจาก EA ตัวอื่น)
 input string               InpTradeComment         = "GoldSnowball_Alpha"; // คำอธิบายออเดอร์
 input ENUM_TIMEFRAMES      InpWorkingTF            = PERIOD_H1;            // Timeframe อ้างอิงหลัก (H1)
-input bool                 InpShowDashboard        = true;                 // แสดงแผงควบคุม On-Chart GUI Dashboard
+input bool                 InpShowDashboard        = true;                 // แสดงแผงควบคุม On-Chart GUI Dashboard (อัตโนมัติปิดใน Backtest เพื่อความเร็ว)
 
 sinput group "=== 2. ตัวกรองสัปดาห์ก่อนหน้า (Prior Week Macro Setup) ==="
 input double               InpMinPriorWeekGainPct  = 0.8;                  // อัตราการขึ้นขั้นต่ำของสัปดาห์ก่อนหน้า (% Gain) (0.8%)
@@ -45,20 +45,23 @@ input int                  InpExitMinute           = 0;                    // �
 //--- GLOBAL STATE VARIABLES ---
 int      g_lastTradedWeek     = -1;
 int      g_lastTradedYear     = -1;
+int      g_cachedWeekId       = -1;
+bool     g_cachedSetupValid   = false;
 string   g_currentStatusText  = "INITIALIZING...";
 color    g_currentStatusColor = clrGold;
 string   g_actionDetailText   = "Preparing system...";
 double   g_priorWeekGain      = 0.0;
 double   g_priorMonOpen       = 0.0;
 double   g_priorFriClose      = 0.0;
-double   g_tuesdayOpenPrice   = 0.0;
 datetime g_lastUIUpdate       = 0;
+bool     g_isTester           = false;
 
 //+------------------------------------------------------------------+
 //| GUI Helper: Create Label                                         |
 //+------------------------------------------------------------------+
 void CreateLabel(string name, int x, int y, string text, int fontSize=9, color clr=clrWhite, string font="Segoe UI", int corner=CORNER_LEFT_UPPER)
 {
+   if(g_isTester || !InpShowDashboard) return;
    string objName = UI_PREFIX + name;
    if(ObjectFind(0, objName) < 0)
    {
@@ -80,6 +83,7 @@ void CreateLabel(string name, int x, int y, string text, int fontSize=9, color c
 //+------------------------------------------------------------------+
 void CreatePanel(string name, int x, int y, int width, int height, color bgColor, color borderColor, int corner=CORNER_LEFT_UPPER)
 {
+   if(g_isTester || !InpShowDashboard) return;
    string objName = UI_PREFIX + name;
    if(ObjectFind(0, objName) < 0)
    {
@@ -103,6 +107,7 @@ void CreatePanel(string name, int x, int y, int width, int height, color bgColor
 //+------------------------------------------------------------------+
 void DestroyDashboard()
 {
+   if(g_isTester) return;
    ObjectsDeleteAll(0, UI_PREFIX);
    ChartRedraw(0);
 }
@@ -112,7 +117,7 @@ void DestroyDashboard()
 //+------------------------------------------------------------------+
 void UpdateDashboard()
 {
-   if(!InpShowDashboard) return;
+   if(g_isTester || !InpShowDashboard) return;
    
    int baseX = 20;
    int baseY = 30;
@@ -121,9 +126,7 @@ void UpdateDashboard()
    
    // Background Card
    CreatePanel("BG_Main", baseX, baseY, panelW, panelH, C'15,20,30', C'45,55,75');
-   // Header Bar
    CreatePanel("BG_Header", baseX, baseY, panelW, 38, C'20,30,48', C'50,70,105');
-   // Status Bar Pill
    CreatePanel("BG_Status", baseX + 14, baseY + 48, panelW - 28, 30, C'24,32,46', C'40,55,80');
    
    // Header Title
@@ -152,7 +155,6 @@ void UpdateDashboard()
    CreateLabel("Val_Target", col2X, y, StringFormat("สัปดาห์ก่อนหน้า >= +%.1f%%", InpMinPriorWeekGainPct), 9, clrLightSteelBlue);
    y += rowGap;
    
-   // Divider 1
    CreatePanel("Div_1", col1X, y + 2, panelW - 36, 1, C'35,45,65', C'35,45,65');
    y += 10;
    
@@ -204,7 +206,6 @@ void UpdateDashboard()
    CreateLabel("Val_Float", col2X, y, pnlStr, 10, pnlClr, "Segoe UI Bold");
    y += rowGap;
    
-   // Divider 2
    CreatePanel("Div_2", col1X, y + 2, panelW - 36, 1, C'35,45,65', C'35,45,65');
    y += 10;
    
@@ -228,10 +229,18 @@ void UpdateDashboard()
 }
 
 //+------------------------------------------------------------------+
-//| Check prior calendar week setup                                  |
+//| Check prior calendar week setup (Cached per week for speed)      |
 //+------------------------------------------------------------------+
-bool CheckPriorWeekSetup(double &priorGainPct, double &monOpen, double &friClose)
+bool CheckPriorWeekSetupFast(int weekId, double &priorGainPct, double &monOpen, double &friClose)
 {
+   if(g_cachedWeekId == weekId)
+   {
+      priorGainPct = g_priorWeekGain;
+      monOpen      = g_priorMonOpen;
+      friClose     = g_priorFriClose;
+      return g_cachedSetupValid;
+   }
+   
    MqlRates weeklyRates[];
    ArraySetAsSeries(weeklyRates, true);
    
@@ -244,10 +253,19 @@ bool CheckPriorWeekSetup(double &priorGainPct, double &monOpen, double &friClose
    if(monOpen <= 0) return false;
    priorGainPct = (friClose - monOpen) / monOpen * 100.0;
    
+   g_priorWeekGain = priorGainPct;
+   g_priorMonOpen  = monOpen;
+   g_priorFriClose = friClose;
+   g_cachedWeekId  = weekId;
+   
    if(InpRequireFridayGreen && friClose <= monOpen)
+   {
+      g_cachedSetupValid = false;
       return false;
-      
-   return (priorGainPct >= InpMinPriorWeekGainPct);
+   }
+   
+   g_cachedSetupValid = (priorGainPct >= InpMinPriorWeekGainPct);
+   return g_cachedSetupValid;
 }
 
 //+------------------------------------------------------------------+
@@ -259,7 +277,10 @@ int GetActivePositionsCount(double &lowestEntry, double &highestEntry)
    lowestEntry = 999999.0;
    highestEntry = 0.0;
    
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   int total = PositionsTotal();
+   if(total == 0) return 0;
+   
+   for(int i = total - 1; i >= 0; i--)
    {
       if(posInfo.SelectByIndex(i))
       {
@@ -293,7 +314,6 @@ void UpdateTrailingAndFreeroll(double trailTargetSL)
             if(curSL == 0.0 || newSL < curSL - 0.10)
             {
                trade.PositionModify(posInfo.Ticket(), newSL, posInfo.TakeProfit());
-               Print("[+] เลื่อน SL ล็อกกำไร / Freeroll ตั๋ว #", posInfo.Ticket(), " ลงมาที่: ", newSL);
             }
          }
       }
@@ -317,7 +337,7 @@ void CloseAllPositions(string reason)
          }
       }
    }
-   if(closed > 0)
+   if(closed > 0 && !g_isTester)
    {
       Print("[★] ปิดรวบกำไรยกชุด ", closed, " ออเดอร์ (", reason, ")");
       g_currentStatusText  = "EOD HARVEST COMPLETE / DONE FOR WEEK";
@@ -331,6 +351,8 @@ void CloseAllPositions(string reason)
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   g_isTester = (bool)MQLInfoInteger(MQL_TESTER);
+   
    if(!symInfo.Name(_Symbol))
    {
       Print("[-] ไม่สามารถระบุ Symbol: ", _Symbol);
@@ -341,12 +363,13 @@ int OnInit()
    trade.SetDeviationInPoints(50);
    trade.SetTypeFilling(ORDER_FILLING_IOC);
    
-   CheckPriorWeekSetup(g_priorWeekGain, g_priorMonOpen, g_priorFriClose);
+   CheckPriorWeekSetupFast(0, g_priorWeekGain, g_priorMonOpen, g_priorFriClose);
    
-   Print("[+] GoldTuesdaySnowballEA v2.0 Initialized successfully for Symbol: ", _Symbol);
-   Print("[+] Magic Number: ", InpMagicNumber, " | Setup: Prior Week Gain >= ", InpMinPriorWeekGainPct, "%");
-   
-   UpdateDashboard();
+   if(!g_isTester)
+   {
+      Print("[+] GoldTuesdaySnowballEA v2.10 Initialized for Symbol: ", _Symbol);
+      UpdateDashboard();
+   }
    return INIT_SUCCEEDED;
 }
 
@@ -356,11 +379,10 @@ int OnInit()
 void OnDeinit(const int reason)
 {
    DestroyDashboard();
-   Print("[-] GoldTuesdaySnowballEA Deinitialized. Dashboard cleared.");
 }
 
 //+------------------------------------------------------------------+
-//| Expert tick function                                             |
+//| Expert tick function (Ultra-Fast Optimized)                      |
 //+------------------------------------------------------------------+
 void OnTick()
 {
@@ -368,139 +390,143 @@ void OnTick()
    MqlDateTime dt;
    TimeToStruct(currentTime, dt);
    
-   symInfo.RefreshRates();
-   double bid = symInfo.Bid();
-   double ask = symInfo.Ask();
+   // --- ULTRA FAST BYPASS: If NOT Tuesday (Wednesday - Monday) ---
+   if(dt.day_of_week != 2)
+   {
+      // If lingering positions exist from Tuesday, clean up
+      if(PositionsTotal() > 0)
+      {
+         double dummyL, dummyH;
+         if(GetActivePositionsCount(dummyL, dummyH) > 0)
+         {
+            CloseAllPositions("Cleanup Non-Tuesday Positions");
+         }
+      }
+      
+      // Update UI only in live mode throttled to 1 sec
+      if(!g_isTester && currentTime - g_lastUIUpdate >= 1)
+      {
+         if(dt.day_of_week == 1)
+         {
+            g_currentStatusText  = "MONDAY LIQUIDITY OBSERVATION";
+            g_currentStatusColor = clrDeepSkyBlue;
+            g_actionDetailText   = StringFormat("สัปดาห์ก่อนหน้า %+.2f%% | เฝ้าดูการกวาด High วันจันทร์", g_priorWeekGain);
+         }
+         else
+         {
+            g_currentStatusText  = "WAITING FOR NEXT TUESDAY";
+            g_currentStatusColor = clrGold;
+            g_actionDetailText   = StringFormat("สัปดาห์ก่อนหน้าบวก %+.2f%% | สแตนด์บายรอวันอังคารถัดไป", g_priorWeekGain);
+         }
+         UpdateDashboard();
+         g_lastUIUpdate = currentTime;
+      }
+      return; // Fast exit in 1 nanosecond on all other 6 days!
+   }
    
+   // ================================================================
+   // TUESDAY TRADING ENGINE
+   // ================================================================
    int currentYear = dt.year;
    int currentWeek = dt.day_of_year / 7;
+   int weekId = currentYear * 100 + currentWeek;
    
-   double lowestEntry, highestEntry;
-   int activeCount = GetActivePositionsCount(lowestEntry, highestEntry);
-   
-   // --- Refresh Prior Week Data ---
-   CheckPriorWeekSetup(g_priorWeekGain, g_priorMonOpen, g_priorFriClose);
-   
-   // --- 1. Tuesday Close / Harvest Check ---
-   if(dt.day_of_week == 2) // Tuesday
+   // 1. Tuesday EOD Harvest Check
+   if(dt.hour >= InpExitHour && dt.min >= InpExitMinute)
    {
-      if(dt.hour >= InpExitHour && dt.min >= InpExitMinute)
+      double dummyL, dummyH;
+      if(GetActivePositionsCount(dummyL, dummyH) > 0)
       {
-         if(activeCount > 0)
-         {
-            CloseAllPositions("Tuesday EOD Close Harvest");
-         }
+         CloseAllPositions("Tuesday EOD Close Harvest");
+      }
+      if(!g_isTester && currentTime - g_lastUIUpdate >= 1)
+      {
          g_currentStatusText  = "EOD HARVEST COMPLETE / DONE FOR WEEK";
          g_currentStatusColor = clrMagenta;
          g_actionDetailText   = "รวบกำไรวันอังคารเรียบร้อยแล้ว รอวันอังคารสัปดาห์ถัดไป";
          UpdateDashboard();
-         return;
+         g_lastUIUpdate = currentTime;
       }
-   }
-   else if(dt.day_of_week >= 3 || dt.day_of_week == 0) // Wednesday to Sunday cleanup
-   {
-      if(activeCount > 0)
-      {
-         CloseAllPositions("End of Tuesday Window Cleanup");
-      }
-      g_currentStatusText  = "WAITING FOR NEXT TUESDAY";
-      g_currentStatusColor = clrGold;
-      g_actionDetailText   = StringFormat("สัปดาห์ก่อนหน้าบวก %+.2f%% | สแตนด์บายรอวันอังคารถัดไป", g_priorWeekGain);
-      UpdateDashboard();
-      return;
-   }
-   else if(dt.day_of_week == 1) // Monday
-   {
-      g_currentStatusText  = "MONDAY LIQUIDITY OBSERVATION";
-      g_currentStatusColor = clrDeepSkyBlue;
-      g_actionDetailText   = StringFormat("สัปดาห์ก่อนหน้า %+.2f%% | กำลังเฝ้าการกวาด High ของวันจันทร์", g_priorWeekGain);
-      UpdateDashboard();
       return;
    }
    
-   // --- 2. Tuesday Trading Logic ---
-   if(dt.day_of_week == 2) // Tuesday
+   // Check active positions
+   double lowestEntry, highestEntry;
+   int activeCount = GetActivePositionsCount(lowestEntry, highestEntry);
+   
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   
+   // 2. Open Layer 1
+   if(activeCount == 0 && (g_lastTradedWeek != currentWeek || g_lastTradedYear != currentYear))
    {
-      // A. Check if we need to open Layer 1
-      if(activeCount == 0 && (g_lastTradedWeek != currentWeek || g_lastTradedYear != currentYear))
+      if(dt.hour == 0 && dt.min < 15) return; // Wait 15 mins for spread normalization
+      
+      double priorGain = 0.0, monO = 0.0, friC = 0.0;
+      if(CheckPriorWeekSetupFast(weekId, priorGain, monO, friC))
       {
-         // Wait for Asian session opening (after 00:15)
-         if(dt.hour == 0 && dt.min < 15)
-         {
-            g_currentStatusText  = "WAITING FOR ASIAN SESSION OPEN";
-            g_currentStatusColor = clrGold;
-            g_actionDetailText   = "รอผ่านช่วงตลาดเปิด 00:15 เพื่อยืนยันสเปรด";
-            UpdateDashboard();
-            return;
-         }
-         
-         double priorGain = 0.0, monO = 0.0, friC = 0.0;
-         if(CheckPriorWeekSetup(priorGain, monO, friC))
-         {
-            g_currentStatusText  = "EXECUTING LAYER 1...";
-            g_currentStatusColor = clrLimeGreen;
-            g_actionDetailText   = StringFormat("เข้าเงื่อนไข! สัปดาห์ก่อนหน้า +%.2f%% ยิงไม้แรก %.2f Lot", priorGain, InpLayer1Lot);
-            UpdateDashboard();
-            
-            double initialSL = ask + InpInitialSLUSD;
-            if(trade.Sell(InpLayer1Lot, _Symbol, bid, initialSL, 0, InpTradeComment + "_L1"))
-            {
-               g_lastTradedWeek = currentWeek;
-               g_lastTradedYear = currentYear;
-               g_tuesdayOpenPrice = bid;
-               Print("[+] เปิดไม้ 1 สำเร็จ! ตั๋ว #", trade.ResultOrder(), " ที่ราคา: ", bid, " | SL: ", initialSL);
-            }
-         }
-         else
+         double initialSL = ask + InpInitialSLUSD;
+         if(trade.Sell(InpLayer1Lot, _Symbol, bid, initialSL, 0, InpTradeComment + "_L1"))
          {
             g_lastTradedWeek = currentWeek;
             g_lastTradedYear = currentYear;
-            g_currentStatusText  = "SETUP SKIPPED (GAIN NOT MET)";
-            g_currentStatusColor = clrSilver;
-            g_actionDetailText   = StringFormat("สัปดาห์ก่อนหน้าบวกเพียง +%.2f%% (ไม่ถึงเกณฑ์ +%.1f%%) ข้ามสัปดาห์นี้", priorGain, InpMinPriorWeekGainPct);
-            UpdateDashboard();
-            return;
+            if(!g_isTester) Print("[+] เปิดไม้ 1 สำเร็จ! ตั๋ว #", trade.ResultOrder(), " ที่ราคา: ", bid);
          }
       }
+      else
+      {
+         g_lastTradedWeek = currentWeek;
+         g_lastTradedYear = currentYear;
+         if(!g_isTester)
+         {
+            g_currentStatusText  = "SETUP SKIPPED (GAIN NOT MET)";
+            g_currentStatusColor = clrSilver;
+            g_actionDetailText   = StringFormat("สัปดาห์ก่อนหน้าบวกเพียง +%.2f%% ข้ามสัปดาห์นี้", priorGain);
+            UpdateDashboard();
+         }
+         return;
+      }
+   }
+   
+   // 3. Pyramiding Snowball on the Dump
+   if(activeCount >= 1 && activeCount < 4)
+   {
+      double nextTarget = lowestEntry - InpStepPriceUSD;
       
-      // B. Pyramiding Snowball on the Dump
+      if(bid <= nextTarget)
+      {
+         double nextLot = InpLayer2Lot;
+         string layerComment = InpTradeComment + "_L2";
+         
+         if(activeCount == 2)
+         {
+            nextLot = InpLayer3Lot;
+            layerComment = InpTradeComment + "_L3";
+         }
+         else if(activeCount == 3)
+         {
+            nextLot = InpLayer4Lot;
+            layerComment = InpTradeComment + "_L4";
+         }
+         
+         // 1. Move SL of earlier layers down to lock profit (Freeroll)
+         double trailSL = nextTarget + InpStepPriceUSD - InpBreakevenBufferUSD;
+         UpdateTrailingAndFreeroll(trailSL);
+         
+         // 2. Open next layer
+         double newSL = ask + InpStepPriceUSD;
+         trade.Sell(nextLot, _Symbol, bid, newSL, 0, layerComment);
+      }
+   }
+   
+   // Update UI in live mode
+   if(!g_isTester && currentTime - g_lastUIUpdate >= 1)
+   {
       if(activeCount >= 1 && activeCount < 4)
       {
-         double nextTarget = lowestEntry - InpStepPriceUSD;
-         
          g_currentStatusText  = StringFormat("ACTIVE: SNOWBALL RUNNING (L%d)", activeCount);
          g_currentStatusColor = clrLimeGreen;
-         g_actionDetailText   = StringFormat("ถือ %d ไม้ | รอราคาดิ่งชน $%.2f เพื่อสโนว์บอลไม้ถัดไป", activeCount, nextTarget);
-         
-         if(bid <= nextTarget)
-         {
-            double nextLot = InpLayer2Lot;
-            string layerComment = InpTradeComment + "_L2";
-            
-            if(activeCount == 2)
-            {
-               nextLot = InpLayer3Lot;
-               layerComment = InpTradeComment + "_L3";
-            }
-            else if(activeCount == 3)
-            {
-               nextLot = InpLayer4Lot;
-               layerComment = InpTradeComment + "_L4";
-            }
-            
-            Print("[⚡] ราคาทองคำทุบถึงเป้าสโนว์บอล: ", bid, " <= ", nextTarget, " (เปิดไม้ ", activeCount + 1, " ขนาด ", nextLot, " Lot!)");
-            
-            // 1. Move SL of all existing positions down to lock profit (Freeroll)
-            double trailSL = nextTarget + InpStepPriceUSD - InpBreakevenBufferUSD;
-            UpdateTrailingAndFreeroll(trailSL);
-            
-            // 2. Open next layer
-            double newSL = ask + InpStepPriceUSD;
-            if(trade.Sell(nextLot, _Symbol, bid, newSL, 0, layerComment))
-            {
-               Print("[+] สโนว์บอลไม้ ", activeCount + 1, " สำเร็จ! ตั๋ว #", trade.ResultOrder());
-            }
-         }
+         g_actionDetailText   = StringFormat("ถือ %d ไม้ | รอราคาดิ่งชน $%.2f เพื่อสโนว์บอลไม้ถัดไป", activeCount, lowestEntry - InpStepPriceUSD);
       }
       else if(activeCount == 4)
       {
@@ -508,11 +534,6 @@ void OnTick()
          g_currentStatusColor = clrAqua;
          g_actionDetailText   = "สโนว์บอลครบ 4 เลเยอร์ รันเทรนด์เต็มกำลัง รอ Harvest 22:00";
       }
-   }
-   
-   // Throttle Dashboard updates to once every second
-   if(currentTime - g_lastUIUpdate >= 1)
-   {
       UpdateDashboard();
       g_lastUIUpdate = currentTime;
    }
