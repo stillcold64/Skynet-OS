@@ -42,13 +42,14 @@ input double               InpUpwardBufferUSD      = 15.0;                 // �
 input double               InpReversalDropUSD      = 3.0;                  // ระยะย่อคอนเฟิร์มหลังทำจุดสูงสุด ($ USD)
 
 sinput group "=== 4. การสเกลสโนว์บอลขาลง (Downward Pyramiding Schedule) ==="
-input double               InpStepPriceUSD         = 8.0;                  // ระยะห่างราคาเพื่อเปิดไม้สโนว์บอลถัดไป ($ USD)
-input double               InpInitialSLUSD         = 20.0;                 // Stop Loss เริ่มต้นของไม้แรก ($ USD)
+input double               InpStepPriceUSD         = 10.0;                 // ระยะห่างราคาเพื่อเปิดไม้สโนว์บอลถัดไป ($ USD) (เช่น $10.0)
+input double               InpInitialSLUSD         = 25.0;                 // Stop Loss เริ่มต้นของไม้แรก ($ USD)
+input bool                 InpUseH1StructureTrail  = true;                 // ล็อกกำไรและเลื่อน SL ตาม High ของแท่ง H1 ก่อนหน้า (Market Structure Trailing)
 input double               InpBreakevenBufferUSD   = 0.5;                  // กำไรกันชนล็อกหน้าทุน ($ USD)
-input double               InpLayer1Lot            = 0.50;                 // ขนาดไม้ที่ 1 (ไม้หยั่งเชิงบนยอด)
-input double               InpLayer2Lot            = 1.00;                 // ขนาดไม้ที่ 2 (ดิ่ง -$8.0)
-input double               InpLayer3Lot            = 1.50;                 // ขนาดไม้ที่ 3 (ดิ่ง -$16.0)
-input double               InpLayer4Lot            = 2.50;                 // ขนาดไม้ที่ 4 (ดิ่ง -$24.0 เต็มกำลัง)
+input double               InpLayer1Lot            = 0.20;                 // ขนาดไม้ที่ 1 (ไม้หยั่งเชิงบนยอด)
+input double               InpLayer2Lot            = 0.40;                 // ขนาดไม้ที่ 2 (ดิ่ง -$10.0)
+input double               InpLayer3Lot            = 0.60;                 // ขนาดไม้ที่ 3 (ดิ่ง -$20.0)
+input double               InpLayer4Lot            = 1.00;                 // ขนาดไม้ที่ 4 (ดิ่ง -$30.0 เต็มกำลัง)
 
 sinput group "=== 5. การล็อกกำไรและการปิดรอบ (Profit Lock & Harvest) ==="
 input double               InpTrailProfitLockThresh= 3000.0;               // เริ่ม Trailing ล็อกกำไรเมื่อกำไรรวมเกิน ($ USD)
@@ -323,6 +324,36 @@ int GetActivePositionsCount(double &lowestEntry, double &highestEntry)
 }
 
 //+------------------------------------------------------------------+
+//| Market Structure Trailing: Trail SL to Previous H1 Bar High      |
+//+------------------------------------------------------------------+
+void UpdateTrailingH1Structure()
+{
+   if(!InpUseH1StructureTrail) return;
+   
+   MqlRates h1Rates[];
+   ArraySetAsSeries(h1Rates, true);
+   if(CopyRates(_Symbol, PERIOD_H1, 0, 3, h1Rates) < 2) return;
+   
+   double prevBarHigh = h1Rates[1].high;
+   double targetSL = prevBarHigh + 0.50; // Just above previous H1 high
+   
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(posInfo.SelectByIndex(i))
+      {
+         if(posInfo.Symbol() == _Symbol && posInfo.Magic() == InpMagicNumber && posInfo.PositionType() == POSITION_TYPE_SELL)
+         {
+            double curSL = posInfo.StopLoss();
+            if(curSL == 0.0 || targetSL < curSL - 0.20)
+            {
+               trade.PositionModify(posInfo.Ticket(), targetSL, posInfo.TakeProfit());
+            }
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
 //| True Freeroll: Update Basket SL to Volume-Weighted Breakeven     |
 //+------------------------------------------------------------------+
 void UpdateFreerollBasketSL()
@@ -522,9 +553,11 @@ void OnTick()
    double lowestEntry, highestEntry;
    int activeCount = GetActivePositionsCount(lowestEntry, highestEntry);
    
-   // 2. Trailing Profit Lock on the Basket
+   // 2. Trailing Stop & Profit Lock on the Basket
    if(activeCount > 0)
    {
+      UpdateTrailingH1Structure();
+      
       double floatingProfit = 0.0;
       for(int i = PositionsTotal() - 1; i >= 0; i--)
       {
@@ -646,8 +679,14 @@ void OnTick()
          double newSL = ask + InpInitialSLUSD;
          if(trade.Sell(nextLot, _Symbol, bid, newSL, 0, layerComment))
          {
-            // 2. Immediately update ALL positions to Volume-Weighted Breakeven (True Freeroll)
-            UpdateFreerollBasketSL();
+            if(InpUseH1StructureTrail)
+            {
+               UpdateTrailingH1Structure();
+            }
+            else
+            {
+               UpdateFreerollBasketSL();
+            }
          }
       }
    }

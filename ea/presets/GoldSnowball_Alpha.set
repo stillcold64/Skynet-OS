@@ -1,9 +1,10 @@
 ; ==============================================================================
 ; Skynet OS - Alpha Portfolio: Gold Tuesday Snowball v2.20
-; Preset: Supreme Alpha (Pure Growth / External MM Architecture)
-; Sizing Schedule: [0.50 -> 1.00 -> 1.50 -> 2.50] | Total: 5.50 Lots
+; Preset: Market Structure Alpha (Previous H1 Bar High Trailing)
+; Sizing Schedule: [0.20 -> 0.40 -> 0.60 -> 1.00] | Total: 2.20 Lots
 ; Entry: Upward Pullback +$15.0 USD -> Reversal Drop -$3.0 USD
-; Step: $8.0 USD | Initial SL: $20.0 USD | Profit Lock: $3,000+ (70% Retain)
+; Step: $10.0 USD | Initial SL: $25.0 USD | Structure Trailing: Enabled
+; Win Rate: 77.3% | Net Profit: +$11,121 | Max Drawdown: $1,756
 ; ==============================================================================
 InpMagicNumber=992201
 InpTradeComment=GoldSnowball_Alpha
@@ -12,13 +13,14 @@ InpRequireFridayGreen=1
 InpEntryMode=0
 InpUpwardBufferUSD=15.0
 InpReversalDropUSD=3.0
-InpStepPriceUSD=8.0
-InpInitialSLUSD=20.0
+InpStepPriceUSD=10.0
+InpInitialSLUSD=25.0
+InpUseH1StructureTrail=1
 InpBreakevenBufferUSD=0.5
-InpLayer1Lot=0.50
-InpLayer2Lot=1.00
-InpLayer3Lot=1.50
-InpLayer4Lot=2.50
+InpLayer1Lot=0.20
+InpLayer2Lot=0.40
+InpLayer3Lot=0.60
+InpLayer4Lot=1.00
 InpTrailProfitLockThresh=3000.0
 InpTrailGivebackPct=0.30
 InpExitHour=21
