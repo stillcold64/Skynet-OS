@@ -1,6 +1,6 @@
-# ☁️ Google Apps Script Webhook Code สำหรับ Skynet OS (แยก 4 หมวดหมู่อัตโนมัติ)
+# ☁️ Google Apps Script Webhook Code สำหรับ Skynet OS (แยก 5 หมวดหมู่อัตโนมัติ)
 
-สคริปต์นี้เป็นระบบ **Smart Multi-Tab Router** ติดตั้งบน Google Sheets เพื่อแยกบันทึกข้อมูลออกเป็น **4 แท็บหมวดหมู่อย่างเป็นระเบียบ 100%** ไม่ปะปนกันเด็ดขาด:
+สคริปต์นี้เป็นระบบ **Smart Multi-Tab Router** ติดตั้งบน Google Sheets เพื่อแยกบันทึกข้อมูลออกเป็น **5 แท็บหมวดหมู่อย่างเป็นระเบียบ 100%** ไม่ปะปนกันเด็ดขาด:
 
 | แท็บใน Google Sheets | ข้อมูลที่จัดเก็บ | แหล่งที่มา |
 | :--- | :--- | :--- |
@@ -8,6 +8,7 @@
 | **⚡_บันทึกไม้เทรด** | บันทึกการเทรดรายไม้ (Symbol, Long/Short, Setup, Outcome Win/Loss) | Skynet OS — Trade Tracker |
 | **🎯_พิมพ์เขียว_Playbook** | คลังเซ็ตอัพท่าเทรด, สมมติฐาน (Thesis), กฎเข้า/ออก, Do's & Don'ts | Skynet OS — Playbook & Thesis |
 | **🧠_ปฏิทินอารมณ์_สติ** | บันทึกอารมณ์รายวัน/รายไม้ (FOMO, CALM, คะแนนวินัย, ข้อคิดเตือนสติ) | Skynet OS — Emotion Journal |
+| **🔥_เป้าหมาย_รูทีน_Heatmap** | เช็คอิน Top 3 Focus, ตอบ 'โอเค' บอท, Streak, ประวัติความสม่ำเสมอ | Telegram Bot & Web Heatmap |
 
 ---
 
@@ -212,6 +213,46 @@ function doPost(e) {
         JSON.stringify({
           success: true,
           message: "บันทึกลงแท็บ '🧠_ปฏิทินอารมณ์_สติ' สำเร็จ!"
+        })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
+    // 📂 หมวดที่ 5: 🔥 เป้าหมาย & รูทีน Heatmap (Focus Tasks & Consistency Heatmap)
+    // =========================================================================
+    if (data.action === "sync_focus_heatmap" || data.type === "FOCUS_HEATMAP") {
+      var fSheetName = "🔥_เป้าหมาย_รูทีน_Heatmap";
+      var fSheet = ss.getSheetByName(fSheetName) || ss.getSheetByName("Focus_Heatmap");
+
+      if (!fSheet) {
+        fSheet = ss.insertSheet(fSheetName);
+        var fHeader = [
+          "วันที่", "ภารกิจ (Task Title)", "อันดับ (Rank)", "สถานะ", "ช่องทางบันทึก",
+          "เวลาแจ้งเตือน", "Streak ปัจจุบัน (วัน)", "บันทึก / Note", "วันเวลาที่อัปเดต"
+        ];
+        fSheet.appendRow(fHeader);
+        fSheet.getRange(1, 1, 1, fHeader.length).setBackground("#1a1d26").setFontColor("#ff453a").setFontWeight("bold");
+        fSheet.setFrozenRows(1);
+      }
+
+      var c = data.checkin || {};
+      fSheet.appendRow([
+        c.date || new Date().toISOString().split("T")[0],
+        c.taskTitle || "Focus Task",
+        c.rank || "-",
+        c.status || "COMPLETED",
+        c.channel || "TELEGRAM",
+        c.reminderTime || "-",
+        c.streak || 1,
+        c.note || "",
+        new Date().toISOString()
+      ]);
+
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          success: true,
+          sheet: fSheetName,
+          message: "บันทึกลงแท็บ '🔥_เป้าหมาย_รูทีน_Heatmap' สำเร็จ"
         })
       ).setMimeType(ContentService.MimeType.JSON);
     }

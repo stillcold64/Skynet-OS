@@ -558,6 +558,112 @@ if (trackerCount === 0) {
   );
 }
 
+// 8. Focus Tasks & Goals (Top 3 Focus Engine + Routine + Challenges)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS focus_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    category TEXT NOT NULL DEFAULT 'TRADING_DISCIPLINE', -- 'TRADING_DISCIPLINE' | 'SELF_DEV' | 'EA_CODE' | 'HEALTH' | 'OTHER'
+    target_days INTEGER DEFAULT 7, -- 0 = ongoing daily routine, >0 = challenge (e.g. 7 days, 30 days)
+    reminder_time TEXT DEFAULT '09:00', -- 'HH:mm' format (Bangkok time) or '' if disabled
+    is_active INTEGER DEFAULT 0, -- 1 if selected in Top 3, 0 otherwise
+    rank INTEGER DEFAULT 0, -- 1, 2, 3
+    status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS focus_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    task_title TEXT NOT NULL,
+    date TEXT NOT NULL, -- 'YYYY-MM-DD'
+    status TEXT NOT NULL DEFAULT 'COMPLETED', -- 'COMPLETED' | 'SKIPPED'
+    channel TEXT DEFAULT 'TELEGRAM', -- 'TELEGRAM' | 'WEB'
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(task_id, date)
+  );
+
+  CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default focus tasks if empty
+const focusCount = db.prepare('SELECT COUNT(*) as count FROM focus_tasks').get().count;
+if (focusCount === 0) {
+  const insertTask = db.prepare(`
+    INSERT INTO focus_tasks (title, description, category, target_days, reminder_time, is_active, rank, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+  `);
+
+  // Active Top 3
+  insertTask.run(
+    '🛑 หยุดเทรดมือ 7 วัน (Cooling Down & Disciplined Mindset)',
+    'ตลาดเปิดแล้ว ตั้งสติ คุมมือ ไม่เข้าออเดอร์นอกแผนเด็ดขาด!',
+    'TRADING_DISCIPLINE',
+    7,
+    '09:00',
+    1,
+    1
+  );
+
+  insertTask.run(
+    '💻 Backtest & พัฒนา EA วันละ 1 ชม.',
+    'รัน Optimization, เก็บสถิติ Edge และเช็คผล Forward Test',
+    'EA_CODE',
+    0,
+    '16:00',
+    1,
+    2
+  );
+
+  insertTask.run(
+    '🌙 นอนก่อนเที่ยงคืน & บันทึก Reflection สติ',
+    'ปิดจอคอม เคลียร์สมอง พักผ่อนให้เต็มที่เพื่อวันใหม่',
+    'SELF_DEV',
+    0,
+    '22:30',
+    1,
+    3
+  );
+
+  // Pool Tasks (Inactive, ready to be activated or swapped)
+  insertTask.run(
+    '💧 ดื่มน้ำให้ครบ 2 ลิตร',
+    'จิบน้ำตลอดวัน ร่างกายสดชื่น สมองโฟกัสได้ดี',
+    'HEALTH',
+    0,
+    '10:00',
+    0,
+    0
+  );
+
+  insertTask.run(
+    '📖 อ่านหนังสือ / ศึกษาความรู้ใหม่ 15 นาที',
+    'อ่านหนังสือจิตวิทยาการลงทุน หรือแนวคิดสร้างระบบชีวิต',
+    'SELF_DEV',
+    0,
+    '20:00',
+    0,
+    0
+  );
+
+  insertTask.run(
+    '🏃‍♂️ ออกกำลังกาย / ยืดเหยียด 20 นาที',
+    'ยืดกล้ามเนื้อ วิดพื้น หรือเดินออกกำลังกายคลายเครียด',
+    'HEALTH',
+    0,
+    '17:30',
+    0,
+    0
+  );
+}
+
 export default db;
 
 

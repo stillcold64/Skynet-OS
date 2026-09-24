@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import PlaybookTab from './components/PlaybookTab';
 import JournalTab from './components/JournalTab';
 import TradeTrackerTab from './components/TradeTrackerTab';
+import FocusTab from './components/FocusTab';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -21,18 +22,18 @@ export default function Home() {
 
   // Mode state: 'finance' | 'trading'
   const [appMode, setAppMode] = useState('finance');
-  // Tab state: 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal'
+  // Tab state: 'calendar' | 'debts' | 'focus' | 'tracker' | 'playbook' | 'journal'
   const [activeTab, setActiveTab] = useState('calendar');
 
   const handleSwitchMode = (mode) => {
     setAppMode(mode);
     if (mode === 'finance') {
-      if (activeTab === 'playbook' || activeTab === 'tracker' || activeTab === 'journal') {
+      if (activeTab === 'playbook' || activeTab === 'tracker' || activeTab === 'journal' || activeTab === 'focus') {
         setActiveTab('calendar');
       }
     } else {
       if (activeTab === 'calendar' || activeTab === 'debts') {
-        setActiveTab('tracker');
+        setActiveTab('focus');
       }
     }
   };
@@ -290,6 +291,13 @@ export default function Home() {
             </>
           ) : (
             <>
+              <button
+                className={`segmented-button ${activeTab === 'focus' ? 'active' : ''}`}
+                onClick={() => setActiveTab('focus')}
+              >
+                <span>🔥</span>
+                <span>Focus & Heatmap (เป้าหมาย 3 ข้อ)</span>
+              </button>
               <button
                 className={`segmented-button ${activeTab === 'tracker' ? 'active' : ''}`}
                 onClick={() => setActiveTab('tracker')}
@@ -768,6 +776,7 @@ export default function Home() {
       )}
 
       {/* TRADING TABS */}
+      {activeTab === 'focus' && <FocusTab />}
       {activeTab === 'tracker' && <TradeTrackerTab />}
       {activeTab === 'playbook' && <PlaybookTab />}
       {activeTab === 'journal' && <JournalTab />}
