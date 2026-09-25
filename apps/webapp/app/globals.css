@@ -2847,6 +2847,13 @@ body {
   box-shadow: 0 2px 12px rgba(191, 90, 242, 0.2);
 }
 
+.mode-tab-btn.active.selfdev {
+  background: linear-gradient(135deg, rgba(255, 69, 58, 0.22), rgba(255, 159, 10, 0.22));
+  border-color: rgba(255, 69, 58, 0.45);
+  color: #ff453a;
+  box-shadow: 0 2px 12px rgba(255, 69, 58, 0.2);
+}
+
 .sub-nav-control {
   margin-bottom: 0 !important;
 }

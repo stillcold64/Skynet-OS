@@ -20,19 +20,23 @@ export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-12
   const [selectedDateStr, setSelectedDateStr] = useState(null);
 
-  // Mode state: 'finance' | 'trading'
+  // Mode state: 'finance' | 'trading' | 'selfdev'
   const [appMode, setAppMode] = useState('finance');
-  // Tab state: 'calendar' | 'debts' | 'focus' | 'tracker' | 'playbook' | 'journal'
+  // Tab state: 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'focus'
   const [activeTab, setActiveTab] = useState('calendar');
 
   const handleSwitchMode = (mode) => {
     setAppMode(mode);
     if (mode === 'finance') {
-      if (activeTab === 'playbook' || activeTab === 'tracker' || activeTab === 'journal' || activeTab === 'focus') {
+      if (activeTab !== 'calendar' && activeTab !== 'debts') {
         setActiveTab('calendar');
       }
-    } else {
-      if (activeTab === 'calendar' || activeTab === 'debts') {
+    } else if (mode === 'trading') {
+      if (activeTab !== 'tracker' && activeTab !== 'playbook' && activeTab !== 'journal') {
+        setActiveTab('tracker');
+      }
+    } else if (mode === 'selfdev') {
+      if (activeTab !== 'focus') {
         setActiveTab('focus');
       }
     }
@@ -342,18 +346,26 @@ export default function Home() {
             <p>
               {appMode === 'finance'
                 ? 'ระบบบริหารการเงินส่วนตัว & จัดการหนี้สิน (รับข้อมูลอัตโนมัติจาก Telegram @my_skynet_money_bot)'
-                : 'ระบบบริหารการเทรด (Trade Tracker บันทึกไม้เทรด, Playbook พิมพ์เขียว & Emotion Journal)'}
+                : appMode === 'trading'
+                ? 'ระบบบริหารการเทรด (Trade Tracker บันทึกไม้เทรด, Playbook พิมพ์เขียว & Emotion Journal)'
+                : 'ระบบพัฒนาตนเอง & สร้างวินัย (Top 3 Focus, Consistency Heatmap & รูทีนประจำวัน)'}
             </p>
           </div>
         </div>
 
         <div className="status-badge">
           <div className="pulse-dot" />
-          <span>{appMode === 'finance' ? 'Telegram Sync Live' : 'GGD Auto-Sync Active'}</span>
+          <span>
+            {appMode === 'finance'
+              ? 'Telegram Money Sync Live'
+              : appMode === 'trading'
+              ? 'GGD Auto-Sync Active'
+              : 'Telegram Focus & Heatmap Live'}
+          </span>
         </div>
       </header>
 
-      {/* Mode Switcher: Personal Finance vs Trading System */}
+      {/* Mode Switcher: 3 Pillars (Finance, Trading, Self-Development) */}
       <div className="mode-switcher-container">
         <div className="mode-segmented-control">
           <button
@@ -368,13 +380,20 @@ export default function Home() {
             onClick={() => handleSwitchMode('trading')}
           >
             <span>📈</span>
-            <span>ระบบการเทรด</span>
+            <span>ระบบการเทรด (Trade)</span>
+          </button>
+          <button
+            className={`mode-tab-btn selfdev ${appMode === 'selfdev' ? 'active' : ''}`}
+            onClick={() => handleSwitchMode('selfdev')}
+          >
+            <span>🔥</span>
+            <span>พัฒนาตนเอง (Self-Dev)</span>
           </button>
         </div>
 
         {/* Sub-tabs for the selected mode */}
         <div className="ios-segmented-control sub-nav-control">
-          {appMode === 'finance' ? (
+          {appMode === 'finance' && (
             <>
               <button
                 className={`segmented-button ${activeTab === 'calendar' ? 'active' : ''}`}
@@ -391,15 +410,10 @@ export default function Home() {
                 <span>หนี้สิน & พอร์ตติดลบ</span>
               </button>
             </>
-          ) : (
+          )}
+
+          {appMode === 'trading' && (
             <>
-              <button
-                className={`segmented-button ${activeTab === 'focus' ? 'active' : ''}`}
-                onClick={() => setActiveTab('focus')}
-              >
-                <span>🔥</span>
-                <span>Focus & Heatmap (เป้าหมาย 3 ข้อ)</span>
-              </button>
               <button
                 className={`segmented-button ${activeTab === 'tracker' ? 'active' : ''}`}
                 onClick={() => setActiveTab('tracker')}
@@ -420,6 +434,18 @@ export default function Home() {
               >
                 <span>🧠</span>
                 <span>Emotion Journal (ปฏิทินอารมณ์)</span>
+              </button>
+            </>
+          )}
+
+          {appMode === 'selfdev' && (
+            <>
+              <button
+                className={`segmented-button ${activeTab === 'focus' ? 'active' : ''}`}
+                onClick={() => setActiveTab('focus')}
+              >
+                <span>🔥</span>
+                <span>Top 3 Focus & Consistency Heatmap (เป้าหมาย 3 ข้อ & รูทีน)</span>
               </button>
             </>
           )}
@@ -1176,10 +1202,12 @@ export default function Home() {
       )}
 
       {/* TRADING TABS */}
-      {activeTab === 'focus' && <FocusTab />}
       {activeTab === 'tracker' && <TradeTrackerTab />}
       {activeTab === 'playbook' && <PlaybookTab />}
       {activeTab === 'journal' && <JournalTab />}
+
+      {/* SELF-DEVELOPMENT TABS */}
+      {activeTab === 'focus' && <FocusTab />}
 
       {/* Bot Audit & Activity Log (Only in Personal Finance mode) */}
       {appMode === 'finance' && (
