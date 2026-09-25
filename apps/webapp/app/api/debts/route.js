@@ -81,7 +81,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { action, exchangeRate, debt } = body;
+    const { action, exchangeRate, amountUsd, debt, id } = body;
 
     // Action 1: Update exchange rate
     if (action === 'update_rate' && exchangeRate && !isNaN(Number(exchangeRate))) {
@@ -91,18 +91,71 @@ export async function POST(request) {
       return NextResponse.json({ success: true, newRate: parseFloat(exchangeRate) });
     }
 
-    // Action 2: Update debt initial amount or interest
+    // Action 1.1: Update investment drawdown (USD + Rate + Note)
+    if (action === 'update_drawdown') {
+      const updates = [];
+      const values = [];
+      if (amountUsd !== undefined && !isNaN(Number(amountUsd))) {
+        updates.push('amount_usd = ?');
+        values.push(parseFloat(amountUsd));
+      }
+      if (exchangeRate !== undefined && !isNaN(Number(exchangeRate))) {
+        updates.push('exchange_rate = ?');
+        values.push(parseFloat(exchangeRate));
+      }
+      if (body.note !== undefined) {
+        updates.push('note = ?');
+        values.push(body.note);
+      }
+      if (updates.length > 0) {
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        values.push(1);
+        db.prepare(`UPDATE investment_drawdown SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    // Action 2: Add new debt
+    if (action === 'add_debt' && debt) {
+      if (!debt.name || debt.initialAmount === undefined || debt.initialAmount === '') {
+        return NextResponse.json({ error: 'กรุณากรอกชื่อหนี้สินและยอดเงินตั้งต้น' }, { status: 400 });
+      }
+      const keywords = (debt.keywords || debt.name).trim().toLowerCase();
+      const stmt = db.prepare(`
+        INSERT INTO debts (name, keywords, initial_amount, interest_rate, note)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      const info = stmt.run(
+        debt.name.trim(),
+        keywords,
+        parseFloat(debt.initialAmount) || 0,
+        parseFloat(debt.interestRate) || 0,
+        debt.note || ''
+      );
+      return NextResponse.json({ success: true, id: info.lastInsertRowid });
+    }
+
+    // Action 3: Update existing debt
     if (action === 'update_debt' && debt && debt.id) {
+      const keywords = (debt.keywords || debt.name).trim().toLowerCase();
       db.prepare(`
         UPDATE debts 
-        SET initial_amount = ?, interest_rate = ?, note = ?
+        SET name = ?, keywords = ?, initial_amount = ?, interest_rate = ?, note = ?
         WHERE id = ?
       `).run(
-        parseFloat(debt.initialAmount),
-        parseFloat(debt.interestRate),
+        debt.name ? debt.name.trim() : '',
+        keywords,
+        parseFloat(debt.initialAmount) || 0,
+        parseFloat(debt.interestRate) || 0,
         debt.note || '',
         debt.id
       );
+      return NextResponse.json({ success: true });
+    }
+
+    // Action 4: Delete debt
+    if (action === 'delete_debt' && id) {
+      db.prepare('DELETE FROM debts WHERE id = ?').run(id);
       return NextResponse.json({ success: true });
     }
 

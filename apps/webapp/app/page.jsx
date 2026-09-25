@@ -47,6 +47,16 @@ export default function Home() {
   const [allTimeStats, setAllTimeStats] = useState(null);
   const [drilldownModal, setDrilldownModal] = useState(null);
   const [rateInput, setRateInput] = useState('36.0');
+  const [usdInput, setUsdInput] = useState('5000');
+  const [showDebtModal, setShowDebtModal] = useState(false);
+  const [editingDebt, setEditingDebt] = useState(null);
+  const [debtFormData, setDebtFormData] = useState({
+    name: '',
+    keywords: '',
+    initialAmount: '',
+    interestRate: '0',
+    note: '',
+  });
   const [loading, setLoading] = useState(true);
 
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
@@ -78,6 +88,9 @@ export default function Home() {
         setDebtsData(dData);
         if (dData.drawdown && dData.drawdown.exchangeRate) {
           setRateInput(String(dData.drawdown.exchangeRate));
+        }
+        if (dData.drawdown && dData.drawdown.amountUsd !== undefined) {
+          setUsdInput(String(dData.drawdown.amountUsd));
         }
       }
     } catch (err) {
@@ -162,6 +175,95 @@ export default function Home() {
       } catch (e) {
         console.error('Update rate error:', e);
       }
+    }
+  };
+
+  const handleUpdateDrawdownUsd = async (newUsd) => {
+    setUsdInput(newUsd);
+    const num = parseFloat(newUsd);
+    if (!isNaN(num) && num >= 0) {
+      try {
+        await fetch('/api/debts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update_drawdown', amountUsd: num }),
+        });
+        const res = await fetch('/api/debts');
+        if (res.ok) setDebtsData(await res.json());
+      } catch (e) {
+        console.error('Update drawdown USD error:', e);
+      }
+    }
+  };
+
+  const handleSaveDebt = async (e) => {
+    e.preventDefault();
+    if (!debtFormData.name.trim() || !debtFormData.initialAmount) {
+      alert('กรุณากรอกชื่อหนี้สินและยอดเงินตั้งต้น');
+      return;
+    }
+
+    try {
+      if (editingDebt) {
+        const res = await fetch('/api/debts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update_debt',
+            debt: {
+              id: editingDebt.id,
+              name: debtFormData.name,
+              keywords: debtFormData.keywords,
+              initialAmount: parseFloat(debtFormData.initialAmount),
+              interestRate: parseFloat(debtFormData.interestRate) || 0,
+              note: debtFormData.note,
+            },
+          }),
+        });
+        if (res.ok) {
+          setShowDebtModal(false);
+          setEditingDebt(null);
+          await fetchData();
+        }
+      } else {
+        const res = await fetch('/api/debts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'add_debt',
+            debt: {
+              name: debtFormData.name,
+              keywords: debtFormData.keywords,
+              initialAmount: parseFloat(debtFormData.initialAmount),
+              interestRate: parseFloat(debtFormData.interestRate) || 0,
+              note: debtFormData.note,
+            },
+          }),
+        });
+        if (res.ok) {
+          setShowDebtModal(false);
+          setDebtFormData({ name: '', keywords: '', initialAmount: '', interestRate: '0', note: '' });
+          await fetchData();
+        }
+      }
+    } catch (e) {
+      console.error('Save debt error:', e);
+    }
+  };
+
+  const handleDeleteDebt = async (id, name) => {
+    if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบรายการหนี้ "${name}"?`)) return;
+    try {
+      const res = await fetch('/api/debts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_debt', id }),
+      });
+      if (res.ok) {
+        await fetchData();
+      }
+    } catch (e) {
+      console.error('Delete debt error:', e);
     }
   };
 
@@ -665,30 +767,46 @@ export default function Home() {
 
           {/* Investment Drawdown Control Card */}
           <section className="glass-panel drawdown-card">
-            <div className="drawdown-header">
+            <div className="drawdown-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#bf5af2' }}>
-                  📉 ยอดติดลบจากพอร์ตการลงทุน ($5,000 USD)
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#bf5af2', margin: 0 }}>
+                  📉 ยอดติดลบจากพอร์ตการลงทุน (${formatCurrency(debtsData.drawdown.amountUsd)} USD)
                 </h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  คำนวณมูลค่าความเสียหายเทียบเท่าเงินบาท สามารถปรับอัตราแลกเปลี่ยนได้
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
+                  คำนวณมูลค่าความเสียหายเทียบเท่าเงินบาท สามารถปรับยอด USD และอัตราแลกเปลี่ยนได้
                 </p>
               </div>
 
-              <div className="rate-control">
-                <span>อัตราแลกเปลี่ยน (THB/USD):</span>
-                <input
-                  type="number"
-                  step="0.05"
-                  className="rate-input"
-                  value={rateInput}
-                  onChange={(e) => handleUpdateRate(e.target.value)}
-                />
-                <span>฿</span>
+              <div className="rate-control" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>ยอดติดลบในพอร์ต:</span>
+                  <input
+                    type="number"
+                    step="50"
+                    className="rate-input"
+                    style={{ width: '100px', textAlign: 'right' }}
+                    value={usdInput}
+                    onChange={(e) => handleUpdateDrawdownUsd(e.target.value)}
+                  />
+                  <span>$</span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>อัตราแลกเปลี่ยน:</span>
+                  <input
+                    type="number"
+                    step="0.05"
+                    className="rate-input"
+                    style={{ width: '80px', textAlign: 'right' }}
+                    value={rateInput}
+                    onChange={(e) => handleUpdateRate(e.target.value)}
+                  />
+                  <span>฿/$</span>
+                </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', marginTop: '16px' }}>
               <div>
                 <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>ยอดติดลบในพอร์ต (USD)</div>
                 <div style={{ fontSize: '24px', fontWeight: '800', color: '#f5f5f7' }}>
@@ -705,22 +823,112 @@ export default function Home() {
             </div>
           </section>
 
-          {/* 4 Debts Cards Grid */}
+          {/* Debts Cards Grid */}
           <section style={{ marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>📑</span>
-              <span>รายการหนี้สิน 4 รายการ (ตัดลดยอดอัตโนมัติเมื่อมีค่าใช้จ่ายเข้า)</span>
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📑</span>
+                  <span>รายการหนี้สิน ({debtsData.debts.length} รายการ)</span>
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                  ตัดลดยอดอัตโนมัติเมื่อมีค่าใช้จ่ายเข้าจาก Telegram หรือบันทึกในระบบ
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setEditingDebt(null);
+                  setDebtFormData({
+                    name: '',
+                    keywords: '',
+                    initialAmount: '',
+                    interestRate: '0',
+                    note: '',
+                  });
+                  setShowDebtModal(true);
+                }}
+                style={{
+                  background: '#30d158',
+                  color: '#000',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.88rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(48, 209, 88, 0.25)',
+                }}
+              >
+                <span>+</span>
+                <span>เพิ่มหนี้สินใหม่</span>
+              </button>
+            </div>
 
             <div className="debts-grid">
               {debtsData.debts.map((debt) => (
                 <div key={debt.id} className="glass-panel debt-card">
-                  <div className="debt-card-header">
-                    <div className="debt-name-box">
-                      <h3>{debt.name}</h3>
-                      <span>{debt.note}</span>
+                  <div className="debt-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                    <div className="debt-name-box" style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h3 style={{ margin: 0 }}>{debt.name}</h3>
+                        <span className="interest-badge">ดอกเบี้ย {debt.interestRate}%/ปี</span>
+                      </div>
+                      <span style={{ display: 'block', marginTop: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {debt.note || 'ไม่มีหมายเหตุ'}
+                      </span>
+                      {debt.keywords && (
+                        <div style={{ fontSize: '11px', color: '#636e7b', marginTop: '4px' }}>
+                          🔑 คำตรวจจับตัดยอด: <code style={{ color: '#64d2ff', background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: '4px' }}>{debt.keywords}</code>
+                        </div>
+                      )}
                     </div>
-                    <span className="interest-badge">ดอกเบี้ย {debt.interestRate}%/ปี</span>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={() => {
+                          setEditingDebt(debt);
+                          setDebtFormData({
+                            name: debt.name,
+                            keywords: debt.keywords,
+                            initialAmount: String(debt.initialAmount),
+                            interestRate: String(debt.interestRate),
+                            note: debt.note || '',
+                          });
+                          setShowDebtModal(true);
+                        }}
+                        style={{
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          color: '#aeaeb2',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                        }}
+                        title="แก้ไขหนี้สินนี้"
+                      >
+                        ✏️ แก้ไข
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDebt(debt.id, debt.name)}
+                        style={{
+                          background: 'rgba(255,69,58,0.1)',
+                          border: '1px solid rgba(255,69,58,0.3)',
+                          color: '#ff453a',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                        }}
+                        title="ลบหนี้สินนี้"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
 
                   <div className="debt-amounts-row">
@@ -772,6 +980,198 @@ export default function Home() {
               ))}
             </div>
           </section>
+
+          {/* DEBT MODAL: ADD / EDIT DEBT */}
+          {showDebtModal && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.75)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000,
+                backdropFilter: 'blur(8px)',
+                padding: '16px',
+              }}
+            >
+              <div
+                className="glass-panel"
+                style={{
+                  width: '100%',
+                  maxWidth: '500px',
+                  padding: '28px',
+                  borderRadius: '20px',
+                  background: '#1a1d26',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', margin: 0 }}>
+                    {editingDebt ? '⚙️ แก้ไขรายการหนี้สิน' : '✨ เพิ่มรายการหนี้สินใหม่'}
+                  </h3>
+                  <button
+                    onClick={() => setShowDebtModal(false)}
+                    style={{ background: 'transparent', border: 'none', color: '#8e8e93', fontSize: '1.2rem', cursor: 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveDebt} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#aeaeb2', marginBottom: '6px' }}>
+                      ชื่อหนี้สิน / แหล่งกู้ *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="เช่น บัตรเครดิต KBank, กยศ., ยืมเพื่อน"
+                      value={debtFormData.name}
+                      onChange={(e) => setDebtFormData({ ...debtFormData, name: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#fff',
+                        fontSize: '0.95rem',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aeaeb2', marginBottom: '6px' }}>
+                        ยอดหนี้ตั้งต้น (บาท) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        placeholder="เช่น 15000"
+                        value={debtFormData.initialAmount}
+                        onChange={(e) => setDebtFormData({ ...debtFormData, initialAmount: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: '#fff',
+                          fontSize: '0.95rem',
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aeaeb2', marginBottom: '6px' }}>
+                        อัตราดอกเบี้ย (% ต่อปี)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="เช่น 16 หรือ 0"
+                        value={debtFormData.interestRate}
+                        onChange={(e) => setDebtFormData({ ...debtFormData, interestRate: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: '#fff',
+                          fontSize: '0.95rem',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#aeaeb2', marginBottom: '4px' }}>
+                      🔑 คำตรวจจับตัดยอดอัตโนมัติ (Keywords)
+                    </label>
+                    <div style={{ fontSize: '0.78rem', color: '#636e7b', marginBottom: '6px' }}>
+                      เมื่อบันทึกผ่าน Telegram ที่มีคำเหล่านี้ ระบบจะตัดลดยอดหนี้ก้อนนี้ให้อัตโนมัติ (คั่นด้วย <code>,</code>)
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="เช่น kbank,เคแบงก์,กสิกร (เว้นว่างได้ ระบบจะใช้ชื่อหนี้แทน)"
+                      value={debtFormData.keywords}
+                      onChange={(e) => setDebtFormData({ ...debtFormData, keywords: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#fff',
+                        fontSize: '0.95rem',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#aeaeb2', marginBottom: '6px' }}>
+                      หมายเหตุ / เงื่อนไขการผ่อน
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="เช่น ผ่อนเดือนละ 2,000 บาท ครบกำหนดวันที่ 25"
+                      value={debtFormData.note}
+                      onChange={(e) => setDebtFormData({ ...debtFormData, note: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#fff',
+                        fontSize: '0.95rem',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowDebtModal(false)}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        background: 'transparent',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#aeaeb2',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      type="submit"
+                      style={{
+                        padding: '10px 22px',
+                        borderRadius: '8px',
+                        background: '#30d158',
+                        border: 'none',
+                        color: '#000',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {editingDebt ? 'บันทึกการแก้ไข' : 'บันทึกหนี้สินใหม่'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </>
       )}
 
