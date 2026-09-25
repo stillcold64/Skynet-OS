@@ -103,6 +103,25 @@ export default function FocusTab() {
     }
   };
 
+  // Ping Telegram Bot with interactive checklist
+  const handlePingTelegram = async () => {
+    try {
+      const res = await fetch('/api/focus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ping_telegram' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('📱 ส่งรายการภารกิจเข้า Telegram เรียบร้อย! ตรวจสอบมือถือและกดติ๊กได้ทันที');
+      } else {
+        showToast('⚠️ ไม่สามารถส่งได้: ' + (data.error || 'กรุณาลองใหม่'));
+      }
+    } catch (err) {
+      showToast('⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    }
+  };
+
   // Save Task (Create or Update)
   const handleSaveTask = async (e) => {
     e.preventDefault();
@@ -410,29 +429,52 @@ export default function FocusTab() {
               บอท Telegram จะแจ้งเตือนตามเวลาที่คุณตั้งไว้ของแต่ละข้อ และเชื่อมโยงกับ Heatmap อัตโนมัติ
             </p>
           </div>
-          <button
-            onClick={() => {
-              setEditingTask(null);
-              setFormData(initialForm);
-              setShowModal(true);
-            }}
-            style={{
-              background: '#0a84ff',
-              color: '#fff',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              fontSize: '0.88rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <span>+</span>
-            <span>เพิ่มภารกิจใหม่</span>
-          </button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={handlePingTelegram}
+              style={{
+                background: 'rgba(10, 132, 255, 0.15)',
+                color: '#64d2ff',
+                border: '1px solid rgba(10, 132, 255, 0.35)',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontSize: '0.88rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              title="ส่งรายการภารกิจเข้า Telegram ของคุณทันทีเพื่อให้กดติ๊กในมือถือได้"
+            >
+              <span>📱</span>
+              <span>ส่งเข้า Telegram ทันที</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setEditingTask(null);
+                setFormData(initialForm);
+                setShowModal(true);
+              }}
+              style={{
+                background: '#0a84ff',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontSize: '0.88rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>+</span>
+              <span>เพิ่มภารกิจใหม่</span>
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>

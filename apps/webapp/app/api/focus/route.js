@@ -118,6 +118,19 @@ export async function POST(request) {
       return NextResponse.json({ success: true });
     }
 
+    if (action === 'ping_telegram') {
+      try {
+        const pingRes = await fetch('http://127.0.0.1:3001/ping_focus', {
+          method: 'POST',
+          signal: AbortSignal.timeout(5000),
+        });
+        const pingData = await pingRes.json();
+        return NextResponse.json({ success: pingRes.ok, pingData });
+      } catch (e) {
+        return NextResponse.json({ success: false, error: 'Telegram bot unreachable: ' + e.message }, { status: 500 });
+      }
+    }
+
     return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });
   } catch (err) {
     console.error('Focus POST API error:', err);
