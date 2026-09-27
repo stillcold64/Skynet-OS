@@ -47,42 +47,30 @@ const API_BASE = `https://api.telegram.org/bot${token}`;
 
 let offset = 0;
 
-// Helper: Render interactive Focus checklist message & keyboard
+// Helper: Render interactive Focus checklist message & keyboard (Compact & Minimal)
 function renderFocusChecklist(todayStr) {
   const todayTop3 = getTodayCheckIns(todayStr);
   const stats = getFocusStats(todayStr);
   const doneCount = todayTop3.filter((t) => t.is_done_today).length;
 
-  let text = `🎯 <b>[ภารกิจหลักประจำวัน — Skynet Focus]</b>\n`;
-  text += `📅 <b>วันที่:</b> <code>${todayStr}</code> | 🔥 <b>Streak:</b> ${stats.currentStreak} วันติด\n`;
-  text += `📊 <b>ความคืบหน้า:</b> <b>${doneCount}/${todayTop3.length} ข้อสำเร็จ</b>\n\n`;
+  let text = `🎯 <b>Focus วันนี้</b> (${doneCount}/${todayTop3.length}) | 🔥 Streak ${stats.currentStreak} วัน\n\n`;
 
   const keyboard = [];
 
   todayTop3.forEach((t) => {
-    const rankEmoji = t.rank === 1 ? '🥇' : t.rank === 2 ? '🥈' : '🥉';
-    const statusText = t.is_done_today ? '✅ <b>[ทำสำเร็จแล้ว]</b>' : '⏳ <i>[รอทำ]</i>';
-    text += `${rankEmoji} <b>อันดับ ${t.rank}: ${t.title}</b>\n`;
-    text += `   สถานะ: ${statusText}\n`;
-    text += `   ⏰ เวลาเตือน: ${t.reminder_time ? t.reminder_time + ' น.' : 'ไม่เตือน'}`;
-    if (t.target_days > 0) {
-      text += ` | 🎯 เป้าหมาย: ${t.target_days} วัน (ทำแล้ว ${t.total_completed_days} วัน)`;
-    }
-    text += `\n\n`;
+    const icon = t.is_done_today ? '✅' : '⏳';
+    const targetInfo = t.target_days > 0 ? ` [${t.total_completed_days}/${t.target_days} วัน]` : '';
+    text += `${icon} <b>${t.title}</b>${targetInfo}\n`;
 
-    const btnText = t.is_done_today
-      ? `✅ ข้อ ${t.rank}: สำเร็จแล้ว (กดเพื่อยกเลิก)`
-      : `⏳ ข้อ ${t.rank}: กดติ๊กถูก (ทำแล้ว)`;
-    keyboard.push([{ text: btnText, callback_data: `toggle_task_${t.id}` }]);
+    const btnIcon = t.is_done_today ? '✅' : '⬜';
+    keyboard.push([{ text: `${btnIcon} ${t.title}`, callback_data: `toggle_task_${t.id}` }]);
   });
 
   if (doneCount < todayTop3.length) {
-    keyboard.push([{ text: '🌟 ติ๊กครบทั้งหมด 3 ข้อ', callback_data: 'ok_all' }]);
+    keyboard.push([{ text: '⚡ ติ๊กครบทั้งหมด', callback_data: 'ok_all' }]);
   } else {
-    text += `🌟 <b>สุดยอดมากครับ! วันนี้คุณเก็บครบ 100% เต็มทุกข้อแล้ว!</b> 🟩🟩🟩\n`;
+    text += `\n🎉 <i>ครบทุกข้อแล้ว เยี่ยมมาก!</i>`;
   }
-
-  text += `👇 <i>กดติ๊กถูกหรือยกเลิกที่ปุ่มด้านล่างนี้ในบอทได้เลยครับ:</i>`;
 
   return { text, keyboard };
 }
@@ -262,23 +250,16 @@ async function checkFocusReminders() {
       // Mark as sent
       setSetting(sentKey, currentTimeStr);
 
-      const rankEmoji = task.rank === 1 ? '🥇' : task.rank === 2 ? '🥈' : '🥉';
-      let message = `⏰ <b>[แจ้งเตือนภารกิจ ${rankEmoji} อันดับ ${task.rank} — ${task.reminder_time} น.]</b>\n\n`;
-      message += `<b>${task.title}</b>\n`;
-      if (task.description) {
-        message += `💬 <i>"${task.description}"</i>\n`;
-      }
+      let message = `⏰ <b>${task.reminder_time} น. — ${task.title}</b>\n`;
       if (task.target_days > 0) {
-        message += `🎯 ชาเลนจ์เป้าหมาย: ${task.target_days} วัน (ทำแล้ว ${task.total_completed_days} วัน)\n`;
+        message += `🎯 ชาเลนจ์วันที่ ${task.total_completed_days}/${task.target_days}\n`;
       }
-      message += `\n👉 <b>ทำสำเร็จตามแผนแล้วใช่ไหมครับ?</b>\nกดปุ่มด้านล่างเพื่อติ๊กถูกในบอทได้เลย:`;
 
       await sendMessage(chatId, message, {
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
-            [{ text: `✅ ข้อ ${task.rank}: ทำตามแผนแล้ว (กดติ๊กถูก)`, callback_data: `toggle_task_${task.id}` }],
-            [{ text: `🌟 ติ๊กครบทั้งหมด 3 ข้อ`, callback_data: `ok_all` }],
+            [{ text: `✅ ทำแล้ว (ติ๊กถูก)`, callback_data: `toggle_task_${task.id}` }],
           ],
         },
       });
@@ -344,10 +325,10 @@ async function poll() {
 
             if (willToggleOff) {
               toggleFocusCheckIn(taskId, todayStr, 'TOGGLE', 'TELEGRAM', 'ยกเลิกผ่านปุ่ม Telegram');
-              await answerCallbackQuery(cq.id, `ยกเลิกการติ๊กข้อ ${task ? task.rank : ''} แล้ว`);
+              await answerCallbackQuery(cq.id, 'ยกเลิกแล้ว');
             } else {
               toggleFocusCheckIn(taskId, todayStr, 'COMPLETED', 'TELEGRAM', 'กดยืนยันปุ่ม Telegram');
-              await answerCallbackQuery(cq.id, `🔥 ติ๊กข้อ ${task ? task.rank : ''} สำเร็จเรียบร้อย!`);
+              await answerCallbackQuery(cq.id, '✅ เรียบร้อย!');
             }
 
             // Edit the message in place with updated checklist & buttons!
@@ -377,7 +358,7 @@ async function poll() {
             for (const t of top3) {
               toggleFocusCheckIn(t.id, todayStr, 'COMPLETED', 'TELEGRAM', 'กดยืนยันทำครบทั้งหมด');
             }
-            await answerCallbackQuery(cq.id, '🌟 สุดยอดมาก! บันทึกครบทั้ง 3 ข้อเรียบร้อย!');
+            await answerCallbackQuery(cq.id, '✅ บันทึกครบทุกข้อแล้ว!');
 
             // Edit message in place
             const { text, keyboard } = renderFocusChecklist(todayStr);
@@ -479,12 +460,9 @@ async function poll() {
 
         // Check command /start or /help
         if (lower === '/start' || lower === '/help') {
-          let reply = `🤖 <b>ยินดีต้อนรับสู่ Skynet OS Assistant!</b>\n\n`;
-          reply += `📌 <b>คำสั่งใช้งาน:</b>\n`;
-          reply += `• <b>ติ๊กภารกิจ Top 3:</b> พิมพ์ <code>/focus</code> หรือ <code>เป้าหมาย</code> (จะมีปุ่มให้กดติ๊กถูกในนี้ได้ทันที)\n`;
-          reply += `• <b>บันทึกความคืบหน้าเร็ว:</b> พิมพ์ <b>"โอเค"</b> เพื่อติ๊กข้อถัดไป\n`;
-          reply += `• <b>บันทึกค่าใช้จ่าย:</b> พิมพ์ยอดเงินได้ทันที เช่น <i>"ข้าว 50 กาแฟ 40"</i>\n`;
-          reply += `• <b>แดชบอร์ด & Heatmap:</b> http://localhost:3000\n`;
+          let reply = `🤖 <b>Skynet OS</b>\n\n`;
+          reply += `• Focus: พิมพ์ <code>/focus</code> หรือ <b>"โอเค"</b>\n`;
+          reply += `• บันทึกเงิน: พิมพ์ <i>"ข้าว 50 กาแฟ 40"</i>\n`;
           await sendMessage(chatId, reply, { parse_mode: 'HTML' });
 
           // Send the interactive checklist alongside start

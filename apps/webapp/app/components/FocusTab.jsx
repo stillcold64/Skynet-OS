@@ -297,29 +297,29 @@ export default function FocusTab() {
       <section
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '16px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '14px',
         }}
       >
         {/* Card 1: Streak */}
         <div
           className="glass-panel"
           style={{
-            padding: '20px',
-            borderRadius: '16px',
+            padding: '16px 20px',
+            borderRadius: '14px',
             background: 'linear-gradient(135deg, rgba(255, 69, 58, 0.1) 0%, rgba(20, 24, 33, 0.6) 100%)',
             border: '1px solid rgba(255, 69, 58, 0.3)',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: '#ff453a', fontWeight: 'bold' }}>🔥 ความสม่ำเสมอ (STREAK)</span>
-            <span style={{ fontSize: '1.2rem' }}>⚡</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '0.8rem', color: '#ff453a', fontWeight: 'bold' }}>🔥 STREAK</span>
+            <span style={{ fontSize: '1.1rem' }}>⚡</span>
           </div>
-          <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.5px' }}>
-            {stats.currentStreak} <span style={{ fontSize: '1rem', fontWeight: 'normal', color: '#8e8e93' }}>วันต่อเนื่อง</span>
+          <div style={{ fontSize: '2rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.5px' }}>
+            {stats.currentStreak} <span style={{ fontSize: '0.95rem', fontWeight: 'normal', color: '#8e8e93' }}>วัน</span>
           </div>
-          <div style={{ fontSize: '0.82rem', color: '#8e8e93', marginTop: '6px' }}>
-            สถิติต่อเนื่องสูงสุด: <strong style={{ color: '#ffd60a' }}>{stats.bestStreak} วัน</strong>
+          <div style={{ fontSize: '0.78rem', color: '#8e8e93', marginTop: '4px' }}>
+            สูงสุด: <strong style={{ color: '#ffd60a' }}>{stats.bestStreak} วัน</strong>
           </div>
         </div>
 
@@ -327,23 +327,23 @@ export default function FocusTab() {
         <div
           className="glass-panel"
           style={{
-            padding: '20px',
-            borderRadius: '16px',
+            padding: '16px 20px',
+            borderRadius: '14px',
             background: 'linear-gradient(135deg, rgba(48, 209, 88, 0.1) 0%, rgba(20, 24, 33, 0.6) 100%)',
             border: '1px solid rgba(48, 209, 88, 0.3)',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: '#30d158', fontWeight: 'bold' }}>🎯 วันนี้ (TODAY FOCUS)</span>
-            <span style={{ fontSize: '1.2rem' }}>✅</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '0.8rem', color: '#30d158', fontWeight: 'bold' }}>🎯 วันนี้</span>
+            <span style={{ fontSize: '1.1rem' }}>✅</span>
           </div>
-          <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#fff' }}>
+          <div style={{ fontSize: '2rem', fontWeight: '800', color: '#fff' }}>
             {completedTodayCount} / {todayTop3.length}{' '}
-            <span style={{ fontSize: '1rem', fontWeight: 'normal', color: '#8e8e93' }}>ข้อสำเร็จ</span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 'normal', color: '#8e8e93' }}>ข้อ</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-            <span style={{ fontSize: '0.82rem', color: '#8e8e93' }}>
-              {completedTodayCount === 3 ? '🌟 ทำครบ 100% แล้ววันนี้' : 'รอเช็คอิน Telegram / Web'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+            <span style={{ fontSize: '0.78rem', color: '#8e8e93' }}>
+              {completedTodayCount === 3 ? '🌟 ครบ 100%' : 'รอเช็คอิน'}
             </span>
             {completedTodayCount < 3 && (
               <button
@@ -352,14 +352,14 @@ export default function FocusTab() {
                   background: 'rgba(48, 209, 88, 0.2)',
                   color: '#30d158',
                   border: '1px solid rgba(48, 209, 88, 0.4)',
-                  padding: '4px 10px',
+                  padding: '3px 8px',
                   borderRadius: '6px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.75rem',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                 }}
               >
-                ✓ ติ๊กครบทั้งหมด
+                ✓ ติ๊กครบ
               </button>
             )}
           </div>
@@ -369,22 +369,22 @@ export default function FocusTab() {
         <div
           className="glass-panel"
           style={{
-            padding: '20px',
-            borderRadius: '16px',
+            padding: '16px 20px',
+            borderRadius: '14px',
             background: 'linear-gradient(135deg, rgba(10, 132, 255, 0.1) 0%, rgba(20, 24, 33, 0.6) 100%)',
             border: '1px solid rgba(10, 132, 255, 0.3)',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: '#0a84ff', fontWeight: 'bold' }}>📊 ความมีวินัยสะสม</span>
-            <span style={{ fontSize: '1.2rem' }}>📈</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '0.8rem', color: '#0a84ff', fontWeight: 'bold' }}>📊 สะสม</span>
+            <span style={{ fontSize: '1.1rem' }}>📈</span>
           </div>
-          <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#fff' }}>
+          <div style={{ fontSize: '2rem', fontWeight: '800', color: '#fff' }}>
             {stats.totalCompletions}{' '}
-            <span style={{ fontSize: '1rem', fontWeight: 'normal', color: '#8e8e93' }}>ครั้ง</span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 'normal', color: '#8e8e93' }}>ครั้ง</span>
           </div>
-          <div style={{ fontSize: '0.82rem', color: '#8e8e93', marginTop: '6px' }}>
-            จำนวนวันที่แอคทีฟทั้งหมด: <strong>{stats.totalDaysActive} วัน</strong>
+          <div style={{ fontSize: '0.78rem', color: '#8e8e93', marginTop: '4px' }}>
+            บันทึกแล้ว: <strong>{stats.totalDaysActive} วัน</strong>
           </div>
         </div>
 
@@ -392,8 +392,8 @@ export default function FocusTab() {
         <div
           className="glass-panel"
           style={{
-            padding: '20px',
-            borderRadius: '16px',
+            padding: '16px 20px',
+            borderRadius: '14px',
             background: 'linear-gradient(135deg, rgba(191, 90, 242, 0.1) 0%, rgba(20, 24, 33, 0.6) 100%)',
             border: '1px solid rgba(191, 90, 242, 0.3)',
             display: 'flex',
@@ -402,53 +402,53 @@ export default function FocusTab() {
           }}
         >
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={{ fontSize: '0.85rem', color: '#bf5af2', fontWeight: 'bold' }}>📱 TELEGRAM & GGS SYNC</span>
-              <span style={{ fontSize: '1.1rem' }}>☁️</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <span style={{ fontSize: '0.8rem', color: '#bf5af2', fontWeight: 'bold' }}>📱 ซิงค์ข้อมูล</span>
+              <span style={{ fontSize: '1rem' }}>☁️</span>
             </div>
-            <div style={{ fontSize: '0.92rem', color: '#fff', fontWeight: '600' }}>บอททักเตือนตามเวลาแต่ละข้อ</div>
-            <div style={{ fontSize: '0.8rem', color: '#8e8e93', marginTop: '4px' }}>
-              ตอบกลับ <code>"โอเค"</code> หรือกดปุ่มใน Telegram เพื่ออัปเดต Heatmap
+            <div style={{ fontSize: '0.88rem', color: '#fff', fontWeight: '600' }}>Telegram & Sheets</div>
+            <div style={{ fontSize: '0.78rem', color: '#8e8e93', marginTop: '2px' }}>
+              แจ้งเตือนและติ๊กผ่านมือถือได้ทันที
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#30d158' }} />
-            <span style={{ fontSize: '0.78rem', color: '#30d158' }}>Google Sheets Redundancy Active</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#30d158' }} />
+            <span style={{ fontSize: '0.75rem', color: '#30d158' }}>Online</span>
           </div>
         </div>
       </section>
 
       {/* SECTION 1: TOP 3 ACTIVE FOCUS CARDS */}
       <section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <div>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: '700', color: '#fff', margin: 0 }}>
-              🎯 3 อันดับภารกิจหลัก (Active Top 3 Focus)
+            <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#fff', margin: 0 }}>
+              🎯 3 อันดับภารกิจหลัก
             </h2>
-            <p style={{ fontSize: '0.85rem', color: '#8e8e93', margin: '4px 0 0 0' }}>
-              บอท Telegram จะแจ้งเตือนตามเวลาที่คุณตั้งไว้ของแต่ละข้อ และเชื่อมโยงกับ Heatmap อัตโนมัติ
+            <p style={{ fontSize: '0.82rem', color: '#8e8e93', margin: '3px 0 0 0' }}>
+              เตือนผ่าน Telegram อัตโนมัติ & ซิงค์ Heatmap
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={handlePingTelegram}
               style={{
                 background: 'rgba(10, 132, 255, 0.15)',
                 color: '#64d2ff',
                 border: '1px solid rgba(10, 132, 255, 0.35)',
-                padding: '8px 16px',
+                padding: '6px 14px',
                 borderRadius: '8px',
-                fontSize: '0.88rem',
+                fontSize: '0.85rem',
                 fontWeight: '600',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
               }}
-              title="ส่งรายการภารกิจเข้า Telegram ของคุณทันทีเพื่อให้กดติ๊กในมือถือได้"
+              title="ส่งรายการภารกิจเข้า Telegram ทันที"
             >
               <span>📱</span>
-              <span>ส่งเข้า Telegram ทันที</span>
+              <span>ส่งเข้า Telegram</span>
             </button>
 
             <button
@@ -461,9 +461,9 @@ export default function FocusTab() {
                 background: '#0a84ff',
                 color: '#fff',
                 border: 'none',
-                padding: '8px 16px',
+                padding: '6px 14px',
                 borderRadius: '8px',
-                fontSize: '0.88rem',
+                fontSize: '0.85rem',
                 fontWeight: '600',
                 cursor: 'pointer',
                 display: 'flex',
@@ -472,7 +472,7 @@ export default function FocusTab() {
               }}
             >
               <span>+</span>
-              <span>เพิ่มภารกิจใหม่</span>
+              <span>เพิ่มภารกิจ</span>
             </button>
           </div>
         </div>
@@ -605,7 +605,7 @@ export default function FocusTab() {
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <span>{task.is_done_today ? '✅ ทำสำเร็จแล้ววันนี้ (โอเค)' : '⏳ รอทำวันนี้ (กดเพื่อติ๊กโอเค)'}</span>
+                    <span>{task.is_done_today ? '✅ สำเร็จแล้ว' : '⏳ รอทำ (คลิกติ๊ก)'}</span>
                   </button>
 
                   <button
@@ -641,14 +641,14 @@ export default function FocusTab() {
       </section>
 
       {/* SECTION 2: CONSISTENCY HEATMAP */}
-      <section className="glass-panel" style={{ padding: '24px', borderRadius: '16px' }}>
+      <section className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#fff', margin: 0 }}>
-              🟩 ตารางความต่อเนื่อง (Consistency Heatmap)
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#fff', margin: 0 }}>
+              🟩 Consistency Heatmap
             </h3>
             <p style={{ fontSize: '0.82rem', color: '#8e8e93', margin: '4px 0 0 0' }}>
-              สถิติบันทึกความสม่ำเสมอรายวัน (16 สัปดาห์ย้อนหลัง) ยิ่งทำครบ 3 ข้อ สีเขียวจะยิ่งสว่างสดใส
+              บันทึกความสม่ำเสมอ 16 สัปดาห์ย้อนหลัง
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#8e8e93' }}>
@@ -780,15 +780,15 @@ export default function FocusTab() {
         )}
       </section>
 
-      {/* SECTION 3: TASK LIBRARY & MANAGER (คลังภารกิจทั้งหมด & สลับ 3 อันดับ) */}
-      <section className="glass-panel" style={{ padding: '24px', borderRadius: '16px' }}>
+      {/* SECTION 3: TASK LIBRARY & MANAGER */}
+      <section className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#fff', margin: 0 }}>
-              📚 คลังภารกิจทั้งหมด (Task Pool & Library)
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#fff', margin: 0 }}>
+              📚 คลังภารกิจ (Task Library)
             </h3>
             <p style={{ fontSize: '0.82rem', color: '#8e8e93', margin: '4px 0 0 0' }}>
-              คุณสามารถสร้างภารกิจไว้กี่ข้อก็ได้ แล้วกดปุ่มปักหมุด 📌 เพื่อเลือกหรือสลับเป็น 3 อันดับหลักได้ตลอดเวลา
+              เลือกสลับ Top 1-3 หรือสร้างภารกิจใหม่ได้ตามต้องการ
             </p>
           </div>
         </div>
