@@ -5,6 +5,7 @@ import PlaybookTab from './components/PlaybookTab';
 import JournalTab from './components/JournalTab';
 import TradeTrackerTab from './components/TradeTrackerTab';
 import FocusTab from './components/FocusTab';
+import MicroHabitsTab from './components/MicroHabitsTab';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -22,7 +23,7 @@ export default function Home() {
 
   // Mode state: 'finance' | 'trading' | 'selfdev'
   const [appMode, setAppMode] = useState('finance');
-  // Tab state: 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'focus'
+  // Tab state: 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'focus' | 'habits'
   const [activeTab, setActiveTab] = useState('calendar');
 
   const handleSwitchMode = (mode) => {
@@ -36,7 +37,7 @@ export default function Home() {
         setActiveTab('tracker');
       }
     } else if (mode === 'selfdev') {
-      if (activeTab !== 'focus') {
+      if (activeTab !== 'focus' && activeTab !== 'habits') {
         setActiveTab('focus');
       }
     }
@@ -445,7 +446,14 @@ export default function Home() {
                 onClick={() => setActiveTab('focus')}
               >
                 <span>🔥</span>
-                <span>Top 3 Focus & Consistency Heatmap (เป้าหมาย 3 ข้อ & รูทีน)</span>
+                <span>Top 3 Focus (เป้าหมาย 3 ข้อ & Heatmap)</span>
+              </button>
+              <button
+                className={`segmented-button ${activeTab === 'habits' ? 'active' : ''}`}
+                onClick={() => setActiveTab('habits')}
+              >
+                <span>⚡</span>
+                <span>Micro Habits (รูทีน & นิสัยรายวัน)</span>
               </button>
             </>
           )}
@@ -1208,6 +1216,7 @@ export default function Home() {
 
       {/* SELF-DEVELOPMENT TABS */}
       {activeTab === 'focus' && <FocusTab />}
+      {activeTab === 'habits' && <MicroHabitsTab />}
 
       {/* Bot Audit & Activity Log (Only in Personal Finance mode) */}
       {appMode === 'finance' && (

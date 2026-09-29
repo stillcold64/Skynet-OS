@@ -664,6 +664,50 @@ if (focusCount === 0) {
   );
 }
 
+// 9. Micro Habits & Daily Atomic Routines
+db.exec(`
+  CREATE TABLE IF NOT EXISTS micro_habits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    category TEXT NOT NULL DEFAULT 'ROUTINE', -- 'CREATIVE' | 'HEALTH' | 'MINDSET' | 'ROUTINE' | 'WORK'
+    icon TEXT DEFAULT '⚡',
+    time_of_day TEXT DEFAULT 'ANYTIME', -- 'MORNING' | 'AFTERNOON' | 'EVENING' | 'ANYTIME'
+    target_days_per_week INTEGER DEFAULT 7,
+    is_active INTEGER DEFAULT 1,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS micro_habit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    habit_id INTEGER NOT NULL,
+    date TEXT NOT NULL, -- 'YYYY-MM-DD'
+    status TEXT NOT NULL DEFAULT 'COMPLETED', -- 'COMPLETED' | 'SKIPPED'
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(habit_id, date)
+  );
+  CREATE INDEX IF NOT EXISTS idx_micro_habit_logs_date ON micro_habit_logs(date);
+`);
+
+// Seed default micro habits if empty
+const habitCount = db.prepare('SELECT COUNT(*) as count FROM micro_habits').get().count;
+if (habitCount === 0) {
+  const insertHabit = db.prepare(`
+    INSERT INTO micro_habits (title, description, category, icon, time_of_day, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  insertHabit.run('🎬 ตัดคลิปเช้า 30 นาที', 'ตัดต่อวิดีโอ/คลิปคอนเทนต์ช่วงเช้า สร้างโมเมนตัม', 'CREATIVE', '🎬', 'MORNING', 1);
+  insertHabit.run('💧 ดื่มน้ำแก้วใหญ่ตอนตื่นนอน', 'ดื่มน้ำ 1 แก้วใหญ่ทันทีหลังตื่นนอน ปลุกความสดชื่น', 'HEALTH', '💧', 'MORNING', 2);
+  insertHabit.run('🎨 สเก็ตช์ไอเดีย / งานอาร์ต 1 ชิ้น', 'วาดรูป ร่างคอนเซ็ปต์ หรือทดลองงานภาพสั้น ๆ', 'CREATIVE', '🎨', 'AFTERNOON', 3);
+  insertHabit.run('🚶‍♂️ ยืดเส้น / ขยับตัว 15 นาที', 'ลุกจากเก้าอี้ ยืดกล้ามเนื้อ เดินเปลี่ยนอิริยาบถ', 'HEALTH', '🚶‍♂️', 'AFTERNOON', 4);
+  insertHabit.run('🧹 เคลียร์โต๊ะทำงาน & ปิดหน้าจอ', 'จัดระเบียบอุปกรณ์ เซฟงาน และเคลียร์สายตาก่อนพัก', 'ROUTINE', '🧹', 'EVENING', 5);
+  insertHabit.run('🌙 จดบันทึกสั้น ๆ & ปิดไฟนอนตรงเวลา', 'ทบทวนสั้น ๆ 1 บรรทัด แล้วพักผ่อนให้เต็มที่', 'MINDSET', '🌙', 'EVENING', 6);
+}
+
 export default db;
 
 
