@@ -1,6 +1,6 @@
-# ☁️ Google Apps Script Webhook Code สำหรับ Skynet OS (แยก 5 หมวดหมู่อัตโนมัติ)
+# ☁️ Google Apps Script Webhook Code สำหรับ Skynet OS (แยก 6 หมวดหมู่อัตโนมัติ)
 
-สคริปต์นี้เป็นระบบ **Smart Multi-Tab Router** ติดตั้งบน Google Sheets เพื่อแยกบันทึกข้อมูลออกเป็น **5 แท็บหมวดหมู่อย่างเป็นระเบียบ 100%** ไม่ปะปนกันเด็ดขาด:
+สคริปต์นี้เป็นระบบ **Smart Multi-Tab Router** ติดตั้งบน Google Sheets เพื่อแยกบันทึกข้อมูลออกเป็น **6 แท็บหมวดหมู่อย่างเป็นระเบียบ 100%** ไม่ปะปนกันเด็ดขาด:
 
 | แท็บใน Google Sheets | ข้อมูลที่จัดเก็บ | แหล่งที่มา |
 | :--- | :--- | :--- |
@@ -9,6 +9,7 @@
 | **🎯_พิมพ์เขียว_Playbook** | คลังเซ็ตอัพท่าเทรด, สมมติฐาน (Thesis), กฎเข้า/ออก, Do's & Don'ts | Skynet OS — Playbook & Thesis |
 | **🧠_ปฏิทินอารมณ์_สติ** | บันทึกอารมณ์รายวัน/รายไม้ (FOMO, CALM, คะแนนวินัย, ข้อคิดเตือนสติ) | Skynet OS — Emotion Journal |
 | **🔥_เป้าหมาย_รูทีน_Heatmap** | เช็คอิน Top 3 Focus, ตอบ 'โอเค' บอท, Streak, ประวัติความสม่ำเสมอ | Telegram Bot & Web Heatmap |
+| **⚡_นิสัย_Micro_Habits** | เช็คอินนิสัยรายวัน (ตัดคลิป, ดื่มน้ำ, สเก็ตช์), Streak รายข้อ, % ความคืบหน้า | Skynet OS — Micro Habits Tracker |
 
 ---
 
@@ -253,6 +254,45 @@ function doPost(e) {
           success: true,
           sheet: fSheetName,
           message: "บันทึกลงแท็บ '🔥_เป้าหมาย_รูทีน_Heatmap' สำเร็จ"
+        })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
+    // 📂 หมวดที่ 6: ⚡ นิสัย_Micro_Habits (Micro Habits Daily Tracker)
+    // =========================================================================
+    if (data.action === "sync_micro_habits" || data.type === "MICRO_HABITS") {
+      var hSheetName = "⚡_นิสัย_Micro_Habits";
+      var hSheet = ss.getSheetByName(hSheetName) || ss.getSheetByName("Micro_Habits");
+
+      if (!hSheet) {
+        hSheet = ss.insertSheet(hSheetName);
+        var hHeader = [
+          "วันที่", "ชื่อนิสัย (Habit Title)", "หมวดหมู่", "สถานะ",
+          "Streak ปัจจุบัน (วัน)", "ความคืบหน้ารายวัน (%)", "บันทึก / Note", "วันเวลาที่บันทึก"
+        ];
+        hSheet.appendRow(hHeader);
+        hSheet.getRange(1, 1, 1, hHeader.length).setBackground("#1a1d26").setFontColor("#30d158").setFontWeight("bold");
+        hSheet.setFrozenRows(1);
+      }
+
+      var h = data.habitLog || {};
+      hSheet.appendRow([
+        h.date || new Date().toISOString().split("T")[0],
+        h.habitTitle || "Habit",
+        h.category || "ROUTINE",
+        h.status || "COMPLETED",
+        h.streak || 0,
+        (h.dailyProgressPct || 0) + "%",
+        h.note || "",
+        new Date().toISOString()
+      ]);
+
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          success: true,
+          sheet: hSheetName,
+          message: "บันทึกลงแท็บ '⚡_นิสัย_Micro_Habits' สำเร็จ"
         })
       ).setMimeType(ContentService.MimeType.JSON);
     }
