@@ -15,8 +15,15 @@ export default function FocusTab() {
   const [todayTop3, setTodayTop3] = useState([]);
   const [heatmap, setHeatmap] = useState({});
   const [stats, setStats] = useState({ currentStreak: 0, bestStreak: 0, totalCompletions: 0, totalDaysActive: 0 });
-  const [todayStr, setTodayStr] = useState('');
+  const [todayStr, setTodayStr] = useState(() => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    } catch (e) {
+      return new Date().toISOString().slice(0, 10);
+    }
+  });
   const [loading, setLoading] = useState(true);
+  const [togglingTaskId, setTogglingTaskId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Modals & Form
@@ -38,9 +45,9 @@ export default function FocusTab() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (showSpinner = false) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const res = await fetch('/api/focus');
       if (res.ok) {
         const data = await res.json();
@@ -48,23 +55,67 @@ export default function FocusTab() {
         setTodayTop3(data.todayTop3 || []);
         setHeatmap(data.heatmap || {});
         setStats(data.stats || { currentStreak: 0, bestStreak: 0, totalCompletions: 0, totalDaysActive: 0 });
-        setTodayStr(data.todayStr || '');
+        if (data.todayStr) setTodayStr(data.todayStr);
       }
     } catch (err) {
       console.error('Failed to load focus data:', err);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000); // auto-refresh to mirror Telegram bot actions
+    fetchData(true);
+    const interval = setInterval(() => fetchData(false), 5000); // auto-refresh to mirror Telegram bot actions
     return () => clearInterval(interval);
   }, []);
 
-  // Check-in action (Toggle Done)
-  const handleCheckIn = async (taskId, currentStatus) => {
+  // Check-in action (Toggle Done with optimistic UI & safety)
+  const handleCheckIn = async (taskId, currentStatus, taskTitle = '') => {
+    if (togglingTaskId) return;
+
+    // Safety guard: if already completed, ask user to confirm cancellation so accidental click doesn't delete today's streak
+    if (currentStatus) {
+      const confirmed = window.confirm(`คุณต้องการยกเลิกการบันทึกภารกิจ "${taskTitle || 'นี้'}" ของวันนี้ใช่หรือไม่?`);
+      if (!confirmed) return;
+    }
+
+    setTogglingTaskId(taskId);
+
+    // Optimistic UI update
+    const nextStatus = !currentStatus;
+    setTodayTop3((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const newCompletedDays = nextStatus ? t.total_completed_days + 1 : Math.max(0, t.total_completed_days - 1);
+          return {
+            ...t,
+            is_done_today: nextStatus,
+            total_completed_days: newCompletedDays,
+            progress_pct: t.target_days > 0 ? Math.min(100, Math.round((newCompletedDays / t.target_days) * 100)) : 100,
+          };
+        }
+        return t;
+      })
+    );
+
+    // Optimistic heatmap update
+    setHeatmap((prev) => {
+      const curEntry = prev[todayStr] || { date: todayStr, count: 0, tasks: [] };
+      const curTasks = curEntry.tasks || [];
+      const newTasks = nextStatus
+        ? [...curTasks, taskTitle || `ภารกิจ #${taskId}`]
+        : curTasks.filter((name) => name !== taskTitle);
+      return {
+        ...prev,
+        [todayStr]: {
+          date: todayStr,
+          count: Math.max(0, curEntry.count + (nextStatus ? 1 : -1)),
+          tasks: newTasks,
+        },
+      };
+    });
+
     try {
       const res = await fetch('/api/focus', {
         method: 'POST',
@@ -79,10 +130,16 @@ export default function FocusTab() {
 
       if (res.ok) {
         showToast(currentStatus ? 'ยกเลิกการติ๊กเสร็จ' : '🔥 บันทึกความต่อเนื่องสำเร็จ! Heatmap อัปเดตแล้ว');
-        fetchData();
+        await fetchData(false);
+      } else {
+        showToast('เกิดข้อผิดพลาดในการบันทึก');
+        await fetchData(false);
       }
     } catch (err) {
-      showToast('เกิดข้อผิดพลาดในการบันทึก');
+      showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      await fetchData(false);
+    } finally {
+      setTogglingTaskId(null);
     }
   };
 
@@ -223,23 +280,23 @@ export default function FocusTab() {
     }
   };
 
-  // Generate 16 weeks of Heatmap dates (Sun to Sat)
+  // Generate 16 weeks of Heatmap dates (Sun to Sat) with timezone-immune calendar math
   const generateHeatmapGrid = () => {
     const weeks = [];
-    const today = new Date();
-    // Go back ~112 days (16 weeks)
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - 111);
-    // Align to Sunday
-    const dayOfWeek = startDate.getDay();
-    startDate.setDate(startDate.getDate() - dayOfWeek);
+    const today = todayStr || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    const [y, m, d] = today.split('-').map(Number);
+    const todayDt = new Date(Date.UTC(y, m - 1, d));
+    const dayOfWeek = todayDt.getUTCDay(); // 0 is Sun
 
-    let cur = new Date(startDate);
+    // Align start to 15 weeks ago Sunday + this week's Sunday
+    const daysBack = 15 * 7 + dayOfWeek;
+    let curDt = new Date(Date.UTC(y, m - 1, d - daysBack));
     let currentWeek = [];
 
-    while (cur <= today || currentWeek.length > 0) {
-      const dStr = cur.toISOString().slice(0, 10);
-      const isFuture = cur > today;
+    // Loop until the end of current week (Saturday)
+    for (let i = 0; i <= daysBack + (6 - dayOfWeek); i++) {
+      const dStr = curDt.toISOString().slice(0, 10);
+      const isFuture = dStr > today;
       const data = heatmap[dStr] || { count: 0, tasks: [] };
 
       currentWeek.push({
@@ -247,16 +304,15 @@ export default function FocusTab() {
         count: isFuture ? 0 : data.count,
         tasks: data.tasks || [],
         isFuture,
-        isToday: dStr === todayStr,
+        isToday: dStr === today,
       });
 
       if (currentWeek.length === 7) {
         weeks.push(currentWeek);
         currentWeek = [];
-        if (cur > today) break;
       }
 
-      cur.setDate(cur.getDate() + 1);
+      curDt = new Date(Date.UTC(curDt.getUTCFullYear(), curDt.getUTCMonth(), curDt.getUTCDate() + 1));
     }
 
     return weeks;
@@ -587,7 +643,8 @@ export default function FocusTab() {
                 {/* Bottom Actions: Check-in Button & Edit */}
                 <div style={{ display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                   <button
-                    onClick={() => handleCheckIn(task.id, task.is_done_today)}
+                    disabled={togglingTaskId === task.id}
+                    onClick={() => handleCheckIn(task.id, task.is_done_today, task.title)}
                     style={{
                       flex: 1,
                       padding: '10px 14px',
@@ -597,7 +654,8 @@ export default function FocusTab() {
                       color: task.is_done_today ? '#000' : '#fff',
                       fontWeight: '700',
                       fontSize: '0.9rem',
-                      cursor: 'pointer',
+                      cursor: togglingTaskId === task.id ? 'wait' : 'pointer',
+                      opacity: togglingTaskId === task.id ? 0.75 : 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -605,7 +663,13 @@ export default function FocusTab() {
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <span>{task.is_done_today ? '✅ สำเร็จแล้ว' : '⏳ รอทำ (คลิกติ๊ก)'}</span>
+                    {togglingTaskId === task.id ? (
+                      <span>⏳ กำลังบันทึก...</span>
+                    ) : task.is_done_today ? (
+                      <span>✅ สำเร็จแล้ว (คลิกเพื่อยกเลิก)</span>
+                    ) : (
+                      <span>⏳ รอทำ (คลิกติ๊ก)</span>
+                    )}
                   </button>
 
                   <button

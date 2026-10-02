@@ -122,6 +122,12 @@ export function deleteFocusTask(id) {
   return { success: true };
 }
 
+function shiftDays(dateStr, offsetDays) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + offsetDays));
+  return dt.toISOString().slice(0, 10);
+}
+
 export function toggleFocusCheckIn(taskId, dateStr, status = 'COMPLETED', channel = 'WEB', note = '') {
   const task = db.prepare('SELECT * FROM focus_tasks WHERE id = ?').get(taskId);
   if (!task) throw new Error('Task not found');
@@ -129,8 +135,8 @@ export function toggleFocusCheckIn(taskId, dateStr, status = 'COMPLETED', channe
   const existing = db.prepare('SELECT * FROM focus_logs WHERE task_id = ? AND date = ?').get(taskId, dateStr);
 
   if (existing) {
-    // If clicking again on web, toggle off if it was COMPLETED
-    if (channel === 'WEB' && status === 'TOGGLE') {
+    // If toggling off, remove log
+    if (status === 'TOGGLE') {
       db.prepare('DELETE FROM focus_logs WHERE id = ?').run(existing.id);
       return { action: 'REMOVED', taskId, date: dateStr };
     }
@@ -138,6 +144,10 @@ export function toggleFocusCheckIn(taskId, dateStr, status = 'COMPLETED', channe
     db.prepare('UPDATE focus_logs SET status = ?, channel = ?, note = ? WHERE id = ?').run(status, channel, note, existing.id);
     return { action: 'UPDATED', taskId, date: dateStr, status };
   } else {
+    // If trying to toggle off when not exist, do nothing
+    if (status === 'TOGGLE') {
+      return { action: 'NOOP', taskId, date: dateStr };
+    }
     // Insert new check-in
     db.prepare(`
       INSERT INTO focus_logs (task_id, task_title, date, status, channel, note)
@@ -195,7 +205,6 @@ export function getHeatmapData(daysCount = 120) {
 
 export function getFocusStats(todayStr) {
   // Calculate streaks across active focus
-  // A day counts towards streak if count >= 1 (or all 3)
   const logs = db.prepare(`
     SELECT date, COUNT(DISTINCT task_id) as count 
     FROM focus_logs 
@@ -208,22 +217,16 @@ export function getFocusStats(todayStr) {
 
   // Current Streak
   let currentStreak = 0;
-  let checkDate = new Date(todayStr);
+  let checkDate = todayStr;
 
   // If today isn't done yet, check if yesterday was done to preserve streak
-  const checkDateStr = checkDate.toISOString().slice(0, 10);
-  if (!completedDates.has(checkDateStr)) {
-    checkDate.setDate(checkDate.getDate() - 1);
+  if (!completedDates.has(checkDate)) {
+    checkDate = shiftDays(checkDate, -1);
   }
 
-  while (true) {
-    const dStr = checkDate.toISOString().slice(0, 10);
-    if (completedDates.has(dStr)) {
-      currentStreak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      break;
-    }
+  while (completedDates.has(checkDate)) {
+    currentStreak++;
+    checkDate = shiftDays(checkDate, -1);
   }
 
   // Best Streak
@@ -233,10 +236,9 @@ export function getFocusStats(todayStr) {
 
   const sortedDates = Array.from(completedDates).sort();
   for (const dStr of sortedDates) {
-    const curD = new Date(dStr);
     if (prevDate) {
-      const diffDays = Math.round((curD - prevDate) / (1000 * 60 * 60 * 24));
-      if (diffDays === 1) {
+      const expectedNext = shiftDays(prevDate, 1);
+      if (dStr === expectedNext) {
         tempStreak++;
       } else {
         tempStreak = 1;
@@ -245,7 +247,7 @@ export function getFocusStats(todayStr) {
       tempStreak = 1;
     }
     if (tempStreak > bestStreak) bestStreak = tempStreak;
-    prevDate = curD;
+    prevDate = dStr;
   }
 
   const totalCompletions = db.prepare("SELECT COUNT(*) as c FROM focus_logs WHERE status = 'COMPLETED'").get().c;

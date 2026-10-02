@@ -43,6 +43,13 @@ export async function syncHabitToGoogleSheets(habitLogData) {
   }
 }
 
+// Helper for timezone-safe calendar day offset
+function shiftDays(dateStr, offsetDays) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + offsetDays));
+  return dt.toISOString().slice(0, 10);
+}
+
 // Calculate streak for a single habit ending at referenceDate
 export function calculateHabitStreak(habitId, referenceDate) {
   const logs = db
@@ -57,22 +64,16 @@ export function calculateHabitStreak(habitId, referenceDate) {
 
   const datesSet = new Set(logs.map((l) => l.date));
   let streak = 0;
-  const cur = new Date(referenceDate);
+  let curStr = referenceDate;
 
   // Check if today is completed; if not, check from yesterday
-  const refStr = cur.toISOString().slice(0, 10);
-  if (!datesSet.has(refStr)) {
-    cur.setDate(cur.getDate() - 1);
+  if (!datesSet.has(curStr)) {
+    curStr = shiftDays(curStr, -1);
   }
 
-  while (true) {
-    const dStr = cur.toISOString().slice(0, 10);
-    if (datesSet.has(dStr)) {
-      streak++;
-      cur.setDate(cur.getDate() - 1);
-    } else {
-      break;
-    }
+  while (datesSet.has(curStr)) {
+    streak++;
+    curStr = shiftDays(curStr, -1);
   }
 
   return streak;
@@ -81,10 +82,7 @@ export function calculateHabitStreak(habitId, referenceDate) {
 // Get recent 7 days history array for a habit
 export function getHabitRecentDays(habitId, referenceDate, numDays = 7) {
   const days = [];
-  const cur = new Date(referenceDate);
-  cur.setDate(cur.getDate() - (numDays - 1));
-
-  const startStr = cur.toISOString().slice(0, 10);
+  const startStr = shiftDays(referenceDate, -(numDays - 1));
   const logs = db
     .prepare(`
       SELECT date FROM micro_habit_logs 
@@ -94,15 +92,16 @@ export function getHabitRecentDays(habitId, referenceDate, numDays = 7) {
 
   const completedSet = new Set(logs.map((l) => l.date));
 
-  for (let i = 0; i < numDays; i++) {
-    const dStr = cur.toISOString().slice(0, 10);
+  for (let i = numDays - 1; i >= 0; i--) {
+    const dStr = shiftDays(referenceDate, -i);
+    const [y, m, d] = dStr.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
     days.push({
       date: dStr,
-      dayName: ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'][cur.getDay()],
+      dayName: ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'][dt.getUTCDay()],
       isDone: completedSet.has(dStr),
       isToday: dStr === referenceDate,
     });
-    cur.setDate(cur.getDate() + 1);
   }
 
   return days;

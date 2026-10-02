@@ -20,8 +20,15 @@ const TIME_MAP = {
 export default function MicroHabitsTab() {
   const [habits, setHabits] = useState([]);
   const [stats, setStats] = useState({ totalHabits: 0, completedToday: 0, percentage: 0, totalCompletions: 0, activeDays: 0 });
-  const [todayStr, setTodayStr] = useState('');
+  const [todayStr, setTodayStr] = useState(() => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    } catch (e) {
+      return new Date().toISOString().slice(0, 10);
+    }
+  });
   const [loading, setLoading] = useState(true);
+  const [togglingHabitId, setTogglingHabitId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Filters
@@ -46,43 +53,62 @@ export default function MicroHabitsTab() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (showSpinner = false) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const res = await fetch('/api/habits');
       if (res.ok) {
         const data = await res.json();
         setHabits(data.habits || []);
         setStats(data.stats || { totalHabits: 0, completedToday: 0, percentage: 0, totalCompletions: 0, activeDays: 0 });
-        setTodayStr(data.todayStr || '');
+        if (data.todayStr) setTodayStr(data.todayStr);
       }
     } catch (err) {
       console.error('Failed to load micro habits:', err);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
   }, []);
 
-  // Toggle single habit
+  // Toggle single habit with optimistic feedback and debouncing
   const handleToggle = async (habitId, currentStatus) => {
-    // Optimistic UI update
+    if (togglingHabitId) return;
+    setTogglingHabitId(habitId);
+
+    const nextDone = !currentStatus;
+
+    // Optimistic habit update
     setHabits((prev) =>
       prev.map((h) => {
         if (h.id === habitId) {
-          const nextDone = !h.is_done_today;
+          const updatedRecent = (h.recent_days || []).map((d) =>
+            d.isToday ? { ...d, isDone: nextDone } : d
+          );
           return {
             ...h,
             is_done_today: nextDone,
             current_streak: nextDone ? h.current_streak + 1 : Math.max(0, h.current_streak - 1),
+            recent_days: updatedRecent,
           };
         }
         return h;
       })
     );
+
+    // Optimistic stats update
+    setStats((prev) => {
+      const nextCompleted = nextDone ? prev.completedToday + 1 : Math.max(0, prev.completedToday - 1);
+      const pct = prev.totalHabits > 0 ? Math.round((nextCompleted / prev.totalHabits) * 100) : 0;
+      return {
+        ...prev,
+        completedToday: nextCompleted,
+        percentage: pct,
+      };
+    });
 
     try {
       const res = await fetch('/api/habits', {
@@ -93,11 +119,16 @@ export default function MicroHabitsTab() {
       if (res.ok) {
         const data = await res.json();
         showToast(data.result.status === 'COMPLETED' ? '✨ ติ๊กสำเร็จ! ซิงค์ Sheets เรียบร้อย' : 'ยกเลิกการติ๊กแล้ว');
-        fetchData();
+        await fetchData(false);
+      } else {
+        showToast('เกิดข้อผิดพลาดในการบันทึก');
+        await fetchData(false);
       }
     } catch (err) {
-      showToast('เกิดข้อผิดพลาดในการบันทึก');
-      fetchData();
+      showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      await fetchData(false);
+    } finally {
+      setTogglingHabitId(null);
     }
   };
 
@@ -504,6 +535,7 @@ export default function MicroHabitsTab() {
                 {/* Bottom Row: Checkbox Button & Settings */}
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
                   <button
+                    disabled={togglingHabitId === habit.id}
                     onClick={() => handleToggle(habit.id, habit.is_done_today)}
                     style={{
                       flex: 1,
@@ -514,7 +546,8 @@ export default function MicroHabitsTab() {
                       color: habit.is_done_today ? '#000' : '#fff',
                       fontWeight: '700',
                       fontSize: '0.84rem',
-                      cursor: 'pointer',
+                      cursor: togglingHabitId === habit.id ? 'wait' : 'pointer',
+                      opacity: togglingHabitId === habit.id ? 0.75 : 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -522,7 +555,13 @@ export default function MicroHabitsTab() {
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    <span>{habit.is_done_today ? '✅ ทำแล้ว' : '⏳ รอทำ (คลิกติ๊ก)'}</span>
+                    {togglingHabitId === habit.id ? (
+                      <span>⏳ กำลังบันทึก...</span>
+                    ) : habit.is_done_today ? (
+                      <span>✅ ทำแล้ว</span>
+                    ) : (
+                      <span>⏳ รอทำ (คลิกติ๊ก)</span>
+                    )}
                   </button>
 
                   <button
