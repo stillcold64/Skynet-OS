@@ -203,6 +203,39 @@ if (drawdownCount === 0) {
   `).run();
 }
 
+// 6.1 Recurring Bills & Fixed Costs Table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS recurring_bills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    keywords TEXT NOT NULL,
+    estimated_amount REAL NOT NULL,
+    due_day INTEGER DEFAULT 1,
+    category_type TEXT DEFAULT 'BILL',
+    is_active INTEGER DEFAULT 1,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+const billCount = db.prepare('SELECT COUNT(*) as count FROM recurring_bills').get().count;
+if (billCount === 0) {
+  const insertBill = db.prepare(`
+    INSERT INTO recurring_bills (name, keywords, estimated_amount, due_day, note)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  insertBill.run('Money Thunder', 'ธันเดอ,thunder,money thunder', 2000, 1, 'ค่างวดสินเชื่อ Money Thunder');
+  insertBill.run('EasyCash', 'easaycash,easycash,easy money', 1867, 1, 'ค่างวด Shopee EasyCash');
+  insertBill.run('Shopee Paylater', 'paylater,shoppee paylater,shopee paylater', 1261, 1, 'ค่างวด Shopee SPayLater');
+  insertBill.run('Finnix', 'finnix,ฟินนิกซ์', 612, 2, 'ค่างวดสินเชื่อ Finnix');
+  insertBill.run('WiFi / เน็ตบ้าน', 'wifi,เน็ต,เน็ตบ้าน', 524, 5, 'ค่าอินเทอร์เน็ตบ้านรายเดือน');
+  insertBill.run('ค่าน้ำประปา', 'น้ำประปา,ค่าน้ำ,ประปา', 142, 5, 'ค่าน้ำประปาที่พัก');
+  insertBill.run('ค่าน้ำบ้านยาย', 'ประปาบ้านยาย,น้ำยาย,ค่าน้ำยาย', 44, 5, 'ค่าน้ำประปาบ้านยาย');
+  insertBill.run('ค่าไฟ', 'ค่าไฟ,การไฟฟ้า', 1560, 21, 'ค่าไฟฟ้าประจำเดือน');
+  insertBill.run('ค่าไฟบ้านยาย', 'ค่าไฟยาย,ไฟยาย', 400, 21, 'ค่าไฟฟ้าบ้านยาย');
+}
+
 // 7. Playbook Unified Strategy (Master Plan & Core Thesis)
 db.exec(`
   CREATE TABLE IF NOT EXISTS playbook_strategy (

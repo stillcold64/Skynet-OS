@@ -13,6 +13,11 @@ import {
   getSetting,
   setSetting,
 } from '../lib/focus_db.js';
+import {
+  getMonthlyFixedCostsStatus,
+  formatFixedCostsAlert,
+  formatFullFixedCostsReport,
+} from '../lib/bills_db.js';
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
@@ -47,29 +52,31 @@ const API_BASE = `https://api.telegram.org/bot${token}`;
 
 let offset = 0;
 
-// Helper: Render interactive Focus checklist message & keyboard (Compact & Minimal)
+// Helper: Render interactive Focus checklist message & keyboard (High Contrast & Clear Status)
 function renderFocusChecklist(todayStr) {
   const todayTop3 = getTodayCheckIns(todayStr);
   const stats = getFocusStats(todayStr);
   const doneCount = todayTop3.filter((t) => t.is_done_today).length;
 
-  let text = `🎯 <b>Focus วันนี้</b> (${doneCount}/${todayTop3.length}) | 🔥 Streak ${stats.currentStreak} วัน\n\n`;
+  let text = `🎯 <b>Focus ประจำวัน</b> (${doneCount}/${todayTop3.length}) | 🔥 Streak ${stats.currentStreak} วัน\n\n`;
 
   const keyboard = [];
 
   todayTop3.forEach((t) => {
-    const icon = t.is_done_today ? '✅' : '⏳';
     const targetInfo = t.target_days > 0 ? ` [${t.total_completed_days}/${t.target_days} วัน]` : '';
-    text += `${icon} <b>${t.title}</b>${targetInfo}\n`;
-
-    const btnIcon = t.is_done_today ? '✅' : '⬜';
-    keyboard.push([{ text: `${btnIcon} ${t.title}`, callback_data: `toggle_task_${t.id}` }]);
+    if (t.is_done_today) {
+      text += `✅ <s>${t.title}</s> <b>(ทำแล้ว)</b> ✨${targetInfo}\n`;
+      keyboard.push([{ text: `✅ [ทำแล้ว] ${t.title} ✨`, callback_data: `toggle_task_${t.id}` }]);
+    } else {
+      text += `🔴 <b>${t.title}</b> <i>(ยังไม่ทำ)</i>${targetInfo}\n`;
+      keyboard.push([{ text: `🔴 [ยังไม่ทำ] ${t.title}`, callback_data: `toggle_task_${t.id}` }]);
+    }
   });
 
   if (doneCount < todayTop3.length) {
     keyboard.push([{ text: '⚡ ติ๊กครบทั้งหมด', callback_data: 'ok_all' }]);
   } else {
-    text += `\n🎉 <i>ครบทุกข้อแล้ว เยี่ยมมาก!</i>`;
+    text += `\n🎉 <b>สุดยอดมาก! วันนี้เก็บครบทุกเป้าหมายแล้ว</b> 🔥`;
   }
 
   return { text, keyboard };
@@ -259,7 +266,7 @@ async function checkFocusReminders() {
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
-            [{ text: `✅ ทำแล้ว (ติ๊กถูก)`, callback_data: `toggle_task_${task.id}` }],
+            [{ text: `🔴 [ยังไม่ทำ] คลิกติ๊ก: ทำแล้ว ✅`, callback_data: `toggle_task_${task.id}` }],
           ],
         },
       });
@@ -325,10 +332,10 @@ async function poll() {
 
             if (willToggleOff) {
               toggleFocusCheckIn(taskId, todayStr, 'TOGGLE', 'TELEGRAM', 'ยกเลิกผ่านปุ่ม Telegram');
-              await answerCallbackQuery(cq.id, 'ยกเลิกแล้ว');
+              await answerCallbackQuery(cq.id, '↩️ ยกเลิกแล้ว (เปลี่ยนเป็น [ยังไม่ทำ])');
             } else {
               toggleFocusCheckIn(taskId, todayStr, 'COMPLETED', 'TELEGRAM', 'กดยืนยันปุ่ม Telegram');
-              await answerCallbackQuery(cq.id, '✅ เรียบร้อย!');
+              await answerCallbackQuery(cq.id, '✅ บันทึกสำเร็จ! เปลี่ยนเป็น [ทำแล้ว] ✨');
             }
 
             // Edit the message in place with updated checklist & buttons!
@@ -458,10 +465,28 @@ async function poll() {
           continue;
         }
 
+        // Check command /bills, /fixedcost, ฟิกคอส, บิล
+        if (
+          lower === '/bills' ||
+          lower === '/fixedcost' ||
+          lower === 'ฟิกคอส' ||
+          lower === 'ฟิกคอสท์' ||
+          lower === 'บิล' ||
+          lower === 'บิลคงเหลือ' ||
+          lower === 'fixedcost' ||
+          lower === 'fixed cost'
+        ) {
+          const status = getMonthlyFixedCostsStatus();
+          const report = formatFullFixedCostsReport(status);
+          await sendMessage(chatId, report, { parse_mode: 'HTML' });
+          continue;
+        }
+
         // Check command /start or /help
         if (lower === '/start' || lower === '/help') {
           let reply = `🤖 <b>Skynet OS</b>\n\n`;
           reply += `• Focus: พิมพ์ <code>/focus</code> หรือ <b>"โอเค"</b>\n`;
+          reply += `• บิลคงเหลือ: พิมพ์ <code>/bills</code> หรือ <b>"ฟิกคอส"</b>\n`;
           reply += `• บันทึกเงิน: พิมพ์ <i>"ข้าว 50 กาแฟ 40"</i>\n`;
           await sendMessage(chatId, reply, { parse_mode: 'HTML' });
 
@@ -485,8 +510,10 @@ async function poll() {
           reply += `📊 บันทึกทั้งหมด: ${result.count} รายการ\n`;
 
           let total = 0;
+          let hasBill = false;
           for (const item of result.items) {
             total += item.amount;
+            if (item.category_group === 'BILL') hasBill = true;
             const emoji = CATEGORY_EMOJI[item.category_group] || '•';
             reply += `• [${item.date}] ${emoji} ${item.category_group} | ${item.category}: ${item.amount.toLocaleString()} ฿\n`;
           }
@@ -495,13 +522,24 @@ async function poll() {
           if (ggsSynced) {
             reply += `☁️ ซิงค์สำรองข้อมูลลง Google Sheets เรียบร้อยแล้ว!\n`;
           }
-          reply += `👉 ตรวจสอบบนปฏิทิน: http://localhost:3000`;
+
+          // If a bill payment was recorded, alert remaining Fixed Costs for the month!
+          if (hasBill) {
+            try {
+              const fixedStatus = getMonthlyFixedCostsStatus();
+              reply += formatFixedCostsAlert(fixedStatus);
+            } catch (err) {
+              console.error('Fixed cost alert error:', err.message);
+            }
+          }
+
+          reply += `\n👉 ตรวจสอบบนปฏิทิน: http://localhost:3000`;
 
           await sendMessage(chatId, reply);
         } else {
           await sendMessage(
             chatId,
-            `💡 <b>Skynet Assistant</b>\n• บันทึกค่าใช้จ่าย: พิมพ์ เช่น <i>"ข้าว 50 กาแฟ 40"</i>\n• ติ๊กภารกิจรูทีน: พิมพ์ <code>/focus</code> หรือพิมพ์ <b>"โอเค"</b> ได้เลยครับ`
+            `💡 <b>Skynet Assistant</b>\n• บันทึกค่าใช้จ่าย: พิมพ์ เช่น <i>"ข้าว 50 กาแฟ 40"</i>\n• ติ๊กภารกิจรูทีน: พิมพ์ <code>/focus</code> หรือพิมพ์ <b>"โอเค"</b>\n• เช็คบิลคงเหลือ: พิมพ์ <code>/bills</code> หรือ <b>"ฟิกคอส"</b>`
           );
         }
       }
