@@ -52,31 +52,40 @@ const API_BASE = `https://api.telegram.org/bot${token}`;
 
 let offset = 0;
 
-// Helper: Render interactive Focus checklist message & keyboard (High Contrast & Clear Status)
+// Helper: Render interactive Focus checklist message & keyboard (Ultra-Compact Single Row)
 function renderFocusChecklist(todayStr) {
   const todayTop3 = getTodayCheckIns(todayStr);
   const stats = getFocusStats(todayStr);
   const doneCount = todayTop3.filter((t) => t.is_done_today).length;
 
-  let text = `🎯 <b>Focus ประจำวัน</b> (${doneCount}/${todayTop3.length}) | 🔥 Streak ${stats.currentStreak} วัน\n\n`;
+  let text = `🎯 <b>Focus วันนี้</b> (${doneCount}/${todayTop3.length}) | 🔥 Streak ${stats.currentStreak} วัน\n\n`;
 
-  const keyboard = [];
+  const taskButtons = [];
 
-  todayTop3.forEach((t) => {
+  todayTop3.forEach((t, idx) => {
+    const num = idx + 1;
     const targetInfo = t.target_days > 0 ? ` [${t.total_completed_days}/${t.target_days} วัน]` : '';
     if (t.is_done_today) {
-      text += `✅ <s>${t.title}</s> <b>(ทำแล้ว)</b> ✨${targetInfo}\n`;
-      keyboard.push([{ text: `✅ [ทำแล้ว] ${t.title} ✨`, callback_data: `toggle_task_${t.id}` }]);
+      text += `${num}. ✅ <s>${t.title}</s>${targetInfo}\n`;
+      taskButtons.push({ text: `${num}. ✅ ทำแล้ว`, callback_data: `toggle_task_${t.id}` });
     } else {
-      text += `🔴 <b>${t.title}</b> <i>(ยังไม่ทำ)</i>${targetInfo}\n`;
-      keyboard.push([{ text: `🔴 [ยังไม่ทำ] ${t.title}`, callback_data: `toggle_task_${t.id}` }]);
+      text += `${num}. ⏳ ${t.title}${targetInfo}\n`;
+      taskButtons.push({ text: `${num}. ⏳ รอทำ`, callback_data: `toggle_task_${t.id}` });
     }
   });
 
+  const keyboard = [];
+
+  // Group all 3 task buttons into ONE single horizontal row!
+  if (taskButtons.length > 0) {
+    keyboard.push(taskButtons);
+  }
+
+  // Quick action: Complete all if not done yet
   if (doneCount < todayTop3.length) {
     keyboard.push([{ text: '⚡ ติ๊กครบทั้งหมด', callback_data: 'ok_all' }]);
   } else {
-    text += `\n🎉 <b>สุดยอดมาก! วันนี้เก็บครบทุกเป้าหมายแล้ว</b> 🔥`;
+    text += `\n🎉 <i>ครบทุกข้อแล้ว ยอดเยี่ยมมาก!</i> 🔥`;
   }
 
   return { text, keyboard };
@@ -327,15 +336,17 @@ async function poll() {
 
             // Check current status
             const top3Before = getTodayCheckIns(todayStr);
+            const taskIdx = top3Before.findIndex((t) => t.id === taskId);
+            const taskNum = taskIdx !== -1 ? taskIdx + 1 : '';
             const currentItem = top3Before.find((t) => t.id === taskId);
             const willToggleOff = currentItem && currentItem.is_done_today;
 
             if (willToggleOff) {
               toggleFocusCheckIn(taskId, todayStr, 'TOGGLE', 'TELEGRAM', 'ยกเลิกผ่านปุ่ม Telegram');
-              await answerCallbackQuery(cq.id, '↩️ ยกเลิกแล้ว (เปลี่ยนเป็น [ยังไม่ทำ])');
+              await answerCallbackQuery(cq.id, `↩️ ข้อ ${taskNum} เปลี่ยนเป็น [รอทำ]`);
             } else {
               toggleFocusCheckIn(taskId, todayStr, 'COMPLETED', 'TELEGRAM', 'กดยืนยันปุ่ม Telegram');
-              await answerCallbackQuery(cq.id, '✅ บันทึกสำเร็จ! เปลี่ยนเป็น [ทำแล้ว] ✨');
+              await answerCallbackQuery(cq.id, `✅ ข้อ ${taskNum} บันทึกสำเร็จ [ทำแล้ว] ✨`);
             }
 
             // Edit the message in place with updated checklist & buttons!
