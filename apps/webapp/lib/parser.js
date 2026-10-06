@@ -1,28 +1,49 @@
 import db from './db.js';
 
 /**
- * Split text by date markers like "วันที่ 1", "วันที 2"
+ * Split text by date markers:
+ * 1) Fast compact 'dd/mm' or 'dd/mm/yyyy' (e.g. "07/11", "06/10", "6/10", "30/09")
+ * 2) Traditional Thai 'วันที่ dd' or 'วันที่ dd/mm'
  * Supports multiple dates in one message or single day.
  */
-function splitByDate(text) {
-  const dateRegex = /(?:^|\s)(?:วันที่|วันที)\s*(\d{1,2})/gi;
-  const sections = [];
+function splitByDate(rawText) {
+  // Protect 7/11 store name from being parsed as November 7th
+  let text = rawText.replace(/\b7\/11\b/gi, '7-11');
+
+  // Regex matching:
+  // 1) dd/mm or dd/mm/yyyy (optionally prefixed by วันที่/วันที)
+  // 2) วันที่ dd
+  const dateRegex = /(?:^|\s)(?:(?:วันที่|วันที)\s*)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?|(?:^|\s)(?:วันที่|วันที)\s*(\d{1,2})(?=\s+|$)/gi;
+
   const matches = [];
   let match;
 
   while ((match = dateRegex.exec(text)) !== null) {
-    matches.push({ day: parseInt(match[1], 10), index: match.index });
+    if (match[1] && match[2]) {
+      const d = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      let y = match[3] ? parseInt(match[3], 10) : null;
+      if (y && y < 100) y += 2000;
+      if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
+        matches.push({ day: d, month: m, year: y, index: match.index });
+      }
+    } else if (match[4]) {
+      const d = parseInt(match[4], 10);
+      if (d >= 1 && d <= 31) {
+        matches.push({ day: d, month: null, year: null, index: match.index });
+      }
+    }
   }
 
   if (matches.length === 0) {
-    return [{ text: text.trim(), day: null }];
+    return [{ text: text.trim(), day: null, month: null, year: null }];
   }
 
-  // If there is text before the first date marker
+  const sections = [];
   if (matches[0].index > 0) {
     const prefix = text.substring(0, matches[0].index).trim();
     if (prefix) {
-      sections.push({ text: prefix, day: null });
+      sections.push({ text: prefix, day: null, month: null, year: null });
     }
   }
 
@@ -30,20 +51,28 @@ function splitByDate(text) {
     const cur = matches[i];
     const nextIndex = i + 1 < matches.length ? matches[i + 1].index : text.length;
     const chunk = text.substring(cur.index, nextIndex).trim();
-    sections.push({ text: chunk, day: cur.day });
+    sections.push({ text: chunk, day: cur.day, month: cur.month, year: cur.year });
   }
 
   return sections;
 }
 
 /**
- * Resolve YYYY-MM-DD for a given day of current month (or today)
- * Intelligently rolls back to previous month if entering retro days early in the month.
+ * Resolve YYYY-MM-DD for given day and optional month/year
+ * If dd/mm provided (e.g. 07/11, 06/10), formats precisely with that month.
+ * If only day provided, smartly rolls back to previous month if early in the month.
  */
-function resolveDate(day) {
+function resolveDate(day, month = null, year = null) {
   const bkkDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
   const [curYear, curMonth, curDay] = bkkDateStr.split('-').map(Number);
 
+  // If explicit day and month are provided (e.g. 07/11 or 06/10)
+  if (day && month) {
+    const targetYear = year || curYear;
+    return `${targetYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  // If only day is provided (e.g. วันที่ 6)
   if (day && day >= 1 && day <= 31) {
     let targetYear = curYear;
     let targetMonth = curMonth;
@@ -130,10 +159,12 @@ export function parseTelegramMessage(rawMessage) {
   const results = [];
 
   for (const section of sections) {
-    const dateStr = resolveDate(section.day);
+    const dateStr = resolveDate(section.day, section.month, section.year);
 
-    // Remove the date marker from the chunk
-    let cleanedChunk = section.text.replace(/(?:^|\s)(?:วันที่|วันที)\s*\d{1,2}/gi, ' ');
+    // Remove the date marker from the chunk (both dd/mm and วันที่ dd)
+    let cleanedChunk = section.text
+      .replace(/(?:^|\s)(?:(?:วันที่|วันที)\s*)?\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi, ' ')
+      .replace(/(?:^|\s)(?:วันที่|วันที)\s*\d{1,2}/gi, ' ');
 
     // Preprocess: If Thai character is immediately followed by digit, insert space (e.g. ข้าว50 -> ข้าว 50)
     // while keeping Latin alphanumeric like 'dota2' or 'ps5' intact!
