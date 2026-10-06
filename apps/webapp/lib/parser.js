@@ -38,16 +38,31 @@ function splitByDate(text) {
 
 /**
  * Resolve YYYY-MM-DD for a given day of current month (or today)
+ * Intelligently rolls back to previous month if entering retro days early in the month.
  */
 function resolveDate(day) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const bkkDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+  const [curYear, curMonth, curDay] = bkkDateStr.split('-').map(Number);
 
   if (day && day >= 1 && day <= 31) {
-    return `${year}-${month}-${String(day).padStart(2, '0')}`;
+    let targetYear = curYear;
+    let targetMonth = curMonth;
+
+    // Smart month rollback:
+    // If today is early in the month (<= 10) and user specifies a day at the end of the month (>= 20),
+    // they are entering a retrospective entry for the previous month (e.g. 'วันที่ 30' on Oct 1st -> Sept 30)
+    if (curDay <= 10 && day >= 20) {
+      targetMonth -= 1;
+      if (targetMonth === 0) {
+        targetMonth = 12;
+        targetYear -= 1;
+      }
+    }
+
+    return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
-  return now.toISOString().split('T')[0];
+
+  return bkkDateStr;
 }
 
 /**
@@ -55,7 +70,12 @@ function resolveDate(day) {
  * LIFE | EXTRAVAGANT | BILL | INVESTING | ETC
  */
 export function classifyItem(itemName) {
-  const nameLower = itemName.toLowerCase().trim();
+  let nameLower = itemName.toLowerCase().trim();
+
+  // Normalize common Thai keyboard typo: 'ข้าง' instead of 'ข้าว'
+  if (/^ข้าง(มัน|ผัด|หมู|ไก่|ไข่|กะเพรา|กระเพรา|แกง|เหนียว|ต้ม|จาน)/.test(nameLower)) {
+    nameLower = nameLower.replace(/^ข้าง/, 'ข้าว');
+  }
 
   // Load rules sorted by length descending so longer phrases match first
   const rules = db
@@ -71,6 +91,23 @@ export function classifyItem(itemName) {
         matchedKeyword: kw,
       };
     }
+  }
+
+  // Smart food & living heuristics
+  if (
+    nameLower.includes('มันไก่') ||
+    nameLower.includes('หมูกรอบ') ||
+    nameLower.includes('กะเพรา') ||
+    nameLower.includes('กระเพรา') ||
+    nameLower.includes('ก๋วยเตี๋ยว') ||
+    nameLower.includes('บะหมี่') ||
+    nameLower.includes('สุกี้') ||
+    nameLower.includes('สุ้กี้') ||
+    nameLower.includes('กินข้าว') ||
+    nameLower.includes('ถอนตังกินข้าว') ||
+    nameLower.includes('ข้าว')
+  ) {
+    return { categoryGroup: 'LIFE', suggestedType: 'ค่าใช้จ่าย', matchedKeyword: 'food_heuristic' };
   }
 
   // Fallback defaults if not matched
@@ -96,19 +133,28 @@ export function parseTelegramMessage(rawMessage) {
     const dateStr = resolveDate(section.day);
 
     // Remove the date marker from the chunk
-    const cleanedChunk = section.text.replace(/(?:^|\s)(?:วันที่|วันที)\s*\d{1,2}/gi, ' ');
+    let cleanedChunk = section.text.replace(/(?:^|\s)(?:วันที่|วันที)\s*\d{1,2}/gi, ' ');
+
+    // Preprocess: If Thai character is immediately followed by digit, insert space (e.g. ข้าว50 -> ข้าว 50)
+    // while keeping Latin alphanumeric like 'dota2' or 'ps5' intact!
+    cleanedChunk = cleanedChunk.replace(/([\u0E00-\u0E7F])(\d+)/g, '$1 $2');
 
     // Match item name followed by amount
-    // Handles decimal and integer numbers: e.g. "จ่ายหนี้ paylater 1190.17" -> name: "จ่ายหนี้ paylater", amount: 1190.17
-    const itemRegex = /(?:^|\s+)(.+?)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)(?=\s+|$)/g;
+    // Handles decimal and integer numbers, e.g. "เติมเกม dota2 130 WiFi 525" -> "เติมเกม dota2": 130, "WiFi": 525
+    const itemRegex = /(?:^|\s+)(.+?)(?:\s+|[:=])(\d+(?:\.\d+)?)(?=\s+[^\d\s]|\s*$)/g;
     let match;
 
     while ((match = itemRegex.exec(cleanedChunk)) !== null) {
       let itemName = match[1].trim();
       const amount = parseFloat(match[2]);
 
-      // Clean leading dashes or commas
-      itemName = itemName.replace(/^[-–,\s]+/, '').trim();
+      // Clean leading dashes, bullets, or commas
+      itemName = itemName.replace(/^[-–,\s•*]+/, '').trim();
+
+      // Normalize common typo in display name if starts with ข้าง...
+      if (/^ข้าง(มัน|ผัด|หมู|ไก่|ไข่|กะเพรา|กระเพรา|แกง|เหนียว|ต้ม|จาน)/.test(itemName)) {
+        itemName = itemName.replace(/^ข้าง/, 'ข้าว');
+      }
 
       if (itemName && !isNaN(amount) && amount > 0) {
         const { categoryGroup, suggestedType } = classifyItem(itemName);

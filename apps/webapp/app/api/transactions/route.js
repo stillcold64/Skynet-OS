@@ -158,44 +158,57 @@ export async function DELETE(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json();
-    const { id, category_group } = body;
+    const { id, date, category, category_group, amount, note } = body;
 
-    if (!id || !category_group) {
-      return NextResponse.json({ error: 'Missing id or category_group' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'Missing transaction id' }, { status: 400 });
     }
 
-    const validGroups = ['LIFE', 'EXTRAVAGANT', 'BILL', 'INVESTING', 'ETC'];
-    if (!validGroups.includes(category_group)) {
-      return NextResponse.json({ error: 'Invalid category_group' }, { status: 400 });
-    }
-
-    const newType = category_group === 'INVESTING' ? 'การลงทุน' : 'ค่าใช้จ่าย';
-
-    // 1. Update transaction row
-    const info = db
-      .prepare('UPDATE transactions SET category_group = ?, type = ? WHERE id = ?')
-      .run(category_group, newType, id);
-
-    if (info.changes === 0) {
+    const existing = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id);
+    if (!existing) {
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
     }
 
-    // 2. Fetch the transaction item name to learn the keyword for future messages
-    const tx = db.prepare('SELECT category FROM transactions WHERE id = ?').get(id);
-    if (tx && tx.category) {
-      const kw = tx.category.trim().toLowerCase();
+    const updatedDate = date || existing.date;
+    const updatedCategory = category ? category.trim() : existing.category;
+    const updatedGroup = category_group || existing.category_group;
+    const updatedAmount =
+      amount !== undefined && !isNaN(parseFloat(amount)) ? parseFloat(amount) : existing.amount;
+    const updatedNote = note !== undefined ? note : existing.note;
+    const updatedType = updatedGroup === 'INVESTING' ? 'การลงทุน' : 'ค่าใช้จ่าย';
+
+    db.prepare(`
+      UPDATE transactions 
+      SET date = ?, category = ?, category_group = ?, type = ?, amount = ?, note = ?
+      WHERE id = ?
+    `).run(updatedDate, updatedCategory, updatedGroup, updatedType, updatedAmount, updatedNote, id);
+
+    // If category name or group changed, also learn it in category_rules
+    if (updatedCategory && updatedGroup) {
+      const kw = updatedCategory.trim().toLowerCase();
       if (kw.length >= 2) {
         db.prepare(`
           INSERT OR REPLACE INTO category_rules (keyword, category_group, suggested_type)
           VALUES (?, ?, ?)
-        `).run(kw, category_group, newType);
+        `).run(kw, updatedGroup, updatedType);
       }
     }
 
-    return NextResponse.json({ success: true, id, category_group, type: newType });
+    return NextResponse.json({
+      success: true,
+      transaction: {
+        id,
+        date: updatedDate,
+        category: updatedCategory,
+        category_group: updatedGroup,
+        type: updatedType,
+        amount: updatedAmount,
+        note: updatedNote,
+      },
+    });
   } catch (error) {
-    console.error('Error updating transaction category:', error);
-    return NextResponse.json({ error: 'Failed to update transaction category' }, { status: 500 });
+    console.error('Error updating transaction:', error);
+    return NextResponse.json({ error: 'Failed to update transaction' }, { status: 500 });
   }
 }
 

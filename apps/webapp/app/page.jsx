@@ -62,6 +62,13 @@ export default function Home() {
     interestRate: '0',
     note: '',
   });
+  const [editingTx, setEditingTx] = useState(null);
+  const [txFormData, setTxFormData] = useState({
+    date: '',
+    category: '',
+    category_group: 'LIFE',
+    amount: '',
+  });
   const [loading, setLoading] = useState(true);
 
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
@@ -114,11 +121,52 @@ export default function Home() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') setDrilldownModal(null);
+      if (e.key === 'Escape') {
+        setDrilldownModal(null);
+        setShowDebtModal(false);
+        setEditingTx(null);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const handleOpenEditTx = (tx) => {
+    setEditingTx(tx);
+    setTxFormData({
+      date: tx.date,
+      category: tx.category,
+      category_group: tx.category_group,
+      amount: String(tx.amount),
+    });
+  };
+
+  const handleSaveEditTx = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingTx) return;
+
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingTx.id,
+          date: txFormData.date,
+          category: txFormData.category,
+          category_group: txFormData.category_group,
+          amount: parseFloat(txFormData.amount),
+        }),
+      });
+      if (res.ok) {
+        setEditingTx(null);
+        await fetchData();
+      } else {
+        alert('บันทึกการแก้ไขไม่สำเร็จ');
+      }
+    } catch (err) {
+      console.error('Error saving tx edit:', err);
+    }
+  };
 
   const handleDelete = async (id) => {
     if (!confirm('ยืนยันลบรายการนี้?')) return;
@@ -651,6 +699,22 @@ export default function Home() {
                       <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div className="item-amount">{formatCurrency(item.amount)} ฿</div>
                         <button
+                          onClick={() => handleOpenEditTx(item)}
+                          title="แก้ไขรายการนี้"
+                          style={{
+                            background: 'rgba(10, 132, 255, 0.15)',
+                            border: '1px solid rgba(10, 132, 255, 0.4)',
+                            color: '#0a84ff',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                          }}
+                        >
+                          ✏️ แก้ไข
+                        </button>
+                        <button
                           onClick={() => handleDelete(item.id)}
                           title="ลบรายการนี้"
                           style={{
@@ -679,7 +743,7 @@ export default function Home() {
             <div className="audit-log-header">
               <div className="audit-log-title">
                 <span>📋</span>
-                <span>รายการธุรกรรมทั้งหมด ({transactions.length} รายการ) — สามารถกดลบรายการเฉพาะบรรทัดได้</span>
+                <span>รายการธุรกรรมทั้งหมด ({transactions.length} รายการ) — สามารถกดแก้ไขหรือลบรายการได้</span>
               </div>
             </div>
 
@@ -720,21 +784,40 @@ export default function Home() {
                           {formatCurrency(item.amount)} ฿
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            style={{
-                              background: 'rgba(255, 55, 95, 0.15)',
-                              border: '1px solid rgba(255, 55, 95, 0.4)',
-                              color: '#ff375f',
-                              borderRadius: '6px',
-                              padding: '3px 8px',
-                              cursor: 'pointer',
-                              fontSize: '11px',
-                              fontWeight: '600',
-                            }}
-                          >
-                            🗑️ ลบ
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => handleOpenEditTx(item)}
+                              title="แก้ไขรายการนี้"
+                              style={{
+                                background: 'rgba(10, 132, 255, 0.15)',
+                                border: '1px solid rgba(10, 132, 255, 0.4)',
+                                color: '#0a84ff',
+                                borderRadius: '6px',
+                                padding: '3px 8px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                              }}
+                            >
+                              ✏️ แก้ไข
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              title="ลบรายการนี้"
+                              style={{
+                                background: 'rgba(255, 55, 95, 0.15)',
+                                border: '1px solid rgba(255, 55, 95, 0.4)',
+                                color: '#ff375f',
+                                borderRadius: '6px',
+                                padding: '3px 8px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                              }}
+                            >
+                              🗑️ ลบ
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1200,6 +1283,185 @@ export default function Home() {
                       }}
                     >
                       {editingDebt ? 'บันทึกการแก้ไข' : 'บันทึกหนี้สินใหม่'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* TRANSACTION EDIT MODAL */}
+          {editingTx && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.75)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10001,
+                backdropFilter: 'blur(8px)',
+                padding: '16px',
+              }}
+            >
+              <div
+                className="glass-panel"
+                style={{
+                  width: '100%',
+                  maxWidth: '480px',
+                  padding: '28px',
+                  borderRadius: '20px',
+                  background: '#1a1d26',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', margin: 0 }}>
+                    ✏️ แก้ไขรายการธุรกรรม #{editingTx.id}
+                  </h3>
+                  <button
+                    onClick={() => setEditingTx(null)}
+                    style={{ background: 'transparent', border: 'none', color: '#8e8e93', fontSize: '1.2rem', cursor: 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveEditTx} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#a1a1a6', marginBottom: '6px' }}>
+                      📅 วันที่ (YYYY-MM-DD)
+                    </label>
+                    <input
+                      type="date"
+                      value={txFormData.date}
+                      onChange={(e) => setTxFormData({ ...txFormData, date: e.target.value })}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#a1a1a6', marginBottom: '6px' }}>
+                      🏷️ ชื่อรายการ
+                    </label>
+                    <input
+                      type="text"
+                      value={txFormData.category}
+                      onChange={(e) => setTxFormData({ ...txFormData, category: e.target.value })}
+                      placeholder="เช่น ข้าวมันไก่, กาแฟ"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#a1a1a6', marginBottom: '6px' }}>
+                      💰 จำนวนเงิน (บาท)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={txFormData.amount}
+                      onChange={(e) => setTxFormData({ ...txFormData, amount: e.target.value })}
+                      placeholder="0.00"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#a1a1a6', marginBottom: '6px' }}>
+                      📂 หมวดหมู่
+                    </label>
+                    <select
+                      value={txFormData.category_group}
+                      onChange={(e) => setTxFormData({ ...txFormData, category_group: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: '#242834',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="LIFE">🌿 LIFE (ชีวิตประจำวัน / อาหาร)</option>
+                      <option value="EXTRAVAGANT">✨ EXTRAVAGANT (ฟุ่มเฟือย / บันเทิง)</option>
+                      <option value="BILL">📄 BILL (บิล / หนี้สิน / คงที่)</option>
+                      <option value="INVESTING">📈 INVESTING (การลงทุน / ออมเงิน)</option>
+                      <option value="ETC">📦 ETC (เบ็ดเตล็ด)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTx(null)}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: 'none',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      type="submit"
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        background: '#0a84ff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(10, 132, 255, 0.4)',
+                      }}
+                    >
+                      บันทึกการแก้ไข ✨
                     </button>
                   </div>
                 </form>

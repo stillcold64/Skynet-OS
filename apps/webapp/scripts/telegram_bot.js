@@ -516,22 +516,16 @@ async function poll() {
 
         if (result.success && result.items.length > 0) {
           const ggsSynced = await syncToGoogleSheets(result.items, rawText);
+          const total = result.items.reduce((sum, it) => sum + it.amount, 0);
+          const hasBill = result.items.some((it) => it.category_group === 'BILL');
 
-          let reply = `รับทราบครับ! บันทึกข้อมูลเรียบร้อยแล้ว ⚡\n\n`;
-          reply += `📊 บันทึกทั้งหมด: ${result.count} รายการ\n`;
-
-          let total = 0;
-          let hasBill = false;
+          let reply = `⚡ <b>บันทึกแล้ว</b> (${result.count} รายการ | รวม <b>${total.toLocaleString()} ฿</b>)\n`;
           for (const item of result.items) {
-            total += item.amount;
-            if (item.category_group === 'BILL') hasBill = true;
             const emoji = CATEGORY_EMOJI[item.category_group] || '•';
-            reply += `• [${item.date}] ${emoji} ${item.category_group} | ${item.category}: ${item.amount.toLocaleString()} ฿\n`;
+            reply += `• [${item.date}] ${emoji} ${item.category}: ${item.amount.toLocaleString()} ฿\n`;
           }
-
-          reply += `\n💰 ยอดรวมก้อนนี้: ${total.toLocaleString()} บาท\n`;
           if (ggsSynced) {
-            reply += `☁️ ซิงค์สำรองข้อมูลลง Google Sheets เรียบร้อยแล้ว!\n`;
+            reply += `☁️ ซิงค์ Google Sheets แล้ว\n`;
           }
 
           // If a bill payment was recorded, alert remaining Fixed Costs for the month!
@@ -543,8 +537,6 @@ async function poll() {
               console.error('Fixed cost alert error:', err.message);
             }
           }
-
-          reply += `\n👉 ตรวจสอบบนปฏิทิน: http://localhost:3000`;
 
           await sendMessage(chatId, reply);
         } else {

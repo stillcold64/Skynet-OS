@@ -76,18 +76,16 @@ export function getMonthlyFixedCostsStatus(yearMonth = null) {
 
 export function formatFixedCostsAlert(status) {
   if (status.unpaid.length === 0) {
-    return `\n🎉 <b>สุดยอดมาก! Fixed Cost เดือนนี้ (${status.yearMonth}) จ่ายครบ 100% แล้วทุกรายการ</b> (รวม ${status.totalPaid.toLocaleString()} ฿)\n`;
+    return `\n🎉 <b>Fixed Cost เดือนนี้จ่ายครบ 100% แล้วทุกบิล</b>\n`;
   }
 
-  let text = `\n💡 <b>สถานะ Fixed Cost เดือนนี้ (${status.yearMonth}):</b>\n`;
-  text += `✅ จ่ายแล้ว: ${status.paid.length}/${status.allCount} รายการ (${status.totalPaid.toLocaleString()} ฿)\n`;
-  text += `⏳ <b>ยังค้างจ่ายอีก ${status.unpaid.length} รายการ (~${status.totalRemaining.toLocaleString()} ฿):</b>\n`;
+  let text = `\n💡 <b>Fixed Cost เดือนนี้</b> (จ่ายแล้ว ${status.paid.length}/${status.allCount} รายการ)\n`;
+  text += `⏳ ค้างอีก ${status.unpaid.length} รายการ (~${status.totalRemaining.toLocaleString()} ฿):\n`;
 
   status.unpaid.forEach((u) => {
-    text += `  • ${u.name}: ~${u.estimated_amount.toLocaleString()} ฿ (กำหนด ~วันที่ ${u.due_day})\n`;
+    text += `• ${u.name}: ~${u.estimated_amount.toLocaleString()} ฿ (กำหนดวันที่ ${u.due_day})\n`;
   });
 
-  text += `👉 <b>ยอดที่ต้องเตรียมไว้จ่ายเพิ่ม: ~${status.totalRemaining.toLocaleString()} บาท</b>\n`;
   return text;
 }
 
