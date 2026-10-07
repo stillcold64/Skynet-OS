@@ -69,6 +69,9 @@ export default function Home() {
     category_group: 'LIFE',
     amount: '',
   });
+  const [privacyMode, setPrivacyMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [hwCategoryFilter, setHwCategoryFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
 
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
@@ -320,7 +323,45 @@ export default function Home() {
     }
   };
 
+  const playClick = (type = 'click') => {
+    if (!soundEnabled || typeof window === 'undefined') return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      if (type === 'toggle') {
+        osc.frequency.setValueAtTime(380, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.05);
+      } else if (type === 'dial') {
+        osc.frequency.setValueAtTime(540, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(260, ctx.currentTime + 0.035);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.035);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.035);
+      } else {
+        osc.frequency.setValueAtTime(680, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + 0.035);
+        gain.gain.setValueAtTime(0.14, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.035);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.035);
+      }
+    } catch (e) {
+      // Audio policy
+    }
+  };
+
   const formatCurrency = (val) => {
+    if (privacyMode) return '••••••';
     return new Intl.NumberFormat('th-TH', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -368,7 +409,7 @@ export default function Home() {
   }
 
   const selectedDayItems = selectedDateStr
-    ? transactions.filter((t) => t.date === selectedDateStr)
+    ? transactions.filter((t) => t.date === selectedDateStr && (hwCategoryFilter === 'ALL' || t.category_group === hwCategoryFilter))
     : [];
 
   const selectedDayTotal = selectedDayItems.reduce((sum, item) => sum + item.amount, 0);
@@ -511,6 +552,214 @@ export default function Home() {
       {/* TAB 1: CALENDAR & EXPENSES */}
       {activeTab === 'calendar' && (
         <>
+          {/* SKEUOMORPHIC HARDWARE CONSOLE DECK */}
+          <section className="hw-deck">
+            {/* 4 Corner Hardware Screws */}
+            <div className="hw-screw tl" />
+            <div className="hw-screw tr" />
+            <div className="hw-screw bl" />
+            <div className="hw-screw br" />
+
+            {/* Deck Header */}
+            <div className="hw-deck-header">
+              <div className="hw-deck-brand">
+                <div className="hw-deck-led" />
+                <span className="hw-deck-title">SKYNET TACTILE HARDWARE CONSOLE</span>
+              </div>
+              <span className="hw-deck-subtitle">UNIT-01 • MODEL SN-2026</span>
+            </div>
+
+            {/* Master Deck Grid */}
+            <div className="hw-deck-grid">
+              {/* Left Dial Section: Rotary Jog Wheel */}
+              <div className="hw-dial-section">
+                <div className="hw-dial-label">
+                  <span>🎛️</span>
+                  <span>ROTARY MONTH JOG DIAL</span>
+                </div>
+                <div className="hw-dial-container">
+                  <div className="hw-dial-tick-ring">
+                    {Array.from({ length: 12 }).map((_, idx) => {
+                      const deg = idx * 30;
+                      const isActive = idx === selectedMonth - 1;
+                      return (
+                        <div
+                          key={idx}
+                          className={`hw-dial-tick ${isActive ? 'active' : ''}`}
+                          style={{
+                            transform: `rotate(${deg}deg) translateY(-64px)`,
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div
+                    className="hw-rotary-wheel"
+                    style={{ transform: `rotate(${((selectedMonth - 1) / 12) * 360}deg)` }}
+                    onClick={() => {
+                      playClick('dial');
+                      setSelectedMonth((m) => (m >= 12 ? 1 : m + 1));
+                    }}
+                    title="คลิกเพื่อหมุนเปลี่ยนเดือน (ม.ค. - ธ.ค.)"
+                  >
+                    <div className="hw-rotary-center">
+                      <div className="hw-rotary-notch" />
+                      <span style={{ fontSize: '18px' }}>⚡</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="hw-dial-readout">
+                  <div className="hw-dial-month-name">เดือน{monthNamesThai[selectedMonth - 1]}</div>
+                  <div className="hw-dial-year-sub">{selectedYear} • M{String(selectedMonth).padStart(2, '0')}</div>
+                </div>
+
+                <div className="hw-dial-stepper-row">
+                  <button
+                    type="button"
+                    className="hw-stepper-btn"
+                    onClick={() => { playClick('dial'); prevMonth(); }}
+                    title="เดือนก่อนหน้า"
+                  >
+                    ◀ ก่อนหน้า
+                  </button>
+                  <button
+                    type="button"
+                    className="hw-stepper-btn"
+                    onClick={() => { playClick('dial'); nextMonth(); }}
+                    title="เดือนถัดไป"
+                  >
+                    ถัดไป ▶
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Controls Deck: Toggles + 3D Round Keycaps */}
+              <div className="hw-controls-deck">
+                {/* Row 1: Toggles */}
+                <div className="hw-deck-subrow">
+                  <div className="hw-channel-card">
+                    <div className="hw-channel-top">
+                      <span className="hw-channel-title">🔒 PRIVACY MASKING</span>
+                      <span className="hw-channel-val">{privacyMode ? 'ON (MASKED)' : 'OFF (VISIBLE)'}</span>
+                    </div>
+                    <div className="hw-switch-row">
+                      <span className="hw-switch-label">ซ่อนตัวเลขยอดเงิน</span>
+                      <div
+                        className={`hw-switch ${privacyMode ? 'active' : ''}`}
+                        onClick={() => {
+                          playClick('toggle');
+                          setPrivacyMode(!privacyMode);
+                        }}
+                        title="เปิด/ปิดโหมดซ่อนยอดเงิน (แสดง •••••• แทนตัวเลข)"
+                      >
+                        <div className="hw-switch-knob" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="hw-channel-card">
+                    <div className="hw-channel-top">
+                      <span className="hw-channel-title">🔊 MECHANICAL SOUND</span>
+                      <span className="hw-channel-val">{soundEnabled ? 'ON' : 'OFF'}</span>
+                    </div>
+                    <div className="hw-switch-row">
+                      <span className="hw-switch-label">เสียงคลิกกลไกฮาร์ดแวร์</span>
+                      <div
+                        className={`hw-switch sound ${soundEnabled ? 'active' : ''}`}
+                        onClick={() => {
+                          const next = !soundEnabled;
+                          setSoundEnabled(next);
+                          if (next) playClick('toggle');
+                        }}
+                        title="เปิด/ปิดเสียงคลิกฮาร์ดแวร์เวลาแตะปุ่ม"
+                      >
+                        <div className="hw-switch-knob" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Chunky 3D Round Push Buttons */}
+                <div className="hw-keycaps-container">
+                  <div className="hw-keycaps-label">
+                    <span>TACTILE CATEGORY MATRIX (ปุ่มกลมนูน 3D กรองหมวดหมู่)</span>
+                    <span style={{ color: '#38bdf8' }}>FILTER: {hwCategoryFilter}</span>
+                  </div>
+                  <div className="hw-keycaps-grid">
+                    <button
+                      type="button"
+                      className={`hw-round-keycap all ${hwCategoryFilter === 'ALL' ? 'pressed' : ''}`}
+                      onClick={() => { playClick('click'); setHwCategoryFilter('ALL'); }}
+                      title="แสดงทั้งหมด"
+                    >
+                      <span>🌐</span>
+                      <span className="keycap-sub">ALL</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`hw-round-keycap life ${hwCategoryFilter === 'LIFE' ? 'pressed' : ''}`}
+                      onClick={() => { playClick('click'); setHwCategoryFilter('LIFE'); }}
+                      title="อาหาร & ชีวิตประจำวัน"
+                    >
+                      <span>🌿</span>
+                      <span className="keycap-sub">LIFE</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`hw-round-keycap extravagant ${hwCategoryFilter === 'EXTRAVAGANT' ? 'pressed' : ''}`}
+                      onClick={() => { playClick('click'); setHwCategoryFilter('EXTRAVAGANT'); }}
+                      title="ฟุ่มเฟือย & บันเทิง"
+                    >
+                      <span>✨</span>
+                      <span className="keycap-sub">EXTRA</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`hw-round-keycap bill ${hwCategoryFilter === 'BILL' ? 'pressed' : ''}`}
+                      onClick={() => { playClick('click'); setHwCategoryFilter('BILL'); }}
+                      title="บิล & ค่างวด"
+                    >
+                      <span>📄</span>
+                      <span className="keycap-sub">BILL</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`hw-round-keycap investing ${hwCategoryFilter === 'INVESTING' ? 'pressed' : ''}`}
+                      onClick={() => { playClick('click'); setHwCategoryFilter('INVESTING'); }}
+                      title="การลงทุน & ออมเงิน"
+                    >
+                      <span>📈</span>
+                      <span className="keycap-sub">INVEST</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`hw-round-keycap etc ${hwCategoryFilter === 'ETC' ? 'pressed' : ''}`}
+                      onClick={() => { playClick('click'); setHwCategoryFilter('ETC'); }}
+                      title="เบ็ดเตล็ด"
+                    >
+                      <span>📦</span>
+                      <span className="keycap-sub">ETC</span>
+                    </button>
+
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="hw-round-keycap"
+                        onClick={() => { playClick('click'); fetchData(); }}
+                        title="รีเฟรชข้อมูล (Sync Realtime)"
+                        style={{ width: '48px', height: '48px' }}
+                      >
+                        <span style={{ fontSize: '15px' }}>⚡</span>
+                        <span className="keycap-sub">SYNC</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Overview Hero Cards (ยอดประจำเดือน & สรุปภาพรวมสะสมทุกเดือน) */}
           <section className="monthly-hero-grid">
             <div className="glass-panel monthly-hero-card total" onClick={() => setDrilldownModal('total')} title="กดเพื่อดูรายละเอียดค่าใช้จ่ายเดือนนี้">
