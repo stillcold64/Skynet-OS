@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { backupAllToGoogleSheets } from '@/scripts/backup_to_sheets';
 
 export async function GET(request) {
   try {
@@ -148,6 +149,7 @@ export async function DELETE(request) {
     }
 
     const info = db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
+    backupAllToGoogleSheets().catch((err) => console.error('Background sync error on delete:', err));
     return NextResponse.json({ success: true, deletedId: id, changes: info.changes });
   } catch (error) {
     console.error('Error deleting transaction:', error);
@@ -193,6 +195,9 @@ export async function PATCH(request) {
         `).run(kw, updatedGroup, updatedType);
       }
     }
+
+    // Trigger background sync to Google Sheets so edits are reflected immediately
+    backupAllToGoogleSheets().catch((err) => console.error('Background sync error on update:', err));
 
     return NextResponse.json({
       success: true,

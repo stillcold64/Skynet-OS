@@ -565,12 +565,23 @@ export default function Home() {
               <div className="month-control-right">
                 <button
                   type="button"
-                  onClick={fetchData}
+                  onClick={async () => {
+                    await fetchData();
+                    try {
+                      const res = await fetch('/api/sync', { method: 'POST' });
+                      const d = await res.json();
+                      if (d.success) {
+                        alert(`☁️ ซิงค์สำรองข้อมูล ${d.count} รายการลง Google Sheets เรียบร้อยแล้ว!`);
+                      }
+                    } catch (e) {
+                      console.error('Manual sync error:', e);
+                    }
+                  }}
                   className="calendar-nav-btn sync-btn"
-                  title="รีเฟรชข้อมูลล่าสุดจากระบบ"
+                  title="ซิงค์ข้อมูลล่าสุดทั้งหมดลง Google Sheets ทันที"
                 >
-                  <span>🔄</span>
-                  <span>ซิงค์ข้อมูล</span>
+                  <span>☁️</span>
+                  <span>ซิงค์ Google Sheets</span>
                 </button>
               </div>
             </div>
