@@ -1314,19 +1314,34 @@ export default function Home() {
                   width: '100%',
                   maxWidth: '480px',
                   padding: '28px',
-                  borderRadius: '20px',
-                  background: '#1a1d26',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+                  borderRadius: '22px',
+                  background: 'linear-gradient(145deg, #181c25, #12151c)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.22)',
+                  boxShadow: '0 32px 80px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', margin: 0 }}>
-                    ✏️ แก้ไขรายการธุรกรรม #{editingTx.id}
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>✏️</span> <span>แก้ไขรายการธุรกรรม #{editingTx.id}</span>
                   </h3>
                   <button
                     onClick={() => setEditingTx(null)}
-                    style={{ background: 'transparent', border: 'none', color: '#8e8e93', fontSize: '1.2rem', cursor: 'pointer' }}
+                    style={{
+                      background: 'linear-gradient(145deg, #222836, #181d26)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+                      color: '#94a3b8',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '2px 2px 5px #07090c',
+                    }}
                   >
                     ✕
                   </button>
@@ -1334,7 +1349,7 @@ export default function Home() {
 
                 <form onSubmit={handleSaveEditTx} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#a1a1a6', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>
                       📅 วันที่ (YYYY-MM-DD)
                     </label>
                     <input
@@ -1345,8 +1360,9 @@ export default function Home() {
                       style={{
                         width: '100%',
                         padding: '10px 14px',
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        background: '#101319',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        boxShadow: 'inset 2px 2px 5px #06070a, inset -1px -1px 3px rgba(45, 54, 72, 0.2)',
                         borderRadius: '10px',
                         color: '#fff',
                         fontSize: '14px',
@@ -1356,7 +1372,7 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#a1a1a6', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>
                       🏷️ ชื่อรายการ
                     </label>
                     <input
@@ -1368,8 +1384,9 @@ export default function Home() {
                       style={{
                         width: '100%',
                         padding: '10px 14px',
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        background: '#101319',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        boxShadow: 'inset 2px 2px 5px #06070a, inset -1px -1px 3px rgba(45, 54, 72, 0.2)',
                         borderRadius: '10px',
                         color: '#fff',
                         fontSize: '14px',
@@ -1379,7 +1396,7 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#a1a1a6', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>
                       💰 จำนวนเงิน (บาท)
                     </label>
                     <input
@@ -1392,8 +1409,9 @@ export default function Home() {
                       style={{
                         width: '100%',
                         padding: '10px 14px',
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        background: '#101319',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        boxShadow: 'inset 2px 2px 5px #06070a, inset -1px -1px 3px rgba(45, 54, 72, 0.2)',
                         borderRadius: '10px',
                         color: '#fff',
                         fontSize: '14px',
@@ -1403,7 +1421,7 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#a1a1a6', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>
                       📂 หมวดหมู่
                     </label>
                     <select
@@ -1412,8 +1430,9 @@ export default function Home() {
                       style={{
                         width: '100%',
                         padding: '10px 14px',
-                        background: '#242834',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        background: '#101319',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        boxShadow: 'inset 2px 2px 5px #06070a, inset -1px -1px 3px rgba(45, 54, 72, 0.2)',
                         borderRadius: '10px',
                         color: '#fff',
                         fontSize: '14px',
@@ -1435,13 +1454,14 @@ export default function Home() {
                       style={{
                         flex: 1,
                         padding: '12px',
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: 'none',
+                        background: 'linear-gradient(145deg, #222836, #181d26)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '10px',
-                        color: '#fff',
+                        color: '#94a3b8',
                         fontSize: '14px',
                         fontWeight: '600',
                         cursor: 'pointer',
+                        boxShadow: '2px 2px 5px #07090c',
                       }}
                     >
                       ยกเลิก
@@ -1451,17 +1471,18 @@ export default function Home() {
                       style={{
                         flex: 1,
                         padding: '12px',
-                        background: '#0a84ff',
-                        border: 'none',
+                        background: 'linear-gradient(145deg, #0ea5e9, #0284c7)',
+                        border: '1px solid rgba(255, 255, 255, 0.18)',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.3)',
                         borderRadius: '10px',
                         color: '#fff',
                         fontSize: '14px',
                         fontWeight: '700',
                         cursor: 'pointer',
-                        boxShadow: '0 4px 14px rgba(10, 132, 255, 0.4)',
+                        boxShadow: '3px 3px 8px #07090c, -2px -2px 6px rgba(45, 54, 72, 0.35)',
                       }}
                     >
-                      บันทึกการแก้ไข ✨
+                      บันทึกการแก้ไข ⚡
                     </button>
                   </div>
                 </form>
