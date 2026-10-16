@@ -6,6 +6,7 @@ import JournalTab from './components/JournalTab';
 import TradeTrackerTab from './components/TradeTrackerTab';
 import FocusTab from './components/FocusTab';
 import MicroHabitsTab from './components/MicroHabitsTab';
+import MemoryAnchorTab from './components/MemoryAnchorTab';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -37,8 +38,8 @@ export default function Home() {
         setActiveTab('tracker');
       }
     } else if (mode === 'selfdev') {
-      if (activeTab !== 'focus' && activeTab !== 'habits') {
-        setActiveTab('focus');
+      if (activeTab !== 'anchor' && activeTab !== 'focus' && activeTab !== 'habits') {
+        setActiveTab('anchor');
       }
     }
   };
@@ -500,6 +501,13 @@ export default function Home() {
 
           {appMode === 'selfdev' && (
             <>
+              <button
+                className={`segmented-button ${activeTab === 'anchor' ? 'active' : ''}`}
+                onClick={() => setActiveTab('anchor')}
+              >
+                <span>⚓</span>
+                <span>Memory Anchor (สติ & สัญญาใจ)</span>
+              </button>
               <button
                 className={`segmented-button ${activeTab === 'focus' ? 'active' : ''}`}
                 onClick={() => setActiveTab('focus')}
@@ -1610,6 +1618,7 @@ export default function Home() {
       {activeTab === 'journal' && <JournalTab />}
 
       {/* SELF-DEVELOPMENT TABS */}
+      {activeTab === 'anchor' && <MemoryAnchorTab />}
       {activeTab === 'focus' && <FocusTab />}
       {activeTab === 'habits' && <MicroHabitsTab />}
 
