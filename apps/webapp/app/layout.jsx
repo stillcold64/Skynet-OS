@@ -1,4 +1,5 @@
 import './globals.css';
+import './quant_terminal.css';
 
 export const metadata = {
   title: 'Skynet OS — Expense & Investment Tracker',

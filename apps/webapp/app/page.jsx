@@ -7,6 +7,7 @@ import TradeTrackerTab from './components/TradeTrackerTab';
 import FocusTab from './components/FocusTab';
 import MicroHabitsTab from './components/MicroHabitsTab';
 import MemoryAnchorTab from './components/MemoryAnchorTab';
+import QuantTerminalTab from './components/QuantTerminalTab';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -22,10 +23,36 @@ export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-12
   const [selectedDateStr, setSelectedDateStr] = useState(null);
 
-  // Mode state: 'finance' | 'trading' | 'selfdev'
+  // Mode state: 'finance' | 'trading' | 'selfdev' | 'quant'
   const [appMode, setAppMode] = useState('finance');
-  // Tab state: 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'focus' | 'habits'
+  // Tab state: 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'focus' | 'habits' | 'quant'
   const [activeTab, setActiveTab] = useState('calendar');
+  const [theme, setTheme] = useState('dark');
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('skynet_theme') || 'dark';
+      setTheme(savedTheme);
+      if (savedTheme === 'quant-light') {
+        document.body.classList.add('theme-quant-light');
+      } else {
+        document.body.classList.remove('theme-quant-light');
+      }
+    } catch (e) {}
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'quant-light' ? 'dark' : 'quant-light';
+    setTheme(nextTheme);
+    try {
+      localStorage.setItem('skynet_theme', nextTheme);
+    } catch (e) {}
+    if (nextTheme === 'quant-light') {
+      document.body.classList.add('theme-quant-light');
+    } else {
+      document.body.classList.remove('theme-quant-light');
+    }
+  };
 
   const handleSwitchMode = (mode) => {
     setAppMode(mode);
@@ -34,13 +61,15 @@ export default function Home() {
         setActiveTab('calendar');
       }
     } else if (mode === 'trading') {
-      if (activeTab !== 'tracker' && activeTab !== 'playbook' && activeTab !== 'journal') {
+      if (activeTab !== 'tracker' && activeTab !== 'playbook' && activeTab !== 'journal' && activeTab !== 'quant') {
         setActiveTab('tracker');
       }
     } else if (mode === 'selfdev') {
       if (activeTab !== 'anchor' && activeTab !== 'focus' && activeTab !== 'habits') {
         setActiveTab('anchor');
       }
+    } else if (mode === 'quant') {
+      setActiveTab('quant');
     }
   };
 
@@ -405,7 +434,9 @@ export default function Home() {
           <div>
             <h1>Skynet OS</h1>
             <p>
-              {appMode === 'finance'
+              {appMode === 'quant'
+                ? 'Quantum Research & Tail Probability Terminal (ระบบจำลองโมเดลสถิติความน่าจะเป็น & ฟิสิกส์การเทรดแบบในภาพเรฟ)'
+                : appMode === 'finance'
                 ? 'ระบบบริหารการเงินส่วนตัว & จัดการหนี้สิน (รับข้อมูลอัตโนมัติจาก Telegram @my_skynet_money_bot)'
                 : appMode === 'trading'
                 ? 'ระบบบริหารการเทรด (Trade Tracker บันทึกไม้เทรด, Playbook พิมพ์เขียว & Emotion Journal)'
@@ -414,21 +445,42 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="status-badge">
-          <div className="pulse-dot" />
-          <span>
-            {appMode === 'finance'
-              ? 'Telegram Money Sync Live'
-              : appMode === 'trading'
-              ? 'GGD Auto-Sync Active'
-              : 'Telegram Focus & Heatmap Live'}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            title="สลับธีมระหว่าง Dark และ Clean Quant Light แบบภาพเรฟ"
+          >
+            <span>{theme === 'quant-light' ? '🌙 TACTILE DARK' : '☀️ QUANT LIGHT (เรฟ)'}</span>
+          </button>
+          <div className="status-badge">
+            <div className="pulse-dot" />
+            <span>
+              {appMode === 'quant'
+                ? 'Quant Radar Live'
+                : appMode === 'finance'
+                ? 'Telegram Money Sync Live'
+                : appMode === 'trading'
+                ? 'GGD Auto-Sync Active'
+                : 'Telegram Focus & Heatmap Live'}
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* Mode Switcher: 3 Pillars (Finance, Trading, Self-Development) */}
+      {/* Mode Switcher: 4 Pillars (Quant Lab, Finance, Trading, Self-Development) */}
       <div className="mode-switcher-container">
         <div className="mode-segmented-control">
+          <button
+            className={`mode-tab-btn quant ${appMode === 'quant' ? 'active' : ''}`}
+            onClick={() => handleSwitchMode('quant')}
+            style={{
+              background: appMode === 'quant' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(37, 99, 235, 0.25))' : undefined,
+            }}
+          >
+            <span>⚡</span>
+            <span>QUANT TERMINAL (เรฟ)</span>
+          </button>
           <button
             className={`mode-tab-btn finance ${appMode === 'finance' ? 'active' : ''}`}
             onClick={() => handleSwitchMode('finance')}
@@ -454,6 +506,16 @@ export default function Home() {
 
         {/* Sub-tabs for the selected mode */}
         <div className="ios-segmented-control sub-nav-control">
+          {appMode === 'quant' && (
+            <button
+              className="segmented-button active"
+              onClick={() => setActiveTab('quant')}
+            >
+              <span>⚡</span>
+              <span>Claude Fable 5 & Mirofish Radar (สถิติ & กราฟฟิสิกส์ 6 มิติ)</span>
+            </button>
+          )}
+
           {appMode === 'finance' && (
             <>
               <button
@@ -475,6 +537,13 @@ export default function Home() {
 
           {appMode === 'trading' && (
             <>
+              <button
+                className={`segmented-button ${activeTab === 'quant' ? 'active' : ''}`}
+                onClick={() => setActiveTab('quant')}
+              >
+                <span>⚡</span>
+                <span>Quant Radar (เรฟ)</span>
+              </button>
               <button
                 className={`segmented-button ${activeTab === 'tracker' ? 'active' : ''}`}
                 onClick={() => setActiveTab('tracker')}
@@ -1610,6 +1679,14 @@ export default function Home() {
             </div>
           )}
         </>
+      )}
+
+      {/* QUANT TERMINAL TAB */}
+      {activeTab === 'quant' && (
+        <QuantTerminalTab
+          botLogs={botLogs}
+          transactions={transactions}
+        />
       )}
 
       {/* TRADING TABS */}
