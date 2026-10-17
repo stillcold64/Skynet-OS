@@ -870,12 +870,15 @@ export default function Home() {
             </div>
           </section>
 
-          {/* All Transactions Table & Management */}
-          <section className="glass-panel audit-log-card" style={{ marginBottom: '24px' }}>
-            <div className="audit-log-header">
-              <div className="audit-log-title">
-                <span>📋</span>
-                <span>รายการธุรกรรมทั้งหมด ({transactions.length} รายการ) — สามารถกดแก้ไขหรือลบรายการได้</span>
+          {/* All Transactions Table & Management (Quant Terminal Style) */}
+          <section className="quant-card" style={{ marginBottom: '24px' }}>
+            <div className="quant-card-header">
+              <div className="quant-card-title">
+                <span className="quant-dot cyan" />
+                <span>TRANSACTION LEDGER & CASHFLOW AUDIT</span>
+              </div>
+              <div className="quant-card-tag">
+                <span>{transactions.length} ENTRIES • REALTIME SQLITE</span>
               </div>
             </div>
 
@@ -883,21 +886,21 @@ export default function Home() {
               <div className="empty-placeholder">ไม่มีข้อมูลธุรกรรมในระบบ ส่งข้อความผ่าน Telegram เพื่อเริ่มต้นบันทึก</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <table className="quant-ledger-table">
                   <thead>
-                    <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
-                      <th style={{ padding: '10px 12px' }}>วันที่</th>
-                      <th style={{ padding: '10px 12px' }}>หมวดหมู่</th>
-                      <th style={{ padding: '10px 12px' }}>ชื่อรายการ</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>จำนวนเงิน</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'center' }}>จัดการ</th>
+                    <tr>
+                      <th>DATE</th>
+                      <th>CATEGORY</th>
+                      <th>DESCRIPTION</th>
+                      <th style={{ textAlign: 'right' }}>AMOUNT</th>
+                      <th style={{ textAlign: 'center' }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
                     {transactions.map((item) => (
-                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                        <td style={{ padding: '10px 12px' }}>{item.date}</td>
-                        <td style={{ padding: '10px 12px' }}>
+                      <tr key={item.id}>
+                        <td className="quant-td-date">{item.date}</td>
+                        <td>
                           <select
                             value={item.category_group}
                             onChange={(e) => handleUpdateCategory(item.id, e.target.value)}
@@ -911,43 +914,25 @@ export default function Home() {
                             <option value="ETC">📦 ETC</option>
                           </select>
                         </td>
-                        <td style={{ padding: '10px 12px', fontWeight: '600' }}>{item.category}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700' }}>
+                        <td className="quant-td-desc">{item.category}</td>
+                        <td className="quant-td-amount">
                           {formatCurrency(item.amount)} ฿
                         </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                             <button
                               onClick={() => handleOpenEditTx(item)}
                               title="แก้ไขรายการนี้"
-                              style={{
-                                background: 'rgba(10, 132, 255, 0.15)',
-                                border: '1px solid rgba(10, 132, 255, 0.4)',
-                                color: '#0a84ff',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
-                                cursor: 'pointer',
-                                fontSize: '11px',
-                                fontWeight: '600',
-                              }}
+                              className="quant-btn-action edit"
                             >
-                              ✏️ แก้ไข
+                              EDIT
                             </button>
                             <button
                               onClick={() => handleDelete(item.id)}
                               title="ลบรายการนี้"
-                              style={{
-                                background: 'rgba(255, 55, 95, 0.15)',
-                                border: '1px solid rgba(255, 55, 95, 0.4)',
-                                color: '#ff375f',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
-                                cursor: 'pointer',
-                                fontSize: '11px',
-                                fontWeight: '600',
-                              }}
+                              className="quant-btn-action del"
                             >
-                              🗑️ ลบ
+                              DEL
                             </button>
                           </div>
                         </td>
