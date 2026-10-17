@@ -265,6 +265,109 @@ export default function TradeTrackerTab() {
         </div>
       </div>
 
+      {/* 2.5 QUANT PERFORMANCE & ALPHA CONVERGENCE RADAR (BLACK TERMINAL STYLE) */}
+      <div className="quant-card" style={{ marginBottom: '20px' }}>
+        <div className="quant-card-header">
+          <div className="quant-card-title">
+            <span className="quant-dot green" />
+            <span>TRADE PERFORMANCE & ALPHA CONVERGENCE</span>
+          </div>
+          <div className="quant-card-tag">
+            <span>EDGE RADAR • WIN RATE: {stats?.winRate || 0}% • TOTAL: {stats?.totalTrades || 0} SAMPLES</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: '16px', alignItems: 'center' }}>
+          <div className="quant-radar-metrics">
+            <div className="quant-metric-item">
+              <span className="quant-metric-lbl">EDGE (WIN RATE)</span>
+              <span className="quant-metric-val green">{stats?.winRate || 0}%</span>
+            </div>
+            <div className="quant-metric-item">
+              <span className="quant-metric-lbl">TOTAL SAMPLES</span>
+              <span className="quant-metric-val cyan">{stats?.totalTrades || 0} ไม้</span>
+            </div>
+            <div className="quant-metric-item">
+              <span className="quant-metric-lbl">WIN / LOSS RATIO</span>
+              <span className="quant-metric-val">{stats?.winCount || 0}W - {stats?.lossCount || 0}L</span>
+            </div>
+            <div className="quant-metric-item">
+              <span className="quant-metric-lbl">BEST STRATEGY</span>
+              <span className="quant-metric-val" style={{ color: '#c084fc' }}>{stats?.bestSetup?.code || 'SETUP-01'}</span>
+            </div>
+          </div>
+
+          <div style={{ width: '100%', height: '110px', position: 'relative' }}>
+            <svg viewBox="0 0 500 110" style={{ width: '100%', height: '100%' }}>
+              <defs>
+                <linearGradient id="tradeCurveGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+                  <stop offset="70%" stopColor="#0ea5e9" stopOpacity="0.08" />
+                  <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.0" />
+                </linearGradient>
+                <linearGradient id="tradeLineGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#10b981" />
+                  <stop offset="70%" stopColor="#0ea5e9" />
+                  <stop offset="100%" stopColor="#38bdf8" />
+                </linearGradient>
+              </defs>
+
+              {/* Baseline */}
+              <line x1="20" y1="92" x2="480" y2="92" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="1" />
+
+              {trades.length === 0 ? (
+                /* Sleek Empty State with technical line */
+                <g>
+                  <path
+                    d="M 20 85 Q 140 82, 260 70 T 480 40"
+                    fill="none"
+                    stroke="rgba(16, 185, 129, 0.35)"
+                    strokeWidth="1.5"
+                    strokeDasharray="4 4"
+                  />
+                  <text x="250" y="55" fill="#64748b" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+                    READY FOR LIVE TRADES • AWAITING NEW ENTRIES
+                  </text>
+                </g>
+              ) : (
+                /* Real Trajectory Curve */
+                <g>
+                  {(() => {
+                    const sorted = [...trades].reverse();
+                    let currentWinCount = 0;
+                    const pts = [{ x: 20, y: 90 }];
+                    sorted.forEach((t, i) => {
+                      if (t.outcome === 'WIN') currentWinCount++;
+                      const x = 20 + ((i + 1) / sorted.length) * 450;
+                      const y = Math.max(15, 90 - (currentWinCount / (i + 1)) * 70);
+                      pts.push({ x, y });
+                    });
+                    let path = `M ${pts[0].x} ${pts[0].y}`;
+                    for (let j = 0; j < pts.length - 1; j++) {
+                      const cpX = (pts[j].x + pts[j + 1].x) / 2;
+                      path += ` C ${cpX} ${pts[j].y}, ${cpX} ${pts[j + 1].y}, ${pts[j + 1].x} ${pts[j + 1].y}`;
+                    }
+                    const lastPt = pts[pts.length - 1];
+                    const area = `${path} L ${lastPt.x} 92 L 20 92 Z`;
+
+                    return (
+                      <>
+                        <path d={area} fill="url(#tradeCurveGrad)" />
+                        <path d={path} fill="none" stroke="url(#tradeLineGrad)" strokeWidth="2.2" />
+                        <circle cx={lastPt.x} cy={lastPt.y} r="4" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
+                        <text x={lastPt.x - 10} y={Math.max(lastPt.y - 8, 12)} fill="#10b981" fontSize="9" fontFamily="JetBrains Mono, monospace" fontWeight="700">
+                          {stats?.winRate || 0}% WR
+                        </text>
+                      </>
+                    );
+                  })()}
+                </g>
+              )}
+            </svg>
+          </div>
+        </div>
+      </div>
+
       {/* 3. TOOLBAR & CONTROLS */}
       <div className="playbook-toolbar glass-panel">
         <div className="toolbar-left">
