@@ -1406,206 +1406,6 @@ export default function Home() {
               </div>
             </div>
           )}
-
-          {/* TRANSACTION EDIT MODAL */}
-          {editingTx && (
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0, 0, 0, 0.75)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10001,
-                backdropFilter: 'blur(8px)',
-                padding: '16px',
-              }}
-            >
-              <div
-                className="glass-panel"
-                style={{
-                  width: '100%',
-                  maxWidth: '480px',
-                  padding: '28px',
-                  borderRadius: '22px',
-                  background: 'linear-gradient(145deg, #181c25, #12151c)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.22)',
-                  boxShadow: '0 32px 80px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>✏️</span> <span>แก้ไขรายการธุรกรรม #{editingTx.id}</span>
-                  </h3>
-                  <button
-                    onClick={() => setEditingTx(null)}
-                    style={{
-                      background: 'linear-gradient(145deg, #222836, #181d26)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-                      color: '#94a3b8',
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '2px 2px 5px #07090c',
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <form onSubmit={handleSaveEditTx} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>
-                      📅 วันที่ (YYYY-MM-DD)
-                    </label>
-                    <input
-                      type="date"
-                      value={txFormData.date}
-                      onChange={(e) => setTxFormData({ ...txFormData, date: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        background: '#101319',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        boxShadow: 'inset 2px 2px 5px #06070a, inset -1px -1px 3px rgba(45, 54, 72, 0.2)',
-                        borderRadius: '10px',
-                        color: '#fff',
-                        fontSize: '14px',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>
-                      🏷️ ชื่อรายการ
-                    </label>
-                    <input
-                      type="text"
-                      value={txFormData.category}
-                      onChange={(e) => setTxFormData({ ...txFormData, category: e.target.value })}
-                      placeholder="เช่น ข้าวมันไก่, กาแฟ"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        background: '#101319',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        boxShadow: 'inset 2px 2px 5px #06070a, inset -1px -1px 3px rgba(45, 54, 72, 0.2)',
-                        borderRadius: '10px',
-                        color: '#fff',
-                        fontSize: '14px',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>
-                      💰 จำนวนเงิน (บาท)
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={txFormData.amount}
-                      onChange={(e) => setTxFormData({ ...txFormData, amount: e.target.value })}
-                      placeholder="0.00"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        background: '#101319',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        boxShadow: 'inset 2px 2px 5px #06070a, inset -1px -1px 3px rgba(45, 54, 72, 0.2)',
-                        borderRadius: '10px',
-                        color: '#fff',
-                        fontSize: '14px',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>
-                      📂 หมวดหมู่
-                    </label>
-                    <select
-                      value={txFormData.category_group}
-                      onChange={(e) => setTxFormData({ ...txFormData, category_group: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        background: '#101319',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        boxShadow: 'inset 2px 2px 5px #06070a, inset -1px -1px 3px rgba(45, 54, 72, 0.2)',
-                        borderRadius: '10px',
-                        color: '#fff',
-                        fontSize: '14px',
-                        outline: 'none',
-                      }}
-                    >
-                      <option value="LIFE">🌿 LIFE (ชีวิตประจำวัน / อาหาร)</option>
-                      <option value="EXTRAVAGANT">✨ EXTRAVAGANT (ฟุ่มเฟือย / บันเทิง)</option>
-                      <option value="BILL">📄 BILL (บิล / หนี้สิน / คงที่)</option>
-                      <option value="INVESTING">📈 INVESTING (การลงทุน / ออมเงิน)</option>
-                      <option value="ETC">📦 ETC (เบ็ดเตล็ด)</option>
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setEditingTx(null)}
-                      style={{
-                        flex: 1,
-                        padding: '12px',
-                        background: 'linear-gradient(145deg, #222836, #181d26)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        borderRadius: '10px',
-                        color: '#94a3b8',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        boxShadow: '2px 2px 5px #07090c',
-                      }}
-                    >
-                      ยกเลิก
-                    </button>
-                    <button
-                      type="submit"
-                      style={{
-                        flex: 1,
-                        padding: '12px',
-                        background: 'linear-gradient(145deg, #0ea5e9, #0284c7)',
-                        border: '1px solid rgba(255, 255, 255, 0.18)',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '10px',
-                        color: '#fff',
-                        fontSize: '14px',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        boxShadow: '3px 3px 8px #07090c, -2px -2px 6px rgba(45, 54, 72, 0.35)',
-                      }}
-                    >
-                      บันทึกการแก้ไข ⚡
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
         </>
       )}
 
@@ -2003,6 +1803,211 @@ export default function Home() {
                 </>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* TRANSACTION EDIT MODAL (QUANT TERMINAL STYLE) */}
+      {editingTx && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.82)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+            backdropFilter: 'blur(10px)',
+            padding: '16px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingTx(null);
+          }}
+        >
+          <div
+            className="quant-card"
+            style={{
+              width: '100%',
+              maxWidth: '460px',
+              padding: '24px',
+              borderRadius: '12px',
+              background: '#0e1118',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              boxShadow: '0 24px 60px rgba(0, 0, 0, 0.9)',
+            }}
+          >
+            <div className="quant-card-header" style={{ marginBottom: '18px' }}>
+              <div className="quant-card-title">
+                <span className="quant-dot cyan" />
+                <span>EDIT TRANSACTION RECORD #{editingTx.id}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingTx(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#94a3b8',
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditTx} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '700', color: '#94a3b8', marginBottom: '6px', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.5px' }}>
+                  DATE (YYYY-MM-DD)
+                </label>
+                <input
+                  type="date"
+                  value={txFormData.date}
+                  onChange={(e) => setTxFormData({ ...txFormData, date: e.target.value })}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    background: '#090a0f',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '13px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '700', color: '#94a3b8', marginBottom: '6px', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.5px' }}>
+                  DESCRIPTION / ITEM NAME
+                </label>
+                <input
+                  type="text"
+                  value={txFormData.category}
+                  onChange={(e) => setTxFormData({ ...txFormData, category: e.target.value })}
+                  placeholder="เช่น ข้าวมันไก่, กาแฟ"
+                  required
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    background: '#090a0f',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '700', color: '#94a3b8', marginBottom: '6px', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.5px' }}>
+                  AMOUNT (THB)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={txFormData.amount}
+                  onChange={(e) => setTxFormData({ ...txFormData, amount: e.target.value })}
+                  placeholder="0.00"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    background: '#090a0f',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '700', color: '#94a3b8', marginBottom: '6px', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.5px' }}>
+                  CATEGORY GROUP
+                </label>
+                <select
+                  value={txFormData.category_group}
+                  onChange={(e) => setTxFormData({ ...txFormData, category_group: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    background: '#090a0f',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '12px',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="LIFE">🌿 LIFE (ชีวิตประจำวัน / อาหาร)</option>
+                  <option value="EXTRAVAGANT">✨ EXTRAVAGANT (ฟุ่มเฟือย / บันเทิง)</option>
+                  <option value="BILL">📄 BILL (บิล / หนี้สิน / คงที่)</option>
+                  <option value="INVESTING">📈 INVESTING (การลงทุน / ออมเงิน)</option>
+                  <option value="ETC">📦 ETC (เบ็ดเตล็ด)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingTx(null)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '6px',
+                    color: '#94a3b8',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  SAVE CHANGES ⚡
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
