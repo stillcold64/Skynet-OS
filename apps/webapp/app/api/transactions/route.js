@@ -196,6 +196,24 @@ export async function PATCH(request) {
       }
     }
 
+    // If existing raw_text had an original item name that differs from updatedCategory, learn it as an alias!
+    if (existing.raw_text && updatedCategory) {
+      const rawItemMatch = existing.raw_text.match(/^(.+?)(?:\s+\d+(\.\d+)?)?$/);
+      if (rawItemMatch) {
+        const rawAlias = rawItemMatch[1].trim().toLowerCase();
+        if (rawAlias && rawAlias !== updatedCategory.toLowerCase() && rawAlias.length >= 2) {
+          try {
+            db.prepare(`
+              INSERT OR REPLACE INTO item_aliases (alias, canonical_name, category_group, suggested_type, note)
+              VALUES (?, ?, ?, ?, ?)
+            `).run(rawAlias, updatedCategory, updatedGroup, updatedType, 'Learned from transaction edit');
+          } catch (e) {
+            console.error('Error learning alias from edit:', e);
+          }
+        }
+      }
+    }
+
     // Trigger background sync to Google Sheets so edits are reflected immediately
     backupAllToGoogleSheets().catch((err) => console.error('Background sync error on update:', err));
 

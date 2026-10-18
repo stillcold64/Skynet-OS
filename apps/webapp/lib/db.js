@@ -236,6 +236,140 @@ if (billCount === 0) {
   insertBill.run('ค่าไฟบ้านยาย', 'ค่าไฟยาย,ไฟยาย', 400, 21, 'ค่าไฟฟ้าบ้านยาย');
 }
 
+// 6.2 Item Aliases & Canonical Names Normalization Table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS item_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alias TEXT UNIQUE NOT NULL COLLATE NOCASE,
+    canonical_name TEXT NOT NULL,
+    category_group TEXT NOT NULL,
+    suggested_type TEXT DEFAULT 'ค่าใช้จ่าย',
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+const aliasCount = db.prepare('SELECT COUNT(*) as count FROM item_aliases').get().count;
+if (aliasCount === 0) {
+  const insertAlias = db.prepare(`
+    INSERT OR REPLACE INTO item_aliases (alias, canonical_name, category_group, suggested_type, note)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  const defaultAliases = [
+    // Water bills (Home)
+    ['ค่าน้ำ', 'ค่าน้ำประปา', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาที่พัก'],
+    ['ค่าน้ำประปา', 'ค่าน้ำประปา', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาที่พัก'],
+    ['น้ำประปา', 'ค่าน้ำประปา', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาที่พัก'],
+    ['ประปา', 'ค่าน้ำประปา', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาที่พัก'],
+    ['บิลค่าน้ำ', 'ค่าน้ำประปา', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาที่พัก'],
+    ['บิลน้ำ', 'ค่าน้ำประปา', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาที่พัก'],
+
+    // Water bills (Grandma)
+    ['ค่าน้ำยาย', 'ค่าน้ำบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาบ้านยาย'],
+    ['ค่าน้ำบ้านยาย', 'ค่าน้ำบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาบ้านยาย'],
+    ['น้ำยาย', 'ค่าน้ำบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาบ้านยาย'],
+    ['ประปายาย', 'ค่าน้ำบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาบ้านยาย'],
+    ['ประปาบ้านยาย', 'ค่าน้ำบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาบ้านยาย'],
+    ['ประผายาย', 'ค่าน้ำบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าน้ำประปาบ้านยาย (Typo safe)'],
+
+    // Electricity bills (Home)
+    ['ค่าไฟ', 'ค่าไฟ', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าที่พัก'],
+    ['ค่าไฟฟ้า', 'ค่าไฟ', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าที่พัก'],
+    ['การไฟฟ้า', 'ค่าไฟ', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าที่พัก'],
+    ['บิลค่าไฟ', 'ค่าไฟ', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าที่พัก'],
+    ['บิลไฟ', 'ค่าไฟ', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าที่พัก'],
+
+    // Electricity bills (Grandma)
+    ['ค่าไฟยาย', 'ค่าไฟบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าบ้านยาย'],
+    ['ไฟยาย', 'ค่าไฟบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าบ้านยาย'],
+    ['ค่าไฟบ้านยาย', 'ค่าไฟบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าบ้านยาย'],
+    ['ค่าไฟฟ้าบ้านยาย', 'ค่าไฟบ้านยาย', 'BILL', 'ค่าใช้จ่าย', 'ค่าไฟฟ้าบ้านยาย'],
+
+    // Internet / WiFi
+    ['wifi', 'WiFi / เน็ตบ้าน', 'BILL', 'ค่าใช้จ่าย', 'ค่าอินเทอร์เน็ตรายเดือน'],
+    ['ค่าwifi', 'WiFi / เน็ตบ้าน', 'BILL', 'ค่าใช้จ่าย', 'ค่าอินเทอร์เน็ตรายเดือน'],
+    ['เน็ต', 'WiFi / เน็ตบ้าน', 'BILL', 'ค่าใช้จ่าย', 'ค่าอินเทอร์เน็ตรายเดือน'],
+    ['เน็ตบ้าน', 'WiFi / เน็ตบ้าน', 'BILL', 'ค่าใช้จ่าย', 'ค่าอินเทอร์เน็ตรายเดือน'],
+    ['ค่าเน็ต', 'WiFi / เน็ตบ้าน', 'BILL', 'ค่าใช้จ่าย', 'ค่าอินเทอร์เน็ตรายเดือน'],
+    ['ค่าเน็ตบ้าน', 'WiFi / เน็ตบ้าน', 'BILL', 'ค่าใช้จ่าย', 'ค่าอินเทอร์เน็ตรายเดือน'],
+    ['ไวไฟ', 'WiFi / เน็ตบ้าน', 'BILL', 'ค่าใช้จ่าย', 'ค่าอินเทอร์เน็ตรายเดือน'],
+
+    // Debts & Installments
+    ['shopee paylater', 'Shopee Paylater', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee SPayLater'],
+    ['paylater', 'Shopee Paylater', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee SPayLater'],
+    ['spaylater', 'Shopee Paylater', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee SPayLater'],
+    ['shoppee paylater', 'Shopee Paylater', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee SPayLater'],
+    ['จ่ายหนี้ paylater', 'Shopee Paylater', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee SPayLater'],
+    ['easycash', 'EasyCash', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee EasyCash'],
+    ['easaycash', 'EasyCash', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee EasyCash'],
+    ['easymoney', 'EasyCash', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee EasyCash'],
+    ['easy money', 'EasyCash', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee EasyCash'],
+    ['จ่ายหนี้ easaycash', 'EasyCash', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee EasyCash'],
+    ['จ่ายหนี้ easycash', 'EasyCash', 'BILL', 'ค่าใช้จ่าย', 'ค่างวด Shopee EasyCash'],
+    ['finnix', 'Finnix', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Finnix'],
+    ['ฟินนิกซ์', 'Finnix', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Finnix'],
+    ['money thunder', 'Money Thunder', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Money Thunder'],
+    ['thunder', 'Money Thunder', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Money Thunder'],
+    ['ธันเดอร์', 'Money Thunder', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Money Thunder'],
+    ['ธันเดอ', 'Money Thunder', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Money Thunder'],
+    ['มันนี่ธันเดอร์', 'Money Thunder', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Money Thunder'],
+    ['จ่ายหนี้ ธันเดอ', 'Money Thunder', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Money Thunder'],
+    ['จ่ายหนี้ ธันเดอร์', 'Money Thunder', 'BILL', 'ค่าใช้จ่าย', 'ค่างวดสินเชื่อ Money Thunder'],
+
+    // Subscriptions
+    ['youtube', 'YouTube Premium', 'BILL', 'ค่าใช้จ่าย', 'Subscription YouTube Premium'],
+    ['yt', 'YouTube Premium', 'BILL', 'ค่าใช้จ่าย', 'Subscription YouTube Premium'],
+    ['youtube premium', 'YouTube Premium', 'BILL', 'ค่าใช้จ่าย', 'Subscription YouTube Premium'],
+    ['yt premium', 'YouTube Premium', 'BILL', 'ค่าใช้จ่าย', 'Subscription YouTube Premium'],
+    ['netflix', 'Netflix', 'BILL', 'ค่าใช้จ่าย', 'Subscription Netflix'],
+
+    // Food & Living
+    ['กาแแฟ', 'กาแฟ', 'LIFE', 'ค่าใช้จ่าย', 'กาแฟ (Typo fix)'],
+    ['กาแฟ', 'กาแฟ', 'LIFE', 'ค่าใช้จ่าย', 'กาแฟ'],
+    ['ข้าว', 'ข้าว', 'LIFE', 'ค่าใช้จ่าย', 'มื้ออาหาร'],
+    ['กินข้าว', 'ข้าว', 'LIFE', 'ค่าใช้จ่าย', 'มื้ออาหาร'],
+    ['ถอนตังกินข้าว', 'ถอนตังกินข้าว', 'LIFE', 'ค่าใช้จ่าย', 'ถอนตังกินข้าว'],
+    ['ข้าวมันไก่', 'ข้าวมันไก่', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวมันไก่'],
+    ['ข้างมันไก่', 'ข้าวมันไก่', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวมันไก่ (Typo fix)'],
+    ['กะเพรา', 'ข้าวกะเพรา', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวกะเพรา'],
+    ['กระเพรา', 'ข้าวกะเพรา', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวกะเพรา'],
+    ['ข้าวกะเพรา', 'ข้าวกะเพรา', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวกะเพรา'],
+    ['ข้าวกระเพรา', 'ข้าวกะเพรา', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวกะเพรา'],
+    ['ข้างกะเพรา', 'ข้าวกะเพรา', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวกะเพรา (Typo fix)'],
+    ['ข้างกระเพรา', 'ข้าวกะเพรา', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวกะเพรา (Typo fix)'],
+    ['ข้าวหมูกรอบ', 'ข้าวหมูกรอบ', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวหมูกรอบ'],
+    ['ข้างหมูกรอบ', 'ข้าวหมูกรอบ', 'LIFE', 'ค่าใช้จ่าย', 'ข้าวหมูกรอบ (Typo fix)'],
+    ['เซเว่น', '7-Eleven', 'LIFE', 'ค่าใช้จ่าย', 'ร้านสะดวกซื้อ 7-Eleven'],
+    ['7-11', '7-Eleven', 'LIFE', 'ค่าใช้จ่าย', 'ร้านสะดวกซื้อ 7-Eleven'],
+    ['7 eleven', '7-Eleven', 'LIFE', 'ค่าใช้จ่าย', 'ร้านสะดวกซื้อ 7-Eleven'],
+    ['macro', 'Makro', 'LIFE', 'ค่าใช้จ่าย', 'ซื้อของ Makro'],
+    ['ซื้อของเข้าบ้าน macro', 'Makro', 'LIFE', 'ค่าใช้จ่าย', 'ซื้อของ Makro'],
+    ['โลตัส', 'Lotus\'s', 'LIFE', 'ค่าใช้จ่าย', 'ซื้อของ Lotus'],
+    ['ซื้อของเข้าบ้านโลตัส', 'Lotus\'s', 'LIFE', 'ค่าใช้จ่าย', 'ซื้อของ Lotus'],
+    ['mr diy', 'MR.DIY', 'LIFE', 'ค่าใช้จ่าย', 'MR.DIY ของใช้'],
+    ['mrdiy', 'MR.DIY', 'LIFE', 'ค่าใช้จ่าย', 'MR.DIY ของใช้'],
+    ['mr diy  life', 'MR.DIY', 'LIFE', 'ค่าใช้จ่าย', 'MR.DIY ของใช้'],
+
+    // Entertainment & Leisure
+    ['dota', 'Dota 2', 'EXTRAVAGANT', 'ค่าใช้จ่าย', 'เกม Dota 2'],
+    ['dota2', 'Dota 2', 'EXTRAVAGANT', 'ค่าใช้จ่าย', 'เกม Dota 2'],
+    ['เติมเกม dota2', 'Dota 2', 'EXTRAVAGANT', 'ค่าใช้จ่าย', 'เกม Dota 2'],
+    ['เติมเกม dota', 'Dota 2', 'EXTRAVAGANT', 'ค่าใช้จ่าย', 'เกม Dota 2'],
+    ['เติม dota', 'Dota 2', 'EXTRAVAGANT', 'ค่าใช้จ่าย', 'เกม Dota 2'],
+    ['เบีย', 'เบียร์', 'EXTRAVAGANT', 'ค่าใช้จ่าย', 'เครื่องดื่มแอลกอฮอล์'],
+    ['เบียร์', 'เบียร์', 'EXTRAVAGANT', 'ค่าใช้จ่าย', 'เครื่องดื่มแอลกอฮอล์'],
+    ['ขนม', 'ขนม', 'EXTRAVAGANT', 'ค่าใช้จ่าย', 'ขนมคบเคี้ยว'],
+  ];
+
+  const insertBatch = db.transaction((aliases) => {
+    for (const [alias, canonical, grp, type, note] of aliases) {
+      insertAlias.run(alias.toLowerCase(), canonical, grp, type, note);
+    }
+  });
+  insertBatch(defaultAliases);
+}
+
 // 7. Playbook Unified Strategy (Master Plan & Core Thesis)
 db.exec(`
   CREATE TABLE IF NOT EXISTS playbook_strategy (

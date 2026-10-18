@@ -148,6 +148,206 @@ export function classifyItem(itemName) {
 }
 
 /**
+ * Normalizes an item name to its canonical name and resolves its category group & suggested type.
+ * Handles synonyms (e.g. 'ค่าน้ำ' vs 'ค่าน้ำประปา'), typos, and domain heuristics.
+ */
+export function normalizeItemName(rawItemName) {
+  if (!rawItemName || typeof rawItemName !== 'string') {
+    return {
+      canonicalName: rawItemName || 'ETC',
+      originalAlias: rawItemName || '',
+      categoryGroup: 'ETC',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'empty',
+    };
+  }
+
+  let clean = rawItemName.trim();
+  const originalAlias = clean;
+
+  // 1. Normalize common Thai keyboard typo prefixes & characters
+  if (/^ข้าง(มัน|ผัด|หมู|ไก่|ไข่|กะเพรา|กระเพรา|แกง|เหนียว|ต้ม|จาน)/.test(clean)) {
+    clean = clean.replace(/^ข้าง/, 'ข้าว');
+  }
+  clean = clean.replace(/กาแแฟ/g, 'กาแฟ');
+  clean = clean.replace(/ประผา/g, 'ประปา');
+
+  const cleanLower = clean.toLowerCase();
+
+  // Strip common noisy prefixes for checking (e.g. 'จ่ายหนี้ ', 'บิล ')
+  const strippedPrefix = cleanLower
+    .replace(/^(จ่ายหนี้|จ่ายบิล|บิล|ค่า)\s*/, '')
+    .trim();
+
+  // 2. Exact match in item_aliases table (fast indexed lookup)
+  try {
+    const aliasRecord = db
+      .prepare('SELECT * FROM item_aliases WHERE LOWER(alias) = ? OR LOWER(alias) = ?')
+      .get(cleanLower, strippedPrefix);
+
+    if (aliasRecord) {
+      return {
+        canonicalName: aliasRecord.canonical_name,
+        originalAlias,
+        categoryGroup: aliasRecord.category_group,
+        suggestedType: aliasRecord.suggested_type || 'ค่าใช้จ่าย',
+        matchedBy: 'alias_table',
+      };
+    }
+  } catch (e) {
+    console.error('Error querying item_aliases:', e);
+  }
+
+  // 3. Smart bill & recurring cost heuristics (High Precision Substrings)
+
+  // Water bills (Home vs Grandma)
+  if (cleanLower.includes('น้ำ') || cleanLower.includes('ประปา')) {
+    if (cleanLower.includes('ยาย')) {
+      return {
+        canonicalName: 'ค่าน้ำบ้านยาย',
+        originalAlias,
+        categoryGroup: 'BILL',
+        suggestedType: 'ค่าใช้จ่าย',
+        matchedBy: 'heuristic_water_grandma',
+      };
+    }
+    const nonBillWater = [
+      'น้ำมัน', 'น้ำปั่น', 'น้ำแข็ง', 'น้ำอัดลม', 'น้ำผลไม้',
+      'น้ำอุ่น', 'น้ำพริก', 'น้ำดื่ม', 'ดื่มน้ำ', 'สิงห์', 'คริสตัล'
+    ];
+    if (!nonBillWater.some((kw) => cleanLower.includes(kw))) {
+      return {
+        canonicalName: 'ค่าน้ำประปา',
+        originalAlias,
+        categoryGroup: 'BILL',
+        suggestedType: 'ค่าใช้จ่าย',
+        matchedBy: 'heuristic_water_home',
+      };
+    }
+  }
+
+  // Electricity bills (Home vs Grandma)
+  if (cleanLower.includes('ค่าไฟ') || cleanLower.includes('ไฟฟ้า') || cleanLower === 'ไฟยาย' || cleanLower.includes('ไฟบ้านยาย')) {
+    if (cleanLower.includes('ยาย')) {
+      return {
+        canonicalName: 'ค่าไฟบ้านยาย',
+        originalAlias,
+        categoryGroup: 'BILL',
+        suggestedType: 'ค่าใช้จ่าย',
+        matchedBy: 'heuristic_electric_grandma',
+      };
+    }
+    return {
+      canonicalName: 'ค่าไฟ',
+      originalAlias,
+      categoryGroup: 'BILL',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_electric_home',
+    };
+  }
+
+  // Internet bills
+  if (cleanLower.includes('wifi') || cleanLower.includes('ไวไฟ') || cleanLower.includes('เน็ต') || cleanLower.includes('เน็ตบ้าน')) {
+    return {
+      canonicalName: 'WiFi / เน็ตบ้าน',
+      originalAlias,
+      categoryGroup: 'BILL',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_internet',
+    };
+  }
+
+  // Loans & Installments
+  if (cleanLower.includes('paylater') || cleanLower.includes('spaylater')) {
+    return {
+      canonicalName: 'Shopee Paylater',
+      originalAlias,
+      categoryGroup: 'BILL',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_paylater',
+    };
+  }
+  if (cleanLower.includes('easycash') || cleanLower.includes('easaycash') || cleanLower.includes('easymoney') || cleanLower.includes('easy money')) {
+    return {
+      canonicalName: 'EasyCash',
+      originalAlias,
+      categoryGroup: 'BILL',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_easycash',
+    };
+  }
+  if (cleanLower.includes('finnix') || cleanLower.includes('ฟินนิกซ์')) {
+    return {
+      canonicalName: 'Finnix',
+      originalAlias,
+      categoryGroup: 'BILL',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_finnix',
+    };
+  }
+  if (cleanLower.includes('thunder') || cleanLower.includes('ธันเดอ')) {
+    return {
+      canonicalName: 'Money Thunder',
+      originalAlias,
+      categoryGroup: 'BILL',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_thunder',
+    };
+  }
+
+  // Subscriptions
+  if (cleanLower.includes('youtube') || cleanLower === 'yt' || cleanLower.includes('yt premium')) {
+    return {
+      canonicalName: 'YouTube Premium',
+      originalAlias,
+      categoryGroup: 'BILL',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_youtube',
+    };
+  }
+  if (cleanLower.includes('netflix')) {
+    return {
+      canonicalName: 'Netflix',
+      originalAlias,
+      categoryGroup: 'BILL',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_netflix',
+    };
+  }
+
+  // Games & Extravagant
+  if (cleanLower.includes('dota')) {
+    return {
+      canonicalName: 'Dota 2',
+      originalAlias,
+      categoryGroup: 'EXTRAVAGANT',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_dota',
+    };
+  }
+  if (cleanLower === 'เบีย' || cleanLower === 'เบียร์') {
+    return {
+      canonicalName: 'เบียร์',
+      originalAlias,
+      categoryGroup: 'EXTRAVAGANT',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedBy: 'heuristic_beer',
+    };
+  }
+
+  // 4. Fallback to classifyItem for rules dictionary and food heuristics
+  const classification = classifyItem(clean);
+
+  return {
+    canonicalName: clean,
+    originalAlias,
+    categoryGroup: classification.categoryGroup,
+    suggestedType: classification.suggestedType,
+    matchedBy: classification.matchedKeyword || 'classification_rule',
+  };
+}
+
+/**
  * Main parser function: converts raw text into structured transaction items
  */
 export function parseTelegramMessage(rawMessage) {
@@ -182,21 +382,19 @@ export function parseTelegramMessage(rawMessage) {
       // Clean leading dashes, bullets, or commas
       itemName = itemName.replace(/^[-–,\s•*]+/, '').trim();
 
-      // Normalize common typo in display name if starts with ข้าง...
-      if (/^ข้าง(มัน|ผัด|หมู|ไก่|ไข่|กะเพรา|กระเพรา|แกง|เหนียว|ต้ม|จาน)/.test(itemName)) {
-        itemName = itemName.replace(/^ข้าง/, 'ข้าว');
-      }
-
       if (itemName && !isNaN(amount) && amount > 0) {
-        const { categoryGroup, suggestedType } = classifyItem(itemName);
+        const norm = normalizeItemName(itemName);
 
         results.push({
           date: dateStr,
-          category: itemName,
-          category_group: categoryGroup,
-          type: suggestedType,
+          category: norm.canonicalName,
+          original_alias: norm.originalAlias,
+          category_group: norm.categoryGroup,
+          type: norm.suggestedType,
           amount,
-          note: `Auto-parsed from Telegram: "${itemName}"`,
+          note: norm.originalAlias.toLowerCase() !== norm.canonicalName.toLowerCase()
+            ? `Auto-parsed from Telegram: "${norm.originalAlias}" -> ${norm.canonicalName}`
+            : `Auto-parsed from Telegram: "${itemName}"`,
           raw_text: `${itemName} ${amount}`,
         });
       }

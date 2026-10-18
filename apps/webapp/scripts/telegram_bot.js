@@ -2,7 +2,8 @@
  * Telegram Long-Polling Bot Worker + Focus Engine + Google Sheets Sync
  */
 
-import { ingestMessage } from '../lib/parser.js';
+import db from '../lib/db.js';
+import { ingestMessage, classifyItem } from '../lib/parser.js';
 import {
   getActiveTop3Tasks,
   getAllFocusTasks,
@@ -499,6 +500,7 @@ async function poll() {
           reply += `• Focus: พิมพ์ <code>/focus</code> หรือ <b>"โอเค"</b>\n`;
           reply += `• บิลคงเหลือ: พิมพ์ <code>/bills</code> หรือ <b>"ฟิกคอส"</b>\n`;
           reply += `• บันทึกเงิน: พิมพ์ <i>"ข้าว 50 กาแฟ 40"</i>\n`;
+          reply += `• สอนคำศัพท์: พิมพ์ <i>"จำว่า ค่าน้ำ คือ ค่าน้ำประปา"</i>\n`;
           await sendMessage(chatId, reply, { parse_mode: 'HTML' });
 
           // Send the interactive checklist alongside start
@@ -508,6 +510,30 @@ async function poll() {
             parse_mode: 'HTML',
             reply_markup: { inline_keyboard: keyboard },
           });
+          continue;
+        }
+
+        // Check dynamic alias teaching command (e.g. "จำว่า ค่าน้ำ คือ ค่าน้ำประปา", "alias wifi = WiFi / เน็ตบ้าน")
+        const aliasMatch = rawText.match(/^(?:จำว่า|alias|แมป)\s+(.+?)\s+(?:คือ|=|เป็น)\s+(.+)$/i);
+        if (aliasMatch) {
+          const aliasName = aliasMatch[1].trim();
+          const canonicalName = aliasMatch[2].trim();
+          const { categoryGroup, suggestedType } = classifyItem(canonicalName);
+
+          try {
+            db.prepare(`
+              INSERT OR REPLACE INTO item_aliases (alias, canonical_name, category_group, suggested_type, note)
+              VALUES (?, ?, ?, ?, ?)
+            `).run(aliasName.toLowerCase(), canonicalName, categoryGroup, suggestedType, 'Learned via Telegram');
+
+            await sendMessage(
+              chatId,
+              `🧠 <b>เรียนรู้คำศัพท์สำเร็จ!</b>\n\nต่อไปเมื่อพิมพ์ว่า "<b>${aliasName}</b>" บอทจะเข้าใจว่าเป็น "<b>${canonicalName}</b>" (${categoryGroup}) ทันทีครับ ✨`
+            );
+          } catch (err) {
+            console.error('Alias save error:', err);
+            await sendMessage(chatId, `⚠️ บันทึกคำศัพท์ไม่สำเร็จ: ${err.message}`);
+          }
           continue;
         }
 
@@ -522,7 +548,11 @@ async function poll() {
           let reply = `⚡ <b>บันทึกแล้ว</b> (${result.count} รายการ | รวม <b>${total.toLocaleString()} ฿</b>)\n`;
           for (const item of result.items) {
             const emoji = CATEGORY_EMOJI[item.category_group] || '•';
-            reply += `• [${item.date}] ${emoji} ${item.category}: ${item.amount.toLocaleString()} ฿\n`;
+            const aliasDisplay =
+              item.original_alias && item.original_alias.toLowerCase() !== item.category.toLowerCase()
+                ? ` (<i>${item.original_alias}</i>)`
+                : '';
+            reply += `• [${item.date}] ${emoji} <b>${item.category}</b>${aliasDisplay}: ${item.amount.toLocaleString()} ฿\n`;
           }
           if (ggsSynced) {
             reply += `☁️ ซิงค์ Google Sheets แล้ว\n`;
