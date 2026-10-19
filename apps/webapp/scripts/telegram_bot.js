@@ -19,6 +19,12 @@ import {
   formatFixedCostsAlert,
   formatFullFixedCostsReport,
 } from '../lib/bills_db.js';
+import {
+  getReflection,
+  upsertReflection,
+  getReflectionStats,
+  getBangkokDate,
+} from '../lib/reflections_db.js';
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
@@ -294,6 +300,61 @@ setInterval(checkFocusReminders, 20000);
 // Run catch-up check after 4 seconds of startup
 setTimeout(checkFocusReminders, 4000);
 
+// Scheduler: 23:00 Nightly Closeout Reminder (Daily Luck & Finish List)
+async function checkNightlyReflectionReminder() {
+  try {
+    const chatId = getSetting('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID;
+    if (!chatId) return;
+
+    const now = new Date();
+    const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+    });
+
+    const currentTimeStr = timeFormatter.format(now); // e.g. "23:00"
+    const todayStr = dateFormatter.format(now);
+
+    // Trigger window: between 23:00 and 23:59
+    if (currentTimeStr >= '23:00' && currentTimeStr <= '23:59') {
+      const sentKey = `reflection_nightly_sent_${todayStr}`;
+      if (getSetting(sentKey)) return; // Already sent today!
+
+      const reflection = getReflection(todayStr);
+      const isFilled =
+        reflection &&
+        ((reflection.luck_text && reflection.luck_text.trim()) ||
+          (reflection.finish_text && reflection.finish_text.trim()) ||
+          (reflection.next_day_text && reflection.next_day_text.trim()));
+
+      if (!isFilled) {
+        setSetting(sentKey, currentTimeStr);
+
+        let msg = `🌙 <b>23:00 น. — สรุปปิดวันกันครับ! (Daily Reflection)</b>\n\n`;
+        msg += `วันนี้ยังไม่ได้บันทึกเรื่องราวของวัน พิมพ์ตัวย่อสั้นๆ ตอบบอทได้เลยครับ:\n\n`;
+        msg += `• <code>dl [เรื่องโชคดีวันนี้ 1 เรื่อง]</code>\n`;
+        msg += `• <code>f [วันนี้ทำอะไรเสร็จบ้าง]</code>\n`;
+        msg += `• <code>ndl [พรุ่งนี้จะทำอะไรต่อ]</code>\n\n`;
+        msg += `<i>💡 ตัวอย่าง (พิมพ์ทีละบรรทัด หรือส่งรวดเดียว):</i>\n`;
+        msg += `<code>dl ลูกค้าคอนเฟิร์มงานไว\nf ตัดต่อคลิปจบ, วิดพื้นครบ\nndl ขึ้นโครงคลิปใหม่, จ่ายค่าไฟ</code>`;
+
+        await sendMessage(chatId, msg);
+        console.log(`🌙 [Nightly Reminder] ส่งแจ้งเตือนสรุปวัน 23:00 ไปยัง [${chatId}] สำเร็จ`);
+      }
+    }
+  } catch (err) {
+    console.error('Nightly Reflection Reminder Error:', err.message);
+  }
+}
+
+setInterval(checkNightlyReflectionReminder, 25000);
+setTimeout(checkNightlyReflectionReminder, 5000);
+
 let isPolling = false;
 let lastPollActivity = Date.now();
 
@@ -498,6 +559,7 @@ async function poll() {
         if (lower === '/start' || lower === '/help') {
           let reply = `🤖 <b>Skynet OS</b>\n\n`;
           reply += `• Focus: พิมพ์ <code>/focus</code> หรือ <b>"โอเค"</b>\n`;
+          reply += `• บันทึกปิดวัน: <code>dl [โชคดี]</code> / <code>f [เสร็จ]</code> / <code>ndl [พรุ่งนี้]</code>\n`;
           reply += `• บิลคงเหลือ: พิมพ์ <code>/bills</code> หรือ <b>"ฟิกคอส"</b>\n`;
           reply += `• บันทึกเงิน: พิมพ์ <i>"ข้าว 50 กาแฟ 40"</i>\n`;
           reply += `• สอนคำศัพท์: พิมพ์ <i>"จำว่า ค่าน้ำ คือ ค่าน้ำประปา"</i>\n`;
@@ -535,6 +597,93 @@ async function poll() {
             await sendMessage(chatId, `⚠️ บันทึกคำศัพท์ไม่สำเร็จ: ${err.message}`);
           }
           continue;
+        }
+
+        // Check Daily Reflection shortcodes: dl (Dump Luck), f (Finish), ndl (Next Day List)
+        const reflectionLines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
+        const hasReflectionPrefix = reflectionLines.some((l) =>
+          /^(?:dl|ndl|f|โชคดี|เสร็จ|พรุ่งนี้|luck|done|next)(?:[:\s]+.*|$)/i.test(l)
+        );
+
+        if (hasReflectionPrefix) {
+          const parsedReflection = {
+            luck: [],
+            finish: [],
+            nextDay: [],
+          };
+
+          for (const line of reflectionLines) {
+            const mLuck = line.match(/^(?:dl|โชคดี|luck)[:\s]*(.*)$/i);
+            if (mLuck) {
+              if (mLuck[1] && mLuck[1].trim()) parsedReflection.luck.push(mLuck[1].trim());
+              continue;
+            }
+
+            const mNext = line.match(/^(?:ndl|พรุ่งนี้|next)[:\s]*(.*)$/i);
+            if (mNext) {
+              if (mNext[1] && mNext[1].trim()) parsedReflection.nextDay.push(mNext[1].trim());
+              continue;
+            }
+
+            const mFinish = line.match(/^(?:f|เสร็จ|done)[:\s]*(.*)$/i);
+            if (mFinish) {
+              if (mFinish[1] && mFinish[1].trim()) parsedReflection.finish.push(mFinish[1].trim());
+              continue;
+            }
+          }
+
+          if (
+            parsedReflection.luck.length > 0 ||
+            parsedReflection.finish.length > 0 ||
+            parsedReflection.nextDay.length > 0
+          ) {
+            const todayStr = getBangkokDate();
+            const existing = getReflection(todayStr);
+
+            let updatedLuck = existing.luck_text || '';
+            if (parsedReflection.luck.length > 0) {
+              updatedLuck = parsedReflection.luck.join('\n');
+            }
+
+            let updatedFinish = existing.finish_text || '';
+            if (parsedReflection.finish.length > 0) {
+              for (const it of parsedReflection.finish) {
+                const clean = it.replace(/^[•*-]\s*/, '');
+                updatedFinish = updatedFinish ? `${updatedFinish}\n• ${clean}` : `• ${clean}`;
+              }
+            }
+
+            let updatedNextDay = existing.next_day_text || '';
+            if (parsedReflection.nextDay.length > 0) {
+              for (const it of parsedReflection.nextDay) {
+                const clean = it.replace(/^[•*-]\s*/, '');
+                updatedNextDay = updatedNextDay ? `${updatedNextDay}\n• ${clean}` : `• ${clean}`;
+              }
+            }
+
+            const updatedRec = upsertReflection(todayStr, {
+              luck_text: updatedLuck,
+              finish_text: updatedFinish,
+              next_day_text: updatedNextDay,
+            });
+
+            const stats = getReflectionStats();
+
+            let reply = `✨ <b>บันทึก Daily Reflection เรียบร้อย!</b> [${todayStr}]\n\n`;
+            if (updatedRec.luck_text) {
+              reply += `🍀 <b>Dump Luck (dl):</b>\n${updatedRec.luck_text}\n\n`;
+            }
+            if (updatedRec.finish_text) {
+              reply += `🏁 <b>Finish List (f):</b>\n${updatedRec.finish_text}\n\n`;
+            }
+            if (updatedRec.next_day_text) {
+              reply += `🚀 <b>Next Day Plan (ndl):</b>\n${updatedRec.next_day_text}\n\n`;
+            }
+            reply += `🔥 <b>Reflection Streak:</b> ${stats.currentStreak} วันติดต่อกัน`;
+
+            await sendMessage(chatId, reply);
+            continue;
+          }
         }
 
         // Finance Transactions ingestion

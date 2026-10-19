@@ -880,6 +880,21 @@ if (habitCount === 0) {
   insertHabit.run('🌙 จดบันทึกสั้น ๆ & ปิดไฟนอนตรงเวลา', 'ทบทวนสั้น ๆ 1 บรรทัด แล้วพักผ่อนให้เต็มที่', 'MINDSET', '🌙', 'EVENING', 6);
 }
 
+// 10. Daily Reflections: Dump Luck Daily (dl), Finish List (f), Next Day Plan (ndl)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_reflections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT UNIQUE NOT NULL, -- 'YYYY-MM-DD'
+    luck_text TEXT,            -- dl: Dump Luck Daily (เรื่องโชคดี 1 เรื่อง)
+    finish_text TEXT,          -- f: Finish List (สิ่งที่ทำเสร็จแล้ววันนี้)
+    next_day_text TEXT,        -- ndl: Next Day Plan (จะทำอะไรต่อพรุ่งนี้)
+    is_completed INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_daily_reflections_date ON daily_reflections(date);
+`);
+
 export default db;
 
 

@@ -7,6 +7,7 @@ import TradeTrackerTab from './components/TradeTrackerTab';
 import FocusTab from './components/FocusTab';
 import MicroHabitsTab from './components/MicroHabitsTab';
 import MemoryAnchorTab from './components/MemoryAnchorTab';
+import DailyReflectionTab from './components/DailyReflectionTab';
 import ExpenseWaveChart from './components/ExpenseWaveChart';
 
 const CATEGORY_META = {
@@ -39,8 +40,8 @@ export default function Home() {
         setActiveTab('tracker');
       }
     } else if (mode === 'selfdev') {
-      if (activeTab !== 'anchor' && activeTab !== 'focus' && activeTab !== 'habits') {
-        setActiveTab('anchor');
+      if (activeTab !== 'reflections' && activeTab !== 'focus' && activeTab !== 'anchor' && activeTab !== 'habits') {
+        setActiveTab('reflections');
       }
     }
   };
@@ -505,11 +506,11 @@ export default function Home() {
           {appMode === 'selfdev' && (
             <>
               <button
-                className={`segmented-button ${activeTab === 'anchor' ? 'active' : ''}`}
-                onClick={() => setActiveTab('anchor')}
+                className={`segmented-button ${activeTab === 'reflections' ? 'active' : ''}`}
+                onClick={() => setActiveTab('reflections')}
               >
-                <span>⚓</span>
-                <span>Memory Anchor (สติ & สัญญาใจ)</span>
+                <span>🍀</span>
+                <span>Daily Luck & Finish (สรุปวัน & โชคดี)</span>
               </button>
               <button
                 className={`segmented-button ${activeTab === 'focus' ? 'active' : ''}`}
@@ -517,6 +518,13 @@ export default function Home() {
               >
                 <span>🔥</span>
                 <span>Top 3 Focus (เป้าหมาย 3 ข้อ & Heatmap)</span>
+              </button>
+              <button
+                className={`segmented-button ${activeTab === 'anchor' ? 'active' : ''}`}
+                onClick={() => setActiveTab('anchor')}
+              >
+                <span>⚓</span>
+                <span>Memory Anchor (สติ & สัญญาใจ)</span>
               </button>
               <button
                 className={`segmented-button ${activeTab === 'habits' ? 'active' : ''}`}
@@ -1415,6 +1423,7 @@ export default function Home() {
       {activeTab === 'journal' && <JournalTab />}
 
       {/* SELF-DEVELOPMENT TABS */}
+      {activeTab === 'reflections' && <DailyReflectionTab />}
       {activeTab === 'anchor' && <MemoryAnchorTab />}
       {activeTab === 'focus' && <FocusTab />}
       {activeTab === 'habits' && <MicroHabitsTab />}
