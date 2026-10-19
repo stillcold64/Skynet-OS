@@ -12,10 +12,39 @@ export function getBangkokDate() {
 }
 
 /**
- * Fetch reflection record for a specific date (or defaults to today)
+ * Returns logical reflection date string.
+ * For daily reflections & bedtime reviews:
+ * If the current Bangkok time is between 00:00 and 03:59 AM,
+ * the user is closing out YESTERDAY before going to bed!
+ * After 04:00 AM, it counts as TODAY.
+ */
+export function getLogicalReflectionDate() {
+  try {
+    const now = new Date();
+    const hourFormatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      hour12: false,
+    });
+    const hour = parseInt(hourFormatter.format(now), 10);
+
+    // If early hours (00:00 - 03:59), logical bedtime reflection is for yesterday
+    if (hour < 4) {
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(yesterday);
+    }
+
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(now);
+  } catch (e) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Fetch reflection record for a specific date (or defaults to logical bedtime date)
  */
 export function getReflection(dateStr = null) {
-  const targetDate = dateStr || getBangkokDate();
+  const targetDate = dateStr || getLogicalReflectionDate();
   const row = db.prepare('SELECT * FROM daily_reflections WHERE date = ?').get(targetDate);
   if (!row) {
     return {
@@ -34,7 +63,7 @@ export function getReflection(dateStr = null) {
  * Upsert reflection record
  */
 export function upsertReflection(dateStr, { luck_text, finish_text, next_day_text }) {
-  const targetDate = dateStr || getBangkokDate();
+  const targetDate = dateStr || getLogicalReflectionDate();
   const existing = db.prepare('SELECT * FROM daily_reflections WHERE date = ?').get(targetDate);
 
   const finalLuck = luck_text !== undefined ? luck_text : (existing ? existing.luck_text : '');
@@ -66,7 +95,7 @@ export function upsertReflection(dateStr, { luck_text, finish_text, next_day_tex
  * Smart append or update for individual fields from Telegram
  */
 export function appendReflectionField(dateStr, fieldKey, newText) {
-  const targetDate = dateStr || getBangkokDate();
+  const targetDate = dateStr || getLogicalReflectionDate();
   const existing = getReflection(targetDate);
   const cleanText = (newText || '').trim();
 

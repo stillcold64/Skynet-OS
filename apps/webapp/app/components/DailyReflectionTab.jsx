@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 
 export default function DailyReflectionTab() {
-  const [todayData, setTodayData] = useState({
+  const [selectedDate, setSelectedDate] = useState('');
+  const [todayStr, setTodayStr] = useState('');
+  const [logicalDate, setLogicalDate] = useState('');
+  const [formData, setFormData] = useState({
     luck_text: '',
     finish_text: '',
     next_day_text: '',
@@ -19,15 +22,46 @@ export default function DailyReflectionTab() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
-  const fetchReflectionData = async () => {
+  const showToast = (msg, duration = 3500) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), duration);
+  };
+
+  // Helper to get yesterday's date string
+  const getYesterdayStr = (baseDateStr) => {
+    try {
+      const d = baseDateStr ? new Date(baseDateStr) : new Date();
+      d.setDate(d.getDate() - 1);
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(d);
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Helper to shift date by +1 or -1
+  const shiftDate = (dateStr, days) => {
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d + days);
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(dateObj);
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Fetch data for a specific date
+  const loadDateReflection = async (targetDate) => {
     try {
       setLoading(true);
-      const res = await fetch('/api/reflections');
+      const res = await fetch(`/api/reflections?date=${targetDate}`);
       if (res.ok) {
         const data = await res.json();
-        setTodayData({
+        setSelectedDate(data.selectedDate || targetDate);
+        setTodayStr(data.todayStr || '');
+        setLogicalDate(data.logicalDate || data.todayStr);
+        setFormData({
           luck_text: data.today?.luck_text || '',
           finish_text: data.today?.finish_text || '',
           next_day_text: data.today?.next_day_text || '',
@@ -42,59 +76,112 @@ export default function DailyReflectionTab() {
     }
   };
 
+  // Initial load
   useEffect(() => {
-    fetchReflectionData();
-    // Auto-refresh every 6 seconds to reflect Telegram updates
-    const interval = setInterval(() => {
-      fetch('/api/reflections')
-        .then((r) => r.json())
-        .then((data) => {
-          if (data && data.today) {
-            setHistory(data.history || []);
-            setStats(data.stats || {});
-          }
-        })
-        .catch(() => {});
-    }, 6000);
-    return () => clearInterval(interval);
+    fetch('/api/reflections')
+      .then((r) => r.json())
+      .then((data) => {
+        const initialDate = data.logicalDate || data.todayStr;
+        setSelectedDate(initialDate);
+        setTodayStr(data.todayStr || '');
+        setLogicalDate(data.logicalDate || data.todayStr);
+        setFormData({
+          luck_text: data.today?.luck_text || '',
+          finish_text: data.today?.finish_text || '',
+          next_day_text: data.today?.next_day_text || '',
+        });
+        setHistory(data.history || []);
+        setStats(data.stats || {});
+        setLoading(false);
+      })
+      .catch((e) => {
+        console.error(e);
+        setLoading(false);
+      });
   }, []);
 
-  const handleSaveToday = async () => {
+  const handleSave = async () => {
+    if (!selectedDate) return;
     try {
       setSaving(true);
       const res = await fetch('/api/reflections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date: stats.todayStr,
-          luck_text: todayData.luck_text,
-          finish_text: todayData.finish_text,
-          next_day_text: todayData.next_day_text,
+          date: selectedDate,
+          luck_text: formData.luck_text,
+          finish_text: formData.finish_text,
+          next_day_text: formData.next_day_text,
         }),
       });
 
       if (res.ok) {
         const json = await res.json();
         if (json.stats) setStats(json.stats);
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-        fetchReflectionData();
+        showToast(`✅ บันทึกข้อมูลของวันที่ ${selectedDate} เรียบร้อยแล้ว!`);
+        // Refresh history
+        const hRes = await fetch('/api/reflections');
+        if (hRes.ok) {
+          const hData = await hRes.json();
+          setHistory(hData.history || []);
+        }
+      } else {
+        showToast('⚠️ เกิดข้อผิดพลาดในการบันทึก');
       }
     } catch (err) {
       console.error('Error saving reflection:', err);
+      showToast('⚠️ บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
     }
   };
 
-  const isTodayComplete = Boolean(
-    (todayData.luck_text && todayData.luck_text.trim()) ||
-    (todayData.finish_text && todayData.finish_text.trim()) ||
-    (todayData.next_day_text && todayData.next_day_text.trim())
+  const handleClearBoxes = () => {
+    if (confirm(`ต้องการล้างข้อความในกล่องของวันที่ ${selectedDate} หรือไม่?`)) {
+      setFormData({
+        luck_text: '',
+        finish_text: '',
+        next_day_text: '',
+      });
+      showToast('🧹 ล้างข้อความในกล่องแล้ว (กดบันทึกหากต้องการลบออกจากระบบ)');
+    }
+  };
+
+  const isCurrentSelectionCompleted = Boolean(
+    (formData.luck_text && formData.luck_text.trim()) ||
+    (formData.finish_text && formData.finish_text.trim()) ||
+    (formData.next_day_text && formData.next_day_text.trim())
   );
 
+  const isNightOwlTime = logicalDate && todayStr && logicalDate !== todayStr;
+  const isSelectedYesterday = selectedDate === getYesterdayStr(todayStr);
+  const isSelectedToday = selectedDate === todayStr;
+
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '10px 0 50px 0' }}>
+    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '10px 0 50px 0', position: 'relative' }}>
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '24px',
+            right: '24px',
+            zIndex: 9999,
+            background: 'rgba(10, 20, 15, 0.95)',
+            color: '#30d158',
+            border: '1px solid #30d158',
+            borderRadius: '12px',
+            padding: '14px 20px',
+            fontSize: '14px',
+            fontWeight: '700',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.8), 0 0 16px rgba(48, 209, 88, 0.3)',
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          {toastMessage}
+        </div>
+      )}
+
       {/* 1. Header Banner */}
       <div
         className="glass-panel"
@@ -133,7 +220,12 @@ export default function DailyReflectionTab() {
             </span>
           </div>
           <p style={{ margin: 0, fontSize: '13px', color: '#a0aec0', lineHeight: '1.6' }}>
-            จดบันทึกความโชคดี 1 เรื่องต่อวัน • ทบทวนสิ่งที่ทำเสร็จ • วางเป้าหมายลุยวันพรุ่งนี้ (บอทเตือน 23:00 น.)
+            จดบันทึกความโชคดี 1 เรื่องต่อวัน • ทบทวนสิ่งที่ทำเสร็จ • วางเป้าหมายลุยวันพรุ่งนี้
+            {isNightOwlTime && (
+              <span style={{ color: '#64d2ff', marginLeft: '8px', fontWeight: '600' }}>
+                🌙 โหมดรอบดึก: หลังเที่ยงคืนระบบจะนับเป็นของเมื่อวานให้อัตโนมัติ
+              </span>
+            )}
           </p>
         </div>
 
@@ -220,29 +312,135 @@ export default function DailyReflectionTab() {
           <div style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>วันที่บันทึกงานเสร็จสมบูรณ์</div>
         </div>
 
-        {/* Today's Status */}
+        {/* Selection Status */}
         <div
           className="glass-panel"
           style={{
             padding: '18px',
             borderRadius: '14px',
             background: 'rgba(15, 17, 23, 0.8)',
-            border: `1px solid ${isTodayComplete ? 'rgba(48, 209, 88, 0.3)' : 'rgba(100, 210, 255, 0.25)'}`,
+            border: `1px solid ${isCurrentSelectionCompleted ? 'rgba(48, 209, 88, 0.3)' : 'rgba(100, 210, 255, 0.25)'}`,
           }}
         >
           <div style={{ fontSize: '12px', color: '#a0aec0', marginBottom: '6px', fontWeight: '600' }}>
-            📅 วันนี้ ({stats.todayStr || 'Today'})
+            📅 สถานะวันที่เลือก ({selectedDate || 'Select Date'})
           </div>
-          <div style={{ fontSize: '20px', fontWeight: '800', color: isTodayComplete ? '#30d158' : '#64d2ff', marginTop: '4px' }}>
-            {isTodayComplete ? '✅ บันทึกแล้ว' : '⏳ รอสรุป 23:00 น.'}
+          <div style={{ fontSize: '18px', fontWeight: '800', color: isCurrentSelectionCompleted ? '#30d158' : '#64d2ff', marginTop: '4px' }}>
+            {isCurrentSelectionCompleted ? '✅ มีข้อมูลบันทึกแล้ว' : '⏳ ยังว่างอยู่ (พร้อมบันทึก)'}
           </div>
           <div style={{ fontSize: '11px', color: '#718096', marginTop: '6px' }}>
-            {isTodayComplete ? 'บอทจะไม่รบกวนตอน 5 ทุ่ม' : 'บอทจะเตือนหากยังไม่บันทึก'}
+            {isCurrentSelectionCompleted ? 'สามารถแก้ไขข้อความได้ตลอดเวลา' : 'พิมพ์เนื้อหาแล้วกดบันทึกได้เลย'}
           </div>
         </div>
       </div>
 
-      {/* 3. Today's Triple Column Editor Deck */}
+      {/* 3. Date Navigator Bar */}
+      <div
+        className="glass-panel"
+        style={{
+          padding: '14px 20px',
+          borderRadius: '14px',
+          background: 'rgba(20, 24, 33, 0.9)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          marginBottom: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+        }}
+      >
+        {/* Date Selector with Next / Prev */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => loadDateReflection(shiftDate(selectedDate, -1))}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '600',
+            }}
+          >
+            ◀ วันก่อนหน้า
+          </button>
+
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => {
+              if (e.target.value) loadDateReflection(e.target.value);
+            }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: '#000',
+              border: '1px solid rgba(100, 210, 255, 0.3)',
+              color: '#64d2ff',
+              fontSize: '14px',
+              fontWeight: '700',
+              outline: 'none',
+              cursor: 'pointer',
+            }}
+          />
+
+          <button
+            onClick={() => loadDateReflection(shiftDate(selectedDate, 1))}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '600',
+            }}
+          >
+            วันถัดไป ▶
+          </button>
+        </div>
+
+        {/* Quick Jump Buttons: Yesterday / Today */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => loadDateReflection(getYesterdayStr(todayStr))}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '8px',
+              background: isSelectedYesterday ? 'rgba(255, 214, 10, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${isSelectedYesterday ? '#ffd60a' : 'rgba(255, 255, 255, 0.1)'}`,
+              color: isSelectedYesterday ? '#ffd60a' : '#cbd5e0',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: '700',
+            }}
+          >
+            🌙 เมื่อวาน ({getYesterdayStr(todayStr)})
+          </button>
+
+          <button
+            onClick={() => loadDateReflection(todayStr)}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '8px',
+              background: isSelectedToday ? 'rgba(100, 210, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${isSelectedToday ? '#64d2ff' : 'rgba(255, 255, 255, 0.1)'}`,
+              color: isSelectedToday ? '#64d2ff' : '#cbd5e0',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: '700',
+            }}
+          >
+            ☀️ วันนี้ ({todayStr})
+          </button>
+        </div>
+      </div>
+
+      {/* 4. Active Reflection Deck (3 Editable Cards) */}
       <div
         className="glass-panel"
         style={{
@@ -254,36 +452,73 @@ export default function DailyReflectionTab() {
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#fff', margin: 0 }}>
-              📝 บันทึกทบทวนประจำวัน ({stats.todayStr})
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#fff', margin: 0 }}>
+                📝 บันทึกทบทวนประจำวัน: <span style={{ color: '#64d2ff' }}>{selectedDate}</span>
+              </h2>
+              {isCurrentSelectionCompleted && (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(48, 209, 88, 0.15)',
+                    color: '#30d158',
+                    border: '1px solid rgba(48, 209, 88, 0.3)',
+                    fontWeight: '600',
+                  }}
+                >
+                  บันทึกแล้ว
+                </span>
+              )}
+            </div>
             <span style={{ fontSize: '12px', color: '#a0aec0' }}>
-              พิมพ์แก้ไขได้จากตรงนี้ หรือพิมพ์ใน Telegram Bot ด้วยตัวย่อ <code>dl</code>, <code>f</code>, <code>ndl</code>
+              กำลังจัดการข้อมูลของวันที่ {selectedDate} (แก้ไขได้ตลอดเวลา และสามารถสลับไปวันอื่นได้ที่แถบด้านบน)
             </span>
           </div>
 
-          <button
-            onClick={handleSaveToday}
-            disabled={saving}
-            style={{
-              padding: '8px 20px',
-              borderRadius: '8px',
-              background: saveSuccess ? '#30d158' : 'linear-gradient(135deg, #0a84ff 0%, #0066cc 100%)',
-              color: '#fff',
-              border: 'none',
-              fontWeight: '700',
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-            }}
-          >
-            {saving ? '⏳ กำลังบันทึก...' : saveSuccess ? '✅ บันทึกสำเร็จ!' : '💾 บันทึกข้อมูล'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleClearBoxes}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '8px',
+                background: 'rgba(255, 69, 58, 0.1)',
+                color: '#ff453a',
+                border: '1px solid rgba(255, 69, 58, 0.25)',
+                fontWeight: '600',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+              title="ล้างข้อความในกล่องทั้งหมด"
+            >
+              🧹 ล้างช่องกรอก
+            </button>
+
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                padding: '8px 22px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #0a84ff 0%, #0066cc 100%)',
+                color: '#fff',
+                border: 'none',
+                fontWeight: '700',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 16px rgba(10, 132, 255, 0.4)',
+                transition: 'all 0.2s',
+              }}
+            >
+              {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึกข้อมูล'}
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
@@ -306,8 +541,8 @@ export default function DailyReflectionTab() {
               </div>
             </div>
             <textarea
-              value={todayData.luck_text}
-              onChange={(e) => setTodayData({ ...todayData, luck_text: e.target.value })}
+              value={formData.luck_text}
+              onChange={(e) => setFormData({ ...formData, luck_text: e.target.value })}
               placeholder="พิมพ์เรื่องโชคดีวันนี้ 1 เรื่อง... (หรือพิมพ์ในบอท: dl ลูกค้าคอนเฟิร์มงานไว)"
               style={{
                 width: '100%',
@@ -346,8 +581,8 @@ export default function DailyReflectionTab() {
               </div>
             </div>
             <textarea
-              value={todayData.finish_text}
-              onChange={(e) => setTodayData({ ...todayData, finish_text: e.target.value })}
+              value={formData.finish_text}
+              onChange={(e) => setFormData({ ...formData, finish_text: e.target.value })}
               placeholder="• ตัดต่อคลิป EP.2 เสร็จแล้ว&#10;• วิดพื้นครบ 50 ที&#10;(หรือพิมพ์ในบอท: f ตัดต่อคลิปจบ)"
               style={{
                 width: '100%',
@@ -386,8 +621,8 @@ export default function DailyReflectionTab() {
               </div>
             </div>
             <textarea
-              value={todayData.next_day_text}
-              onChange={(e) => setTodayData({ ...todayData, next_day_text: e.target.value })}
+              value={formData.next_day_text}
+              onChange={(e) => setFormData({ ...formData, next_day_text: e.target.value })}
               placeholder="• วางสตอรี่บอร์ดคลิปใหม่&#10;• จ่ายบิลค่าไฟ&#10;(หรือพิมพ์ในบอท: ndl เริ่มคลิปใหม่)"
               style={{
                 width: '100%',
@@ -409,7 +644,7 @@ export default function DailyReflectionTab() {
         </div>
       </div>
 
-      {/* 4. Historical Archive & Timeline */}
+      {/* 5. Historical Archive & Timeline */}
       <div
         className="glass-panel"
         style={{
@@ -423,7 +658,7 @@ export default function DailyReflectionTab() {
           <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#fff', margin: 0 }}>
             📖 ประวัติการทบทวนย้อนหลัง ({history.length} วัน)
           </h2>
-          <span style={{ fontSize: '12px', color: '#718096' }}>คลังสะสมความโชคดีและความสำเร็จ</span>
+          <span style={{ fontSize: '12px', color: '#718096' }}>คลิกที่วันใดก็ได้เพื่อดึงขึ้นมาดูหรือแก้ไข</span>
         </div>
 
         {history.length === 0 ? (
@@ -432,59 +667,87 @@ export default function DailyReflectionTab() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {history.map((item) => (
-              <div
-                key={item.id || item.date}
-                style={{
-                  background: 'rgba(20, 24, 33, 0.6)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: '12px',
-                  padding: '16px 20px',
-                  display: 'grid',
-                  gridTemplateColumns: '120px 1fr 1fr 1fr',
-                  gap: '16px',
-                  alignItems: 'start',
-                }}
-              >
-                {/* Date */}
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{item.date}</div>
-                  <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                    {item.is_completed ? '✅ บันทึกแล้ว' : '⏳ ไม่สมบูรณ์'}
+            {history.map((item) => {
+              const isSelectedRow = item.date === selectedDate;
+              return (
+                <div
+                  key={item.id || item.date}
+                  onClick={() => {
+                    loadDateReflection(item.date);
+                    window.scrollTo({ top: 300, behavior: 'smooth' });
+                  }}
+                  style={{
+                    background: isSelectedRow ? 'rgba(30, 41, 59, 0.8)' : 'rgba(20, 24, 33, 0.6)',
+                    border: `1px solid ${isSelectedRow ? 'rgba(100, 210, 255, 0.4)' : 'rgba(255, 255, 255, 0.06)'}`,
+                    borderRadius: '12px',
+                    padding: '16px 20px',
+                    display: 'grid',
+                    gridTemplateColumns: '130px 1fr 1fr 1fr',
+                    gap: '16px',
+                    alignItems: 'start',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  title="คลิกเพื่อแก้ไขรายการของวันนี้"
+                >
+                  {/* Date & Badge */}
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: isSelectedRow ? '#64d2ff' : '#fff' }}>
+                      {item.date}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
+                      {item.is_completed ? '✅ บันทึกแล้ว' : '⏳ ไม่สมบูรณ์'}
+                    </div>
+                    {isSelectedRow && (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          marginTop: '6px',
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: 'rgba(100, 210, 255, 0.15)',
+                          color: '#64d2ff',
+                          fontWeight: '700',
+                        }}
+                      >
+                        กำลังเปิดดู
+                      </span>
+                    )}
                   </div>
-                </div>
 
-                {/* Luck */}
-                <div>
-                  <div style={{ fontSize: '11px', color: '#ffd60a', fontWeight: '700', marginBottom: '4px' }}>
-                    🍀 เรื่องโชคดี (dl):
+                  {/* Luck */}
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#ffd60a', fontWeight: '700', marginBottom: '4px' }}>
+                      🍀 เรื่องโชคดี (dl):
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#e2e8f0', whiteSpace: 'pre-line', lineHeight: '1.5' }}>
+                      {item.luck_text || <span style={{ color: '#4a5568' }}>-</span>}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#e2e8f0', whiteSpace: 'pre-line', lineHeight: '1.5' }}>
-                    {item.luck_text || <span style={{ color: '#4a5568' }}>-</span>}
-                  </div>
-                </div>
 
-                {/* Finished */}
-                <div>
-                  <div style={{ fontSize: '11px', color: '#30d158', fontWeight: '700', marginBottom: '4px' }}>
-                    🏁 งานที่ทำเสร็จ (f):
+                  {/* Finished */}
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#30d158', fontWeight: '700', marginBottom: '4px' }}>
+                      🏁 งานที่ทำเสร็จ (f):
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#e2e8f0', whiteSpace: 'pre-line', lineHeight: '1.5' }}>
+                      {item.finish_text || <span style={{ color: '#4a5568' }}>-</span>}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#e2e8f0', whiteSpace: 'pre-line', lineHeight: '1.5' }}>
-                    {item.finish_text || <span style={{ color: '#4a5568' }}>-</span>}
-                  </div>
-                </div>
 
-                {/* Next Day */}
-                <div>
-                  <div style={{ fontSize: '11px', color: '#64d2ff', fontWeight: '700', marginBottom: '4px' }}>
-                    🚀 แผนวันพรุ่งนี้ (ndl):
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#e2e8f0', whiteSpace: 'pre-line', lineHeight: '1.5' }}>
-                    {item.next_day_text || <span style={{ color: '#4a5568' }}>-</span>}
+                  {/* Next Day */}
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64d2ff', fontWeight: '700', marginBottom: '4px' }}>
+                      🚀 แผนวันพรุ่งนี้ (ndl):
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#e2e8f0', whiteSpace: 'pre-line', lineHeight: '1.5' }}>
+                      {item.next_day_text || <span style={{ color: '#4a5568' }}>-</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

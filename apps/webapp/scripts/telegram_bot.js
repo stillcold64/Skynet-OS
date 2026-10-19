@@ -24,6 +24,7 @@ import {
   upsertReflection,
   getReflectionStats,
   getBangkokDate,
+  getLogicalReflectionDate,
 } from '../lib/reflections_db.js';
 import fs from 'fs';
 import path from 'path';
@@ -637,8 +638,8 @@ async function poll() {
             parsedReflection.finish.length > 0 ||
             parsedReflection.nextDay.length > 0
           ) {
-            const todayStr = getBangkokDate();
-            const existing = getReflection(todayStr);
+            const targetDate = getLogicalReflectionDate();
+            const existing = getReflection(targetDate);
 
             let updatedLuck = existing.luck_text || '';
             if (parsedReflection.luck.length > 0) {
@@ -661,15 +662,17 @@ async function poll() {
               }
             }
 
-            const updatedRec = upsertReflection(todayStr, {
+            const updatedRec = upsertReflection(targetDate, {
               luck_text: updatedLuck,
               finish_text: updatedFinish,
               next_day_text: updatedNextDay,
             });
 
             const stats = getReflectionStats();
+            const isNightOwl = targetDate !== getBangkokDate();
+            const nightOwlBadge = isNightOwl ? ' <i>(รอบดึก สรุปของเมื่อวาน 🌙)</i>' : '';
 
-            let reply = `✨ <b>บันทึก Daily Reflection เรียบร้อย!</b> [${todayStr}]\n\n`;
+            let reply = `✨ <b>บันทึก Daily Reflection เรียบร้อย!</b> [${targetDate}]${nightOwlBadge}\n\n`;
             if (updatedRec.luck_text) {
               reply += `🍀 <b>Dump Luck (dl):</b>\n${updatedRec.luck_text}\n\n`;
             }

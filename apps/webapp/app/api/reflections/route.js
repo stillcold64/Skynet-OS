@@ -5,6 +5,7 @@ import {
   getAllReflections,
   getReflectionStats,
   getBangkokDate,
+  getLogicalReflectionDate,
 } from '@/lib/reflections_db';
 
 export async function GET(request) {
@@ -12,16 +13,20 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date');
     const todayStr = getBangkokDate();
+    const logicalDate = getLogicalReflectionDate();
+    const targetDate = dateParam || logicalDate;
 
-    const today = getReflection(dateParam || todayStr);
+    const reflection = getReflection(targetDate);
     const history = getAllReflections(60);
     const stats = getReflectionStats();
 
     return NextResponse.json({
-      today,
+      today: reflection,
       history,
       stats,
       todayStr,
+      logicalDate,
+      selectedDate: targetDate,
     });
   } catch (error) {
     console.error('API reflections GET error:', error);
@@ -34,8 +39,8 @@ export async function POST(request) {
     const body = await request.json();
     const { date, luck_text, finish_text, next_day_text } = body;
 
-    const todayStr = getBangkokDate();
-    const targetDate = date || todayStr;
+    const logicalDate = getLogicalReflectionDate();
+    const targetDate = date || logicalDate;
 
     const updated = upsertReflection(targetDate, {
       luck_text,
