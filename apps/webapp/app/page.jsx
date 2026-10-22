@@ -73,6 +73,23 @@ export default function Home() {
     amount: '',
   });
   const [loading, setLoading] = useState(true);
+  const [isAuditLogCollapsed, setIsAuditLogCollapsed] = useState(true);
+
+  const handleUndoLog = async (logId) => {
+    if (!window.confirm(`ยืนยันการลบและยกเลิกรายการที่บันทึกจาก Log #${logId} หรือไม่?`)) return;
+    try {
+      const res = await fetch(`/api/logs?id=${logId}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const err = await res.json();
+        alert(err.message || 'เกิดข้อผิดพลาดในการยกเลิก');
+      }
+    } catch (e) {
+      console.error('Error undoing log:', e);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    }
+  };
 
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
@@ -1434,44 +1451,113 @@ export default function Home() {
           <div className="audit-log-header">
             <div className="audit-log-title">
               <span>🛡️</span>
-              <span>Bot Audit Log (ประวัติข้อความจาก Telegram และผลการแยกแยะ)</span>
+              <span>Bot Audit Log (ประวัติข้อความจาก Telegram)</span>
             </div>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              ล่าสุด 20 รายการ
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                ล่าสุด {botLogs.length} รายการ
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsAuditLogCollapsed(!isAuditLogCollapsed)}
+                style={{
+                  background: 'rgba(0, 242, 254, 0.08)',
+                  border: '1px solid rgba(0, 242, 254, 0.3)',
+                  color: 'var(--cyan-neon, #00f2fe)',
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {isAuditLogCollapsed ? '▶ เปิดดูประวัติ (Expand)' : '▼ ย่อประวัติ (Collapse)'}
+              </button>
+            </div>
           </div>
 
-          {botLogs.length === 0 ? (
-            <div className="empty-placeholder">ยังไม่มีประวัติการส่งข้อมูลจาก Telegram</div>
-          ) : (
-            <div className="audit-log-list">
-              {botLogs.map((log) => {
-                let parsedItems = [];
-                try {
-                  parsedItems = JSON.parse(log.parsed_data || '[]');
-                } catch (e) {}
+          {!isAuditLogCollapsed && (
+            <>
+              {botLogs.length === 0 ? (
+                <div className="empty-placeholder">ยังไม่มีประวัติการส่งข้อมูลจาก Telegram</div>
+              ) : (
+                <div className="audit-log-list">
+                  {botLogs.map((log) => {
+                    let parsedItems = [];
+                    try {
+                      parsedItems = JSON.parse(log.parsed_data || '[]');
+                    } catch (e) {}
 
-                return (
-                  <div key={log.id} className="audit-log-item">
-                    <div className="log-item-top">
-                      <span>Log #{log.id} • บันทึกสำเร็จ {log.parsed_count} รายการ</span>
-                      <span>{log.created_at}</span>
-                    </div>
-                    <div className="log-item-raw">"{log.raw_message}"</div>
-                    {parsedItems.length > 0 && (
-                      <div className="log-item-summary">
-                        <strong>ผลการจำแนก:</strong>{' '}
-                        {parsedItems.map((p, i) => (
-                          <span key={i} style={{ marginRight: '10px' }}>
-                            [{p.date}] {CATEGORY_META[p.category_group]?.emoji} {p.category}: {formatCurrency(p.amount)} ฿
-                          </span>
-                        ))}
+                    const isCancelled = log.status === 'CANCELLED';
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="audit-log-item"
+                        style={{
+                          opacity: isCancelled ? 0.45 : 1,
+                          borderLeft: isCancelled ? '3px solid #ff4757' : '3px solid #00f2fe',
+                        }}
+                      >
+                        <div className="log-item-top">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>Log #{log.id}</span>
+                            {isCancelled ? (
+                              <span style={{ color: '#ff6b81', background: 'rgba(255, 107, 129, 0.15)', padding: '1px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                                🚫 ยกเลิกแล้ว (CANCELLED)
+                              </span>
+                            ) : (
+                              <span style={{ color: '#2ed573', background: 'rgba(46, 213, 115, 0.15)', padding: '1px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                                ✅ บันทึกสำเร็จ ({log.parsed_count} รายการ)
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span>{log.created_at}</span>
+                            {!isCancelled && (
+                              <button
+                                type="button"
+                                onClick={() => handleUndoLog(log.id)}
+                                title="ลบและยกเลิกรายการในชุดนี้ทั้งหมด"
+                                style={{
+                                  background: 'rgba(255, 71, 87, 0.12)',
+                                  border: '1px solid rgba(255, 71, 87, 0.4)',
+                                  color: '#ff6b81',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                🗑️ ลบชุดนี้
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div
+                          className="log-item-raw"
+                          style={{ textDecoration: isCancelled ? 'line-through' : 'none' }}
+                        >
+                          "{log.raw_message}"
+                        </div>
+                        {parsedItems.length > 0 && (
+                          <div className="log-item-summary">
+                            <strong>ผลการจำแนก:</strong>{' '}
+                            {parsedItems.map((p, i) => (
+                              <span key={i} style={{ marginRight: '10px' }}>
+                                [{p.date}] {CATEGORY_META[p.category_group]?.emoji} {p.category}: {formatCurrency(p.amount)} ฿
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </section>
       )}

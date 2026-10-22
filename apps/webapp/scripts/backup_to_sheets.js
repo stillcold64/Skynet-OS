@@ -5,11 +5,20 @@ import path from 'path';
 function getWebhookUrl() {
   let url = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
   if (!url) {
-    const envPath = path.join(process.cwd(), '.env');
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf8');
-      const match = content.match(/GOOGLE_SHEETS_WEBHOOK_URL\s*=\s*(.+)/);
-      if (match) url = match[1].trim();
+    const candidatePaths = [
+      path.join(process.cwd(), '.env'),
+      path.join(process.cwd(), 'apps', 'webapp', '.env'),
+      path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')), '..', '.env'),
+    ];
+    for (const envPath of candidatePaths) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ envPath)) {
+        const content = fs.readFileSync(/*turbopackIgnore: true*/ envPath, 'utf8');
+        const match = content.match(/GOOGLE_SHEETS_WEBHOOK_URL\s*=\s*(.+)/);
+        if (match) {
+          url = match[1].trim().replace(/^["'](.*)["']$/, '$1');
+          break;
+        }
+      }
     }
   }
   return url;
@@ -74,7 +83,7 @@ export async function backupAllToGoogleSheets(customUrl) {
 }
 
 // If run directly: node scripts/backup_to_sheets.js [url]
-if (process.argv[1].endsWith('backup_to_sheets.js')) {
+if (process.argv[1] && process.argv[1].endsWith('backup_to_sheets.js')) {
   const argUrl = process.argv[2];
   backupAllToGoogleSheets(argUrl).then((r) => {
     console.log('Result:', r);

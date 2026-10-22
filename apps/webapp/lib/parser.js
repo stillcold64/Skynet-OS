@@ -13,7 +13,8 @@ function splitByDate(rawText) {
   // Regex matching:
   // 1) dd/mm or dd/mm/yyyy (optionally prefixed by วันที่/วันที)
   // 2) วันที่ dd
-  const dateRegex = /(?:^|\s)(?:(?:วันที่|วันที)\s*)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?|(?:^|\s)(?:วันที่|วันที)\s*(\d{1,2})(?=\s+|$)/gi;
+  // 3) Standalone dd (1-31) at start of message or line, followed by non-digit text (e.g. "18 คาเฟ่ 60")
+  const dateRegex = /(?:^|\s)(?:(?:วันที่|วันที)\s*)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?|(?:^|\s)(?:วันที่|วันที)\s*(\d{1,2})(?=\s+|$)|(?:^|\n)\s*(\d{1,2})\s+(?=[^\d\s/])/gi;
 
   const matches = [];
   let match;
@@ -27,8 +28,8 @@ function splitByDate(rawText) {
       if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
         matches.push({ day: d, month: m, year: y, index: match.index });
       }
-    } else if (match[4]) {
-      const d = parseInt(match[4], 10);
+    } else if (match[4] || match[5]) {
+      const d = parseInt(match[4] || match[5], 10);
       if (d >= 1 && d <= 31) {
         matches.push({ day: d, month: null, year: null, index: match.index });
       }
@@ -361,10 +362,11 @@ export function parseTelegramMessage(rawMessage) {
   for (const section of sections) {
     const dateStr = resolveDate(section.day, section.month, section.year);
 
-    // Remove the date marker from the chunk (both dd/mm and วันที่ dd)
+    // Remove the date marker from the chunk (both dd/mm, วันที่ dd, and standalone dd at start of line/chunk)
     let cleanedChunk = section.text
       .replace(/(?:^|\s)(?:(?:วันที่|วันที)\s*)?\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi, ' ')
-      .replace(/(?:^|\s)(?:วันที่|วันที)\s*\d{1,2}/gi, ' ');
+      .replace(/(?:^|\s)(?:วันที่|วันที)\s*\d{1,2}/gi, ' ')
+      .replace(/(?:^|\n)\s*\d{1,2}\s+(?=[^\d\s/])/gi, ' ');
 
     // Preprocess: If Thai character is immediately followed by digit, insert space (e.g. ข้าว50 -> ข้าว 50)
     // while keeping Latin alphanumeric like 'dota2' or 'ps5' intact!
@@ -407,16 +409,16 @@ export function parseTelegramMessage(rawMessage) {
 /**
  * Ingests a raw message: parses items, saves to transactions, records bot log
  */
-export function ingestMessage(rawMessage) {
+export function ingestMessage(rawMessage, telegramMsgId = null) {
   try {
     const items = parseTelegramMessage(rawMessage);
 
     if (items.length === 0) {
       const logStmt = db.prepare(`
-        INSERT INTO bot_logs (raw_message, parsed_count, parsed_data, status, error_message)
-        VALUES (?, 0, '[]', 'ERROR', 'Could not parse any transactions from message')
+        INSERT INTO bot_logs (raw_message, parsed_count, parsed_data, status, error_message, telegram_msg_id)
+        VALUES (?, 0, '[]', 'ERROR', 'Could not parse any transactions from message', ?)
       `);
-      const logRes = logStmt.run(rawMessage);
+      const logRes = logStmt.run(rawMessage, telegramMsgId);
       return { success: false, count: 0, items: [], logId: logRes.lastInsertRowid, message: 'No items parsed' };
     }
 
@@ -445,10 +447,16 @@ export function ingestMessage(rawMessage) {
 
     // Record audit log
     const logStmt = db.prepare(`
-      INSERT INTO bot_logs (raw_message, parsed_count, parsed_data, status)
-      VALUES (?, ?, ?, 'SUCCESS')
+      INSERT INTO bot_logs (raw_message, parsed_count, parsed_data, status, transaction_ids, telegram_msg_id)
+      VALUES (?, ?, ?, 'SUCCESS', ?, ?)
     `);
-    const logRes = logStmt.run(rawMessage, items.length, JSON.stringify(items));
+    const logRes = logStmt.run(
+      rawMessage,
+      items.length,
+      JSON.stringify(items),
+      JSON.stringify(insertedIds),
+      telegramMsgId
+    );
 
     return {
       success: true,
@@ -460,10 +468,67 @@ export function ingestMessage(rawMessage) {
   } catch (error) {
     console.error('Ingest message error:', error);
     const logStmt = db.prepare(`
-      INSERT INTO bot_logs (raw_message, parsed_count, parsed_data, status, error_message)
-      VALUES (?, 0, '[]', 'ERROR', ?)
+      INSERT INTO bot_logs (raw_message, parsed_count, parsed_data, status, error_message, telegram_msg_id)
+      VALUES (?, 0, '[]', 'ERROR', ?, ?)
     `);
-    const logRes = logStmt.run(rawMessage, error.message);
+    const logRes = logStmt.run(rawMessage, error.message, telegramMsgId);
     return { success: false, count: 0, error: error.message, logId: logRes.lastInsertRowid };
   }
+}
+
+/**
+ * Undo and delete transactions created by a specific bot log ID
+ */
+export function undoBotLog(logId) {
+  const log = db.prepare('SELECT * FROM bot_logs WHERE id = ?').get(logId);
+  if (!log) return { success: false, message: 'ไม่พบ Log #' + logId };
+  if (log.status === 'CANCELLED') return { success: false, message: 'รายการนี้ถูกยกเลิกไปแล้ว' };
+
+  let ids = [];
+  try {
+    ids = JSON.parse(log.transaction_ids || '[]');
+  } catch (e) {}
+
+  let deletedCount = 0;
+  if (ids.length > 0) {
+    const deleteTx = db.prepare('DELETE FROM transactions WHERE id = ?');
+    for (const id of ids) {
+      const res = deleteTx.run(id);
+      deletedCount += res.changes;
+    }
+  } else {
+    // Fallback: match by raw_text or parsed items
+    let parsedItems = [];
+    try {
+      parsedItems = JSON.parse(log.parsed_data || '[]');
+    } catch (e) {}
+    for (const item of parsedItems) {
+      const res = db.prepare('DELETE FROM transactions WHERE raw_text = ? AND date = ?').run(item.raw_text, item.date);
+      deletedCount += res.changes;
+    }
+  }
+
+  db.prepare('UPDATE bot_logs SET status = "CANCELLED" WHERE id = ?').run(logId);
+
+  return {
+    success: true,
+    logId,
+    deletedCount,
+    rawMessage: log.raw_message,
+  };
+}
+
+/**
+ * Undo the most recent successful bot log
+ */
+export function undoLastBotLog() {
+  const lastLog = db
+    .prepare('SELECT * FROM bot_logs WHERE status = "SUCCESS" AND parsed_count > 0 ORDER BY id DESC LIMIT 1')
+    .get();
+
+  if (!lastLog) {
+    return { success: false, message: 'ไม่มีรายการล่าสุดให้ยกเลิก' };
+  }
+
+  return undoBotLog(lastLog.id);
 }

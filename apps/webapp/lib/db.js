@@ -61,6 +61,19 @@ db.exec(`
   );
 `);
 
+// Migration: Ensure transaction_ids and telegram_msg_id columns exist in bot_logs
+try {
+  const botLogInfo = db.prepare('PRAGMA table_info(bot_logs)').all();
+  if (!botLogInfo.some((col) => col.name === 'transaction_ids')) {
+    db.exec('ALTER TABLE bot_logs ADD COLUMN transaction_ids TEXT');
+  }
+  if (!botLogInfo.some((col) => col.name === 'telegram_msg_id')) {
+    db.exec('ALTER TABLE bot_logs ADD COLUMN telegram_msg_id INTEGER');
+  }
+} catch (e) {
+  console.error('Migration error on bot_logs table:', e);
+}
+
 // 4. Category Rules table (Rule Dictionary & Learning Memory)
 db.exec(`
   CREATE TABLE IF NOT EXISTS category_rules (

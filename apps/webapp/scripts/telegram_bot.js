@@ -3,7 +3,8 @@
  */
 
 import db from '../lib/db.js';
-import { ingestMessage, classifyItem } from '../lib/parser.js';
+import { ingestMessage, classifyItem, undoBotLog, undoLastBotLog } from '../lib/parser.js';
+import { backupAllToGoogleSheets } from './backup_to_sheets.js';
 import {
   getActiveTop3Tasks,
   getAllFocusTasks,
@@ -460,12 +461,30 @@ async function poll() {
               reminderTime: 'ALL',
               note: 'ยืนยันปุ่ม Telegram ครบ 3 ข้อ',
             }).catch(() => {});
+          } else if (cqData.startsWith('undo_log_')) {
+            const logId = parseInt(cqData.replace('undo_log_', ''), 10);
+            const undoRes = undoBotLog(logId);
+            if (undoRes.success) {
+              await answerCallbackQuery(cq.id, `🗑️ ลบ ${undoRes.deletedCount} รายการเรียบร้อย`);
+              await editMessageText(
+                chatId,
+                messageId,
+                `🗑️ <b>ยกเลิกและลบรายการชุดนี้เรียบร้อยแล้ว ✅</b>\n<i>(ลบออก ${undoRes.deletedCount} รายการ: "${undoRes.rawMessage}")</i>\n☁️ ซิงค์คืนค่า Google Sheets แล้ว`,
+                {
+                  reply_markup: { inline_keyboard: [] },
+                }
+              );
+              backupAllToGoogleSheets().catch((err) => console.error('Undo sync error:', err.message));
+            } else {
+              await answerCallbackQuery(cq.id, `⚠️ ${undoRes.message || 'ไม่สามารถยกเลิกได้'}`);
+            }
           }
           continue;
         }
 
-        // 2. Handle Text Messages
-        const msg = update.message;
+        // 2. Handle Text Messages & Edited Messages
+        const msg = update.message || update.edited_message;
+        const isEdited = !!update.edited_message;
         if (!msg || !msg.text) continue;
 
         const chatId = msg.chat.id;
@@ -474,7 +493,38 @@ async function poll() {
         const rawText = msg.text.trim();
         const lower = rawText.toLowerCase();
 
-        console.log(`📩 ได้รับข้อความจาก [${chatId}]: "${rawText}"`);
+        console.log(`📩 ได้รับข้อความ${isEdited ? ' (แก้ไข)' : ''}จาก [${chatId}]: "${rawText}"`);
+
+        // If this is an edited message, rollback previous transactions ingested for this telegram message_id
+        if (isEdited) {
+          try {
+            const prevLog = db
+              .prepare('SELECT id FROM bot_logs WHERE telegram_msg_id = ? AND status != "CANCELLED" ORDER BY id DESC LIMIT 1')
+              .get(msg.message_id);
+            if (prevLog) {
+              const rollbackRes = undoBotLog(prevLog.id);
+              console.log(`✏️ [EDITED_MESSAGE] Rollback previous log #${prevLog.id} (deleted ${rollbackRes.deletedCount} items)`);
+            }
+          } catch (e) {
+            console.error('Error handling edited message rollback:', e.message);
+          }
+        }
+
+        // Check if user wants to undo/delete the last transaction
+        if (/^(ลบ|ยกเลิก|undo|ลบล่าสุด|ยกเลิกล่าสุด)$/i.test(rawText)) {
+          const undoRes = undoLastBotLog();
+          if (undoRes.success) {
+            await sendMessage(
+              chatId,
+              `🗑️ <b>ยกเลิกรายการล่าสุดเรียบร้อยแล้ว ✅</b>\n• ลบออก: <b>${undoRes.deletedCount}</b> รายการ\n• ข้อความเดิม: <i>"${undoRes.rawMessage}"</i>\n☁️ ซิงค์คืนสถานะ Google Sheets แล้ว`,
+              { parse_mode: 'HTML' }
+            );
+            backupAllToGoogleSheets().catch((err) => console.error('Undo sync error:', err.message));
+          } else {
+            await sendMessage(chatId, `⚠️ ${undoRes.message || 'ไม่มีรายการล่าสุดให้ยกเลิก'}`);
+          }
+          continue;
+        }
 
         // Check if user says "โอเค" / "ok" / "ทำแล้ว"
         const isOk = /^(โอเค|โอเคร|เค|ok|okay|okey|done|เสร็จ|เรียบร้อย)(\s*\d+)?$/i.test(lower);
@@ -690,14 +740,14 @@ async function poll() {
         }
 
         // Finance Transactions ingestion
-        const result = ingestMessage(rawText);
+        const result = ingestMessage(rawText, msg.message_id);
 
         if (result.success && result.items.length > 0) {
           const ggsSynced = await syncToGoogleSheets(result.items, rawText);
           const total = result.items.reduce((sum, it) => sum + it.amount, 0);
           const hasBill = result.items.some((it) => it.category_group === 'BILL');
 
-          let reply = `⚡ <b>บันทึกแล้ว</b> (${result.count} รายการ | รวม <b>${total.toLocaleString()} ฿</b>)\n`;
+          let reply = `${isEdited ? '✏️ <b>อัปเดตใหม่เรียบร้อย</b>' : '⚡ <b>บันทึกแล้ว</b>'} (${result.count} รายการ | รวม <b>${total.toLocaleString()} ฿</b>)\n`;
           for (const item of result.items) {
             const emoji = CATEGORY_EMOJI[item.category_group] || '•';
             const aliasDisplay =
@@ -720,7 +770,19 @@ async function poll() {
             }
           }
 
-          await sendMessage(chatId, reply);
+          // If it was an edited message, also trigger full backup sync so Google Sheets stays in sync
+          if (isEdited) {
+            backupAllToGoogleSheets().catch((err) => console.error('Edit backup sync error:', err.message));
+          }
+
+          // Inline delete / undo button for 1-tap rollback
+          const keyboard = [
+            [{ text: '🗑️ ยกเลิก / ลบรายการชุดนี้', callback_data: `undo_log_${result.logId}` }],
+          ];
+
+          await sendMessage(chatId, reply, {
+            reply_markup: { inline_keyboard: keyboard },
+          });
         } else {
           await sendMessage(
             chatId,
