@@ -35,6 +35,7 @@ export function getMonthlyFixedCostsStatus(yearMonth = null) {
       if (bill.name === 'ค่าน้ำประปา' && (cat.includes('ยาย') || raw.includes('ยาย'))) return false;
       if (bill.name === 'ค่าไฟ' && (cat.includes('ยาย') || raw.includes('ยาย'))) return false;
 
+      if (cat === bill.name.toLowerCase() || cat.includes(bill.name.toLowerCase())) return true;
       return kws.some((kw) => cat.includes(kw) || raw.includes(kw));
     });
 
