@@ -9,6 +9,7 @@ import MicroHabitsTab from './components/MicroHabitsTab';
 import MemoryAnchorTab from './components/MemoryAnchorTab';
 import DailyReflectionTab from './components/DailyReflectionTab';
 import ExpenseWaveChart from './components/ExpenseWaveChart';
+import MissionControlTab from './components/MissionControlTab';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -24,14 +25,16 @@ export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-12
   const [selectedDateStr, setSelectedDateStr] = useState(null);
 
-  // Mode state: 'finance' | 'trading' | 'selfdev' (3 Core Pillars)
-  const [appMode, setAppMode] = useState('finance');
-  // Tab state: 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'focus' | 'habits'
-  const [activeTab, setActiveTab] = useState('calendar');
+  // Mode state: 'mission' | 'finance' | 'trading' | 'selfdev' (Command Center & 3 Core Pillars)
+  const [appMode, setAppMode] = useState('mission');
+  // Tab state: 'mission' | 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'focus' | 'habits'
+  const [activeTab, setActiveTab] = useState('mission');
 
   const handleSwitchMode = (mode) => {
     setAppMode(mode);
-    if (mode === 'finance') {
+    if (mode === 'mission') {
+      setActiveTab('mission');
+    } else if (mode === 'finance') {
       if (activeTab !== 'calendar' && activeTab !== 'debts') {
         setActiveTab('calendar');
       }
@@ -424,7 +427,9 @@ export default function Home() {
           <div>
             <h1>Skynet OS</h1>
             <p>
-              {appMode === 'quant'
+              {appMode === 'mission'
+                ? 'ศูนย์บัญชาการภาพรวม & จุดเซฟเกม (The North Star Blueprint, 3 Portfolios & Project Vault)'
+                : appMode === 'quant'
                 ? 'Quantum Research & Tail Probability Terminal (ระบบจำลองโมเดลสถิติความน่าจะเป็น & ฟิสิกส์การเทรดแบบในภาพเรฟ)'
                 : appMode === 'finance'
                 ? 'ระบบบริหารการเงินส่วนตัว & จัดการหนี้สิน (รับข้อมูลอัตโนมัติจาก Telegram @my_skynet_money_bot)'
@@ -438,7 +443,9 @@ export default function Home() {
         <div className="status-badge">
           <div className="pulse-dot" />
           <span>
-            {appMode === 'finance'
+            {appMode === 'mission'
+              ? 'Mission Control // Save Point Active'
+              : appMode === 'finance'
               ? 'Telegram Money Sync Live'
               : appMode === 'trading'
               ? 'GGD Auto-Sync Active'
@@ -447,22 +454,29 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Mode Switcher: 3 Core Pillars (Finance, Trading, Self-Development) */}
+      {/* Mode Switcher: 4 Core Pillars (Mission, Finance, Trading, Self-Development) */}
       <div className="mode-switcher-container">
         <div className="mode-segmented-control">
+          <button
+            className={`mode-tab-btn mission ${appMode === 'mission' ? 'active' : ''}`}
+            onClick={() => handleSwitchMode('mission')}
+          >
+            <span>🧭</span>
+            <span>ศูนย์บัญชาการ (Mission)</span>
+          </button>
           <button
             className={`mode-tab-btn finance ${appMode === 'finance' ? 'active' : ''}`}
             onClick={() => handleSwitchMode('finance')}
           >
             <span>💰</span>
-            <span>การเงินส่วนตัว</span>
+            <span>การเงินส่วนตัว (Cash)</span>
           </button>
           <button
             className={`mode-tab-btn trading ${appMode === 'trading' ? 'active' : ''}`}
             onClick={() => handleSwitchMode('trading')}
           >
             <span>📈</span>
-            <span>ระบบการเทรด (Trade)</span>
+            <span>ระบบการเทรด (Alpha & Beta)</span>
           </button>
           <button
             className={`mode-tab-btn selfdev ${appMode === 'selfdev' ? 'active' : ''}`}
@@ -475,6 +489,13 @@ export default function Home() {
 
         {/* Sub-tabs for the selected mode */}
         <div className="ios-segmented-control sub-nav-control">
+          {appMode === 'mission' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', fontSize: '12px', color: 'var(--cyan-neon, #00f2fe)', fontFamily: 'monospace' }}>
+              <span>⌘</span>
+              <span>MASTER BLUEPRINT // SAVE POINT & 3-PORTFOLIO ARCHITECTURE</span>
+            </div>
+          )}
+
           {appMode === 'finance' && (
             <>
               <button
@@ -555,8 +576,13 @@ export default function Home() {
         </div>
       </div>
 
+      {/* MISSION CONTROL TAB */}
+      {appMode === 'mission' && (
+        <MissionControlTab debtsData={debtsData} transactions={transactions} />
+      )}
+
       {/* TAB 1: CALENDAR & EXPENSES */}
-      {activeTab === 'calendar' && (
+      {appMode === 'finance' && activeTab === 'calendar' && (
         <>
           {/* TACTILE MONTH CONTROL PANEL & QUICK SELECTOR RIBBON */}
           <div className="month-control-panel glass-panel">

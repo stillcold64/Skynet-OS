@@ -3717,3 +3717,75 @@ body {
   background: #10b981;
   box-shadow: 0 0 6px #10b981;
 }
+
+/* Mission Control & Master Blueprint (Matte Black Quant Terminal) */
+.mission-control-container {
+  max-width: 1300px;
+  margin: 0 auto 32px auto;
+}
+
+.mc-card {
+  background: #0d1118;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: all 0.2s ease;
+}
+
+.mc-card:hover {
+  border-color: rgba(0, 242, 254, 0.25);
+}
+
+.mc-header-banner {
+  background: linear-gradient(170deg, #101622 0%, #0b0e15 100%);
+  border-color: rgba(0, 242, 254, 0.3);
+  box-shadow: 0 0 25px -8px rgba(0, 242, 254, 0.15), 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.mc-pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00f2fe;
+  box-shadow: 0 0 10px #00f2fe;
+  animation: mcPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes mcPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.85); }
+}
+
+.mc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+.mc-pill.cyan {
+  background: rgba(0, 242, 254, 0.1);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  color: #00f2fe;
+}
+
+.mc-pill.emerald {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+}
+
+.mode-tab-btn.mission {
+  border-color: rgba(0, 242, 254, 0.3);
+}
+
+.mode-tab-btn.mission.active {
+  background: linear-gradient(145deg, #112838, #0a1824);
+  border-color: #00f2fe;
+  color: #00f2fe;
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.25);
+}

@@ -74,6 +74,34 @@ try {
   console.error('Migration error on bot_logs table:', e);
 }
 
+// 3.1 Project Vault (Idea Parking Lot for high-creative mind)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS project_vault (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    category TEXT DEFAULT 'HOBBY',
+    status TEXT DEFAULT 'PARKED',
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default vault ideas if empty
+try {
+  const vaultCount = db.prepare('SELECT COUNT(*) as count FROM project_vault').get().count;
+  if (vaultCount === 0) {
+    const insertVault = db.prepare(`
+      INSERT INTO project_vault (title, category, status, note)
+      VALUES (?, ?, ?, ?)
+    `);
+    insertVault.run('ปลูกผักไฮโดรโปนิกส์ & กัญชา', 'HOBBY', 'PARKED', 'กิจกรรมฮีลใจ รีเซ็ตสติหน้าดิน ไม่ต้องวัดผลกำไร');
+    insertVault.run('ทำช่อง YouTube คอนเทนต์การเงิน / จิตวิทยา', 'MEDIA', 'PARKED', 'ปั้นแบรนด์ระยะยาว ถ่ายทอดประสบการณ์จริง');
+    insertVault.run('ที่ปรึกษาจิตวิทยาการเทรด (Trading Psychology Coach)', 'CAREER', 'PARKED', 'ฟรีแลนซ์/อาชีพเสริม นำบทเรียนความผิดพลาดไปช่วยเทรดเดอร์คนอื่น');
+  }
+} catch (e) {
+  console.error('Error seeding project_vault:', e);
+}
+
 // 4. Category Rules table (Rule Dictionary & Learning Memory)
 db.exec(`
   CREATE TABLE IF NOT EXISTS category_rules (
