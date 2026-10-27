@@ -354,8 +354,9 @@ async function checkNightlyReflectionReminder() {
   }
 }
 
-setInterval(checkNightlyReflectionReminder, 25000);
-setTimeout(checkNightlyReflectionReminder, 5000);
+// Nightly Reflection Reminder is disabled per user request (User does reflection on computer only)
+// setInterval(checkNightlyReflectionReminder, 25000);
+// setTimeout(checkNightlyReflectionReminder, 5000);
 
 let isPolling = false;
 let lastPollActivity = Date.now();
@@ -610,7 +611,6 @@ async function poll() {
         if (lower === '/start' || lower === '/help') {
           let reply = `🤖 <b>Skynet OS</b>\n\n`;
           reply += `• Focus: พิมพ์ <code>/focus</code> หรือ <b>"โอเค"</b>\n`;
-          reply += `• บันทึกปิดวัน: <code>dl [โชคดี]</code> / <code>f [เสร็จ]</code> / <code>ndl [พรุ่งนี้]</code>\n`;
           reply += `• บิลคงเหลือ: พิมพ์ <code>/bills</code> หรือ <b>"ฟิกคอส"</b>\n`;
           reply += `• บันทึกเงิน: พิมพ์ <i>"ข้าว 50 กาแฟ 40"</i>\n`;
           reply += `• สอนคำศัพท์: พิมพ์ <i>"จำว่า ค่าน้ำ คือ ค่าน้ำประปา"</i>\n`;
