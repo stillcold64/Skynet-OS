@@ -94,22 +94,30 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
 
   // Monthly Cash Flow & Real Constraints
   const currentMonthExpense = transactions.reduce((sum, t) => sum + (t.amount || 0), 0) || 18524;
-  const billExpense = transactions.filter((t) => t.category_group === 'BILL').reduce((sum, t) => sum + (t.amount || 0), 0) || 9826;
-  const lifeExpense = transactions.filter((t) => t.category_group === 'LIFE').reduce((sum, t) => sum + (t.amount || 0), 0) || 6040;
-  
-  // Real numbers (Salary 15k, Mom helps with Money Thunder 2k)
   const realSalary = 15000;
-  const familySubsidy = 2000; // แม่ช่วยจ่าย Money Thunder
-  const netOutOfPocket = Math.max(0, currentMonthExpense - familySubsidy);
-  const netBurnRate = Math.round((realSalary - netOutOfPocket) * 100) / 100;
+  const netBurnRate = Math.round((realSalary - currentMonthExpense) * 100) / 100;
 
-  // Finnix specific
+  // Specific Spending Drilldown (Leaks analysis)
+  const snackExpense = transactions.filter((t) => (t.category || '').includes('ขนม')).reduce((sum, t) => sum + (t.amount || 0), 0) || 779;
+  const zazaExpense = transactions.filter((t) => (t.category || '').toLowerCase().includes('zaza')).reduce((sum, t) => sum + (t.amount || 0), 0) || 1400;
+  const waterExpense = transactions.filter((t) => (t.category || '').includes('ค่าน้ำประปา')).reduce((sum, t) => sum + (t.amount || 0), 0) || 1525;
+  const coffeeExpense = transactions.filter((t) => (t.category || '').includes('กาแฟ')).reduce((sum, t) => sum + (t.amount || 0), 0) || 655;
+  const gasExpense = transactions.filter((t) => (t.category || '').toLowerCase().includes('gas')).reduce((sum, t) => sum + (t.amount || 0), 0) || 400;
+
+  // Finnix & Paylater specifics
   const finnix = debtsData?.debts?.find((d) => d.name.toLowerCase().includes('finnix')) || {
     initial_amount: 10000,
     remaining_amount: 9388,
   };
   const finnixPaid = Math.max(0, (finnix.initial_amount || 10000) - (finnix.remaining_amount || 9388));
   const finnixProgressPct = Math.min(100, Math.round((finnixPaid / (finnix.initial_amount || 10000)) * 100)) || 6;
+
+  const paylater = debtsData?.debts?.find((d) => d.name.toLowerCase().includes('paylater')) || {
+    initial_amount: 4568.17,
+    remaining_amount: 2117.0,
+  };
+  const paylaterPaid = Math.max(0, (paylater.initial_amount || 4568) - (paylater.remaining_amount || 2117));
+  const paylaterProgressPct = Math.min(100, Math.round((paylaterPaid / (paylater.initial_amount || 4568)) * 100)) || 54;
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto 40px auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -151,7 +159,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           </div>
 
           <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
-            การดำเนินงานปัจจุบัน: ควบคุมกระแสเงินสดจากงาน Active • ชำระคืนสินเชื่อ Finnix 10,000 ฿ • ทดสอบ EA ใน MT5 Demo • คุมความเสี่ยง BTC DCA 1,500 ฿/ด.
+            การดำเนินงานปัจจุบัน: โฟกัสงานประจำ (เงินเดือน 15k) • คุมงบกินอยู่ & ขนม/Zaza • เร่งปิด Shopee Paylater ก้อนแรก (เหลือ 2.1k) • ปล่อย EA รัน MT5 Demo ไร้อารมณ์
           </p>
         </div>
 
@@ -169,14 +177,14 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontFamily: 'monospace' }}>
-            <span style={{ color: '#94a3b8', fontWeight: 600 }}>เกณฑ์ผ่านสู่ PHASE 2:</span>
-            <span style={{ color: '#fbbf24', fontWeight: 700 }}>{finnixProgressPct}% (ปิดยอด Finnix 10k)</span>
+            <span style={{ color: '#94a3b8', fontWeight: 600 }}>เป้าหมายแรก PHASE 1:</span>
+            <span style={{ color: '#fbbf24', fontWeight: 700 }}>{paylaterProgressPct}% (ปิด Paylater เหลือ 2,117 ฿)</span>
           </div>
           
           <div style={{ width: '100%', height: '8px', background: '#030508', borderRadius: '999px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
             <div
               style={{
-                width: `${Math.max(6, finnixProgressPct)}%`,
+                width: `${Math.max(10, paylaterProgressPct)}%`,
                 height: '100%',
                 borderRadius: '999px',
                 background: 'linear-gradient(90deg, #f59e0b, #10b981)',
@@ -186,8 +194,8 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>
-            <span>ชำระสะสม: {finnixPaid.toLocaleString()} ฿</span>
-            <span style={{ color: '#00f2fe' }}>ผลลัพธ์: ปลดล็อกกระแสเงินสด 612 ฿/ด.</span>
+            <span>ชำระแล้ว: {paylaterPaid.toLocaleString()} ฿</span>
+            <span style={{ color: '#00f2fe' }}>ผลลัพธ์: ปลดล็อกเงินสดคืน 1,261 ฿/ด.</span>
           </div>
         </div>
       </section>
@@ -214,10 +222,10 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '16px' }}>📊</span>
               <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff', letterSpacing: '0.5px' }}>
-                THE 3 PORTFOLIOS (RAY DALIO)
+                THE 3 PORTFOLIOS
               </span>
             </div>
-            <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>Cash = Alpha + Beta</span>
+            <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>Cash • Alpha • Beta</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -225,58 +233,52 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#f43f5e' }}>🛡️</span> พอร์ต 1: เงินสดกินอยู่ & ปลดหนี้
+                  <span style={{ color: '#f43f5e' }}>💼</span> พอร์ต 1: เงินเดือน & ปลดหนี้ (Active)
                 </span>
-                <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#f43f5e', fontWeight: 700 }}>หนี้รวม 56k</span>
+                <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#f43f5e', fontWeight: 700 }}>หนี้คงเหลือ 51.1k</span>
               </div>
               <div style={{ width: '100%', height: '6px', background: '#020305', borderRadius: '999px', overflow: 'hidden' }}>
                 <div style={{ width: `${debtProgressPct}%`, height: '100%', background: 'linear-gradient(90deg, #f43f5e, #f59e0b)' }}></div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontFamily: 'monospace', color: '#64748b' }}>
-                <span>จ่ายสะสม {totalDebtPaid.toLocaleString()} ฿ ({debtProgressPct}%)</span>
-                <span style={{ color: '#10b981' }}>เงินเดือน 15k (แม่ช่วย 2k)</span>
+                <span>ชำระสะสมแล้ว {totalDebtPaid.toLocaleString()} ฿ ({debtProgressPct}%)</span>
+                <span style={{ color: '#10b981' }}>เงินเดือนประจำ 15k</span>
               </div>
             </div>
 
             {/* Port 2: Alpha EA Engine */}
-            <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#00f2fe' }}>🤖</span> พอร์ต 2: EA Cashflow (Alpha)
+                  <span style={{ color: '#00f2fe' }}>🤖</span> พอร์ต 2: Alpha EA Engine
                 </span>
                 <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(0, 242, 254, 0.1)', color: '#00f2fe', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(0, 242, 254, 0.3)' }}>
-                  MT5 Demo
+                  MT5 Demo Test
                 </span>
               </div>
               <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.4 }}>
-                รันอัลกอริทึม 100% (GoldTuesday / BTCSnowball) หาเงินเสริมรายเดือน ไร้อารมณ์
+                ทดสอบบอทอัตโนมัติ (GoldTuesday / BTCSnowball) เพื่อเตรียมปั้นกระแสเงินสดเสริม ไม่รบกวนเวลางานประจำ
               </p>
             </div>
 
-            {/* Port 3: BTC DCA Pressure Valve */}
-            <div style={{ background: '#07090f', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {/* Port 3: Long-Term Wealth / Beta */}
+            <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#f59e0b' }}>🪙</span> พอร์ต 3: BTC DCA (ระงับกิเลส)
+                  <span style={{ color: '#f59e0b' }}>🌱</span> พอร์ต 3: สินทรัพย์สะสมระยะยาว (Beta)
                 </span>
-                <span style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
-                  งบ 1,500 ฿/ด.
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace' }}>
-                <span style={{ color: '#94a3b8' }}>เงื่อนไข: TRIX &gt; 0</span>
-                <span style={{ color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span> BUY ZONE ACTIVE
+                <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#64748b' }}>
+                  เริ่มสะสมหลังปลอดหนี้
                 </span>
               </div>
-              <div style={{ fontSize: '10px', color: '#94a3b8', background: '#040508', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)', lineHeight: 1.4 }}>
-                💡 <strong>กฎเหล็ก:</strong> ซื้อ Spot เก็บยาวเท่านั้น ห้ามแตะ Futures/Margin ดับความ FOMO แบบมีกรอบคุมความเสี่ยง!
-              </div>
+              <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.4 }}>
+                ออมสะสม & DCA สินทรัพย์เติบโตเพื่ออิสรภาพการเงิน (เริ่มหลังปิด Shopee Paylater & Finnix)
+              </p>
             </div>
           </div>
 
           <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b', textAlign: 'center', paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
-            Meawbin Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"
+            Meawbin Macro: "แยกพอร์ตให้ขาด โฟกัสงานประจำ อารมณ์จะไม่กวนเงินสด"
           </div>
         </div>
 
@@ -334,9 +336,9 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                 <span style={{ color: '#00f2fe', fontWeight: 700 }}>PHASE 1 (ปัจจุบัน) : ต.ค. – พ.ย. 2026</span>
                 <span style={{ color: '#10b981', fontWeight: 600 }}>🟢 ACTIVE</span>
               </div>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>วางรากฐานกระแสเงินสด & คัดกรอง EA (Demo)</h4>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>รักษางานประจำ • คุมขนม/Zaza • ฆ่า Paylater 2.1k</h4>
               <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.45 }}>
-                ทำคลิปผลิตเงินสดสม่ำเสมอ คุมรายจ่ายกินอยู่ ~220 ฿/วัน จ่ายหนี้ตรงเวลา และโยน EA เข้า MT5 Demo เพื่อดูสถิติจริงโดยไม่เสียเงิน
+                โฟกัสประสิทธิภาพงานประจำ 15k คุมงบขนมและ Zaza ไม่ให้บานปลาย และเร่งปิดหนี้ Shopee Paylater ให้หมดตัวแรกเพื่อปลดภาระ 1,261 ฿/ด.
               </p>
 
               <div style={{ paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -350,15 +352,19 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1' }}>
                     <span style={{ color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>○</span>
-                    <span>ทำคลิปต่อเนื่อง 5-7 ชิ้น/สัปดาห์</span>
+                    <span>โฟกัสงานประจำ (รักษาฐานเงินเดือน 15,000 ฿ สม่ำเสมอ)</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1' }}>
                     <span style={{ color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>○</span>
-                    <span>เปิด MT5 Demo รัน BTCSnowball หรือ Gold 1 กราฟ</span>
+                    <span>ฆ่าหนี้ Shopee Paylater ที่เหลือ 2,117 ฿ ให้หมดตัวแรก (ปลดภาระ 1,261 ฿/ด.)</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1' }}>
                     <span style={{ color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>○</span>
-                    <span>DCA BTC งบ 1,500 ฿ เมื่อ TRIX &gt; 0</span>
+                    <span>คุมงบขนม & Zaza รวมกันไม่เกิน 1,500 ฿/ด. (ไม่หักดิบ แต่มีเพดานชัด)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1' }}>
+                    <span style={{ color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>○</span>
+                    <span>ปล่อยบอท EA รัน MT5 Demo ต่อเนื่อง ไร้อารมณ์ ไม่เฝ้าจอ ไม่กวนเวลางาน</span>
                   </div>
                 </div>
               </div>
@@ -372,14 +378,14 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                 <span style={{ color: '#00f2fe', fontWeight: 700 }}>PHASE 2 : พ.ย. – ธ.ค. 2026</span>
                 <span style={{ color: '#f59e0b', fontWeight: 600 }}>⏳ NEXT QUEUE</span>
               </div>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>Debt Snowball & Micro Pilot</h4>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>Debt Snowball Finnix 9.4k & ขยายเงินสด</h4>
               <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.45 }}>
-                นำเงินส่วนเกินจากงานคลิป มาเร่งปิด Finnix 10k และนำเงินค่างวดที่ได้คืน 612 ฿/ด. ไปเปิดพอร์ต Cent ($20) รัน EA จริงตัวแรก
+                นำเงินค่างวดที่ได้คืนจาก Paylater 1,261 ฿/ด. มารวมพลังโปะปิด Finnix 10k เพื่อตัดดอกเบี้ย 33% ถาวร
               </p>
               <div style={{ paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', color: '#94a3b8' }}>
-                <div><span>○</span> ปิดหนี้ Finnix 10,000 ฿ 100%</div>
+                <div><span>○</span> ปิดหนี้ Finnix 9,388 ฿ 100% (ปลดภาระดอก 33% และค่างวด 612 ฿/ด.)</div>
                 <div><span>○</span> เริ่มรัน EA บนพอร์ต Cent ความเสี่ยงจำกัด</div>
-                <div><span>○</span> กระแสเงินสดสุทธิเริ่มบวกเกิน 5,000 ฿</div>
+                <div><span>○</span> กระแสเงินสดสุทธิเริ่มบวกเกิน 4,000 ฿</div>
               </div>
             </div>
           )}
@@ -429,19 +435,19 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: '#f59e0b' }}>💵</span> กระแสเงินสด ต.ค. 2026 (เงินเดือนจริง)
               </span>
-              <span style={{ fontSize: '10px', fontFamily: 'monospace', background: netBurnRate < 0 ? 'rgba(244, 63, 94, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: netBurnRate < 0 ? '#fda4af' : '#6ee7b7', padding: '1px 6px', borderRadius: '4px', border: `1px solid ${netBurnRate < 0 ? 'rgba(244, 63, 94, 0.4)' : 'rgba(16, 185, 129, 0.4)'}` }}>
-                {netBurnRate < 0 ? `ดึงเงินเก็บ ${Math.abs(netBurnRate).toLocaleString()} ฿` : `กระแสเงินสดบวก`}
+              <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(244, 63, 94, 0.15)', color: '#fda4af', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(244, 63, 94, 0.4)' }}>
+                ดึงเงินเก็บ {Math.abs(netBurnRate).toLocaleString()} ฿
               </span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', margin: '2px 0' }}>
               <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                <div style={{ fontSize: '10px', color: '#64748b' }}>เงินเดือนจริง</div>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>เงินเดือนประจำ</div>
                 <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#ffffff' }}>15,000 ฿</div>
               </div>
               <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                <div style={{ fontSize: '10px', color: '#64748b' }}>จ่ายเอง (หักแม่ช่วย 2k)</div>
-                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#f43f5e' }}>{netOutOfPocket.toLocaleString()} ฿</div>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>รายจ่ายสะสมจริง</div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#f43f5e' }}>{currentMonthExpense.toLocaleString()} ฿</div>
               </div>
               <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.25)' }}>
                 <div style={{ fontSize: '10px', color: '#fda4af' }}>ส่วนต่างดึงเงินเก็บ</div>
@@ -449,13 +455,26 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace', color: '#94a3b8' }}>
-              <span>หนี้ 3 เจ้าที่จ่ายเอง: 3,740 ฿</span>
-              <span>กินอยู่: {lifeExpense.toLocaleString()} ฿</span>
+            {/* Granular Spending Drilldown */}
+            <div style={{ background: '#04060a', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#94a3b8', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+                <span>🔍 เจาะลึกจุดรั่วสำคัญในเดือนนี้:</span>
+                <span style={{ color: '#f59e0b' }}>รวม {((snackExpense || 779) + (zazaExpense || 1400) + (waterExpense || 1525)).toLocaleString()} ฿</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', fontSize: '10px', fontFamily: 'monospace' }}>
+                <div style={{ color: '#cbd5e1' }}>🍪 ขนม 7-11: <strong style={{ color: '#f59e0b' }}>{snackExpense.toLocaleString()} ฿</strong></div>
+                <div style={{ color: '#cbd5e1' }}>🌿 Zaza: <strong style={{ color: '#f43f5e' }}>{zazaExpense.toLocaleString()} ฿</strong></div>
+                <div style={{ color: '#cbd5e1' }}>💧 น้ำประปา: <strong style={{ color: '#00f2fe' }}>{waterExpense.toLocaleString()} ฿</strong></div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontFamily: 'monospace', color: '#64748b', paddingTop: '2px' }}>
+                <span>☕ กาแฟ: {coffeeExpense.toLocaleString()} ฿ (18 แก้ว)</span>
+                <span>⛽ น้ำมัน: {gasExpense.toLocaleString()} ฿</span>
+                <span>📄 หนี้ 4 เจ้า: 5,740 ฿</span>
+              </div>
             </div>
 
             <div style={{ fontSize: '10px', color: '#94a3b8', background: '#030508', padding: '6px 8px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.05)', lineHeight: 1.4 }}>
-              💡 <strong>ความจริงที่ปลดล็อก:</strong> เดือนนี้มีค่าน้ำประปาผิดปกติ 1,525 ฿ + Zaza 1,400 ฿ รวมเกือบ 3,000 ฿ ถ้าตัดออกเงินเดือน 15k จะเหลือบวกทันที!
+              💡 <strong>ความจริง:</strong> ขนม ({snackExpense} ฿) + Zaza ({zazaExpense} ฿) + ค่าน้ำผิดปกติ ({waterExpense} ฿) = 3,704 ฿ (เกินยอดที่ดึงเงินเก็บ 3,524 ฿) ถ้าคุมงบหย่อนใจ Zaza+ขนม ให้อยู่ในงบ ~1,500 ฿ และค่าน้ำกลับมาปกติ เงินเดือน 15k จะเหลือบวกทันทีโดยไม่ต้องหักดิบ!
             </div>
           </div>
 
