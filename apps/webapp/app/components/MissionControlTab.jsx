@@ -92,12 +92,16 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const totalDebtPaid = Math.max(0, totalDebtInitial - totalDebtRemaining);
   const debtProgressPct = Math.min(100, Math.round((totalDebtPaid / totalDebtInitial) * 100)) || 17;
 
-  // Monthly Cash Flow
+  // Monthly Cash Flow & Real Constraints
   const currentMonthExpense = transactions.reduce((sum, t) => sum + (t.amount || 0), 0) || 18524;
   const billExpense = transactions.filter((t) => t.category_group === 'BILL').reduce((sum, t) => sum + (t.amount || 0), 0) || 9826;
   const lifeExpense = transactions.filter((t) => t.category_group === 'LIFE').reduce((sum, t) => sum + (t.amount || 0), 0) || 6040;
-  const estimatedIncome = 30000;
-  const netFreeCashFlow = Math.round((estimatedIncome - currentMonthExpense) * 100) / 100;
+  
+  // Real numbers (Salary 15k, Mom helps with Money Thunder 2k)
+  const realSalary = 15000;
+  const familySubsidy = 2000; // แม่ช่วยจ่าย Money Thunder
+  const netOutOfPocket = Math.max(0, currentMonthExpense - familySubsidy);
+  const netBurnRate = Math.round((realSalary - netOutOfPocket) * 100) / 100;
 
   // Finnix specific
   const finnix = debtsData?.debts?.find((d) => d.name.toLowerCase().includes('finnix')) || {
@@ -230,7 +234,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontFamily: 'monospace', color: '#64748b' }}>
                 <span>จ่ายสะสม {totalDebtPaid.toLocaleString()} ฿ ({debtProgressPct}%)</span>
-                <span style={{ color: '#10b981' }}>คลิป 30k เลี้ยงระบบ</span>
+                <span style={{ color: '#10b981' }}>เงินเดือน 15k (แม่ช่วย 2k)</span>
               </div>
             </div>
 
@@ -419,40 +423,39 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
           }}
         >
-          {/* MONTHLY CASHFLOW & RUNWAY (REPLACES DUPLICATE ANCHOR) */}
-          <div style={{ background: '#07090f', border: '1px solid rgba(0, 242, 254, 0.25)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* MONTHLY CASHFLOW & RUNWAY (REALITY NUMBERS) */}
+          <div style={{ background: '#07090f', border: '1px solid rgba(244, 63, 94, 0.3)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ color: '#10b981' }}>💵</span> กระแสเงินสด ต.ค. 2026 (Cash Flow)
+                <span style={{ color: '#f59e0b' }}>💵</span> กระแสเงินสด ต.ค. 2026 (เงินเดือนจริง)
               </span>
-              <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                SURPLUS POSITIVE
+              <span style={{ fontSize: '10px', fontFamily: 'monospace', background: netBurnRate < 0 ? 'rgba(244, 63, 94, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: netBurnRate < 0 ? '#fda4af' : '#6ee7b7', padding: '1px 6px', borderRadius: '4px', border: `1px solid ${netBurnRate < 0 ? 'rgba(244, 63, 94, 0.4)' : 'rgba(16, 185, 129, 0.4)'}` }}>
+                {netBurnRate < 0 ? `ดึงเงินเก็บ ${Math.abs(netBurnRate).toLocaleString()} ฿` : `กระแสเงินสดบวก`}
               </span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', margin: '2px 0' }}>
               <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                <div style={{ fontSize: '10px', color: '#64748b' }}>รายรับคาดการณ์</div>
-                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#10b981' }}>~30,000 ฿</div>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>เงินเดือนจริง</div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#ffffff' }}>15,000 ฿</div>
               </div>
               <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                <div style={{ fontSize: '10px', color: '#64748b' }}>รายจ่ายสะสม</div>
-                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#f43f5e' }}>{currentMonthExpense.toLocaleString()} ฿</div>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>จ่ายเอง (หักแม่ช่วย 2k)</div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#f43f5e' }}>{netOutOfPocket.toLocaleString()} ฿</div>
               </div>
-              <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(0, 242, 254, 0.2)' }}>
-                <div style={{ fontSize: '10px', color: '#00f2fe' }}>กระแสเงินสดสุทธิ</div>
-                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#00f2fe' }}>+{netFreeCashFlow.toLocaleString()} ฿</div>
+              <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.25)' }}>
+                <div style={{ fontSize: '10px', color: '#fda4af' }}>ส่วนต่างดึงเงินเก็บ</div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#fda4af' }}>{netBurnRate.toLocaleString()} ฿</div>
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace', color: '#94a3b8' }}>
-              <span>หนี้+บิลคงที่: {billExpense.toLocaleString()} ฿</span>
+              <span>หนี้ 3 เจ้าที่จ่ายเอง: 3,740 ฿</span>
               <span>กินอยู่: {lifeExpense.toLocaleString()} ฿</span>
             </div>
 
-            <div style={{ fontSize: '10px', color: '#64748b', background: '#030508', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>🛡️ กระสุนเหลือสำหรับสโนว์บอลหนี้ & BTC DCA</span>
-              <span style={{ color: '#00f2fe' }}>ฉบับสติเต็ม → แท็บพัฒนาตนเอง</span>
+            <div style={{ fontSize: '10px', color: '#94a3b8', background: '#030508', padding: '6px 8px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.05)', lineHeight: 1.4 }}>
+              💡 <strong>ความจริงที่ปลดล็อก:</strong> เดือนนี้มีค่าน้ำประปาผิดปกติ 1,525 ฿ + Zaza 1,400 ฿ รวมเกือบ 3,000 ฿ ถ้าตัดออกเงินเดือน 15k จะเหลือบวกทันที!
             </div>
           </div>
 
