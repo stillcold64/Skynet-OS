@@ -86,6 +86,51 @@ db.exec(`
   );
 `);
 
+// 3.2 Roadmap Steps & Strategic Milestones (Editable progression ladder)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS roadmap_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phase_num INTEGER NOT NULL DEFAULT 1,
+    step_order INTEGER NOT NULL DEFAULT 1,
+    title TEXT NOT NULL,
+    condition_text TEXT,
+    target_amount REAL DEFAULT 0,
+    current_amount REAL DEFAULT 0,
+    status TEXT DEFAULT 'IN_PROGRESS', -- 'DONE' | 'IN_PROGRESS' | 'PENDING'
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default roadmap steps if empty
+try {
+  const stepCount = db.prepare('SELECT COUNT(*) as count FROM roadmap_steps').get().count;
+  if (stepCount === 0) {
+    const insertStep = db.prepare(`
+      INSERT INTO roadmap_steps (phase_num, step_order, title, condition_text, target_amount, current_amount, status, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    // Phase 1: ความอยู่รอด & ฆ่าหนี้ก้อนแรก
+    insertStep.run(1, 1, 'ฆ่าหนี้ Shopee Paylater ให้เหลือ 0 ฿ (เหลือ 2,117 ฿)', 'ปลดล็อกเงินสดค่างวดคืนกระเป๋า 1,261 ฿/ด. ทันที', 4568.17, 2451.17, 'IN_PROGRESS', 'ก้อนที่ใกล้หมดที่สุด');
+    insertStep.run(1, 2, 'คุมงบหย่อนใจ (ขนม + Zaza) รวมกันไม่เกิน 1,500 ฿/ด.', 'ไม่หักดิบ แต่หยุดการดึงเงินเก็บเก่ามาใช้', 1500, 2179, 'IN_PROGRESS', 'เพดานคุมความเสี่ยง');
+    insertStep.run(1, 3, 'โฟกัสประสิทธิภาพงานประจำ (เงินเดือน 15,000 ฿)', 'รักษาฐานเงินสดความอยู่รอดให้มั่นคง ไม่ให้หลุด', 15000, 15000, 'DONE', 'กระแสเงินสดหลัก');
+    insertStep.run(1, 4, 'ปล่อยบอท EA รัน MT5 Demo ต่อเนื่อง ไร้อารมณ์', 'เก็บสถิติ Win Rate โดยไม่ต้องเฝ้าจอ ไม่รบกวนเวลางาน', 0, 0, 'IN_PROGRESS', 'GoldTuesday / BTCSnowball');
+
+    // Phase 2: สโนว์บอลปิด Finnix & ขยายเงินสด
+    insertStep.run(2, 1, 'สโนว์บอลปิดหนี้ Finnix 9,388 ฿ ให้หมด 100%', 'ตัดดอกเบี้ย 33% และปลดค่างวด 612 ฿/ด. คืนกระเป๋า', 10000, 612, 'PENDING', 'เป้าหมายหลักเฟส 2');
+    insertStep.run(2, 2, 'กระแสเงินสดสุทธิเริ่มเป็นบวกเกิน +4,000 ฿/ด.', 'เงินเดือนประจำเริ่มเหลือกินเหลือเก็บจริง', 4000, 0, 'PENDING', 'สภาพคล่องพร้อม');
+    insertStep.run(2, 3, 'เริ่มเปิดพอร์ต Cent ($20 ~ 700 ฿) รัน EA ตัวแรก', 'ใช้เงินเย็นที่ประหยัดได้จากค่างวดหนี้มาทดสอบจริง', 700, 0, 'PENDING', 'ความเสี่ยงจำกัด');
+
+    // Phase 3: ปลอดหนี้ถาวร & สร้างความมั่งคั่ง
+    insertStep.run(3, 1, 'ปิดหนี้ EasyCash & Money Thunder ให้หนี้รวมเป็น 0.00 ฿', 'ปลอดหนี้ 100% ดอกเบี้ยหยุดไหลออกถาวร', 47329, 0, 'PENDING', 'อิสรภาพจากหนี้');
+    insertStep.run(3, 2, 'เริ่มพอร์ต Beta: DCA Bitcoin / คริปโต Spot เดือนละ 1,000-1,500 ฿', 'ออมสินทรัพย์เติบโตระยะยาวโดยไร้ความกังวล', 1500, 0, 'PENDING', 'สะสมความมั่งคั่ง');
+    insertStep.run(3, 3, 'สะสมเงินสำรองฉุกเฉิน 3-6 เดือน & ลุยโปรเจกต์ใน Vault', 'ปลูกต้นไม้/ทำช่องยูทูป ด้วยความสบายใจ', 50000, 0, 'PENDING', 'เป้าหมายระยะยาว');
+  }
+} catch (e) {
+  console.error('Error seeding roadmap_steps:', e);
+}
+
 // Seed default vault ideas if empty
 try {
   const vaultCount = db.prepare('SELECT COUNT(*) as count FROM project_vault').get().count;

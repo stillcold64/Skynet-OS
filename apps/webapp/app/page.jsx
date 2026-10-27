@@ -444,7 +444,7 @@ export default function Home() {
           <div className="pulse-dot" />
           <span>
             {appMode === 'mission'
-              ? 'Mission Control // Phase 1 Active'
+              ? 'Master Plan // Save Point Active'
               : appMode === 'finance'
               ? 'Telegram Money Sync Live'
               : appMode === 'trading'
@@ -454,7 +454,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Mode Switcher: 4 Core Pillars (Mission, Finance, Trading, Self-Development) */}
+      {/* Mode Switcher: 4 Core Pillars (Overview Roadmap, Finance, Trading, Self-Development) */}
       <div className="mode-switcher-container">
         <div className="mode-segmented-control">
           <button
@@ -462,7 +462,7 @@ export default function Home() {
             onClick={() => handleSwitchMode('mission')}
           >
             <span>🧭</span>
-            <span>ศูนย์บัญชาการ (Mission)</span>
+            <span>แผนภาพรวม & Roadmap</span>
           </button>
           <button
             className={`mode-tab-btn finance ${appMode === 'finance' ? 'active' : ''}`}
