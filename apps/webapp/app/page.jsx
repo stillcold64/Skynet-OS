@@ -444,7 +444,7 @@ export default function Home() {
           <div className="pulse-dot" />
           <span>
             {appMode === 'mission'
-              ? 'Mission Control // Save Point Active'
+              ? 'Mission Control // Phase 1 Active'
               : appMode === 'finance'
               ? 'Telegram Money Sync Live'
               : appMode === 'trading'
@@ -492,7 +492,7 @@ export default function Home() {
           {appMode === 'mission' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', fontSize: '12px', color: 'var(--cyan-neon, #00f2fe)', fontFamily: 'monospace' }}>
               <span>⌘</span>
-              <span>MASTER BLUEPRINT // SAVE POINT & 3-PORTFOLIO ARCHITECTURE</span>
+              <span>MASTER BLUEPRINT // 3-PHASE CAPITAL & EXECUTION ARCHITECTURE</span>
             </div>
           )}
 

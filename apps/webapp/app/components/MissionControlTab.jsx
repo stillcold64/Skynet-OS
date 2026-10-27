@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 
 const CATEGORY_TAGS = {
-  HOBBY: { label: '🌱 ฮีลใจ/งานอดิเรก', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
-  MEDIA: { label: '🎥 สื่อ/ยูทูป/แบรนด์', color: '#00f2fe', bg: 'rgba(0, 242, 254, 0.12)' },
-  CAREER: { label: '🧠 จิตวิทยา/อาชีพใหม่', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.12)' },
-  BIZ: { label: '💡 ธุรกิจ/โปรเจกต์', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
+  HOBBY: { label: '🌱 ฮีลใจ/งานอดิเรก', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
+  MEDIA: { label: '🎥 สื่อ/ยูทูป/แบรนด์', color: '#00f2fe', bg: 'rgba(0, 242, 254, 0.15)' },
+  CAREER: { label: '🧠 จิตวิทยา/อาชีพใหม่', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)' },
+  BIZ: { label: '💡 ธุรกิจ/โปรเจกต์', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
 };
 
 export default function MissionControlTab({ debtsData, transactions = [] }) {
@@ -18,9 +18,6 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('HOBBY');
   const [isAddingProject, setIsAddingProject] = useState(false);
-
-  // BTC DCA State simulation
-  const [btcDcaChecked, setBtcDcaChecked] = useState(false);
 
   // Fetch Projects from SQLite API
   const fetchProjects = async () => {
@@ -91,9 +88,16 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
 
   // Financial Calculations
   const totalDebtInitial = debtsData?.debts?.reduce((s, d) => s + (d.initial_amount || 0), 0) || 61897;
-  const totalDebtRemaining = debtsData?.totalDebt || 56157;
+  const totalDebtRemaining = debtsData?.totalDebt || 51101;
   const totalDebtPaid = Math.max(0, totalDebtInitial - totalDebtRemaining);
-  const debtProgressPct = Math.min(100, Math.round((totalDebtPaid / totalDebtInitial) * 100)) || 9;
+  const debtProgressPct = Math.min(100, Math.round((totalDebtPaid / totalDebtInitial) * 100)) || 17;
+
+  // Monthly Cash Flow
+  const currentMonthExpense = transactions.reduce((sum, t) => sum + (t.amount || 0), 0) || 18524;
+  const billExpense = transactions.filter((t) => t.category_group === 'BILL').reduce((sum, t) => sum + (t.amount || 0), 0) || 9826;
+  const lifeExpense = transactions.filter((t) => t.category_group === 'LIFE').reduce((sum, t) => sum + (t.amount || 0), 0) || 6040;
+  const estimatedIncome = 30000;
+  const netFreeCashFlow = Math.round((estimatedIncome - currentMonthExpense) * 100) / 100;
 
   // Finnix specific
   const finnix = debtsData?.debts?.find((d) => d.name.toLowerCase().includes('finnix')) || {
@@ -101,205 +105,255 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
     remaining_amount: 9388,
   };
   const finnixPaid = Math.max(0, (finnix.initial_amount || 10000) - (finnix.remaining_amount || 9388));
-  const finnixProgressPct = Math.min(100, Math.round((finnixPaid / (finnix.initial_amount || 10000)) * 100));
+  const finnixProgressPct = Math.min(100, Math.round((finnixPaid / (finnix.initial_amount || 10000)) * 100)) || 6;
 
   return (
-    <div className="mission-control-container space-y-4">
-      {/* 1. TOP STATUS COCKPIT: CURRENT SAVE POINT & CLASS */}
-      <section className="mc-card mc-header-banner p-5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="mc-pulse-dot"></span>
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan-400">
-                SKYNET COMMAND // MASTER BLUEPRINT
-              </span>
-              <span className="mc-pill cyan font-mono text-[11px]">
-                SAVE POINT : LVL 1.2 ACTIVE
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2.5">
-              <span>🛡️ CLASS 1: THE DEBT SLAYER</span>
-              <span className="text-xs font-mono font-normal text-slate-400 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
-                ผู้สังหารหนี้ & คัดเลือก EA
-              </span>
-            </h1>
-            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-              สเตจปัจจุบัน: คุมเงินกินอยู่ด้วยงานคลิป • โปะหนี้ Finnix ก้อนแรก • ทดสอบ EA ใน MT5 Demo • ดับความโลภด้วย BTC DCA 1,500 ฿/ด.
-            </p>
+    <div style={{ maxWidth: '1280px', margin: '0 auto 40px auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      
+      {/* 1. TOP STATUS COCKPIT: CURRENT PHASE & STRATEGIC PROGRESS */}
+      <section
+        style={{
+          background: 'linear-gradient(165deg, #101624 0%, #090d15 100%)',
+          border: '1px solid rgba(0, 242, 254, 0.35)',
+          borderRadius: '16px',
+          padding: '20px 24px',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '20px',
+        }}
+      >
+        <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00f2fe', boxShadow: '0 0 10px #00f2fe' }}></span>
+            <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, color: '#00f2fe', letterSpacing: '1px' }}>
+              SKYNET COMMAND // MASTER BLUEPRINT
+            </span>
+            <span style={{ background: 'rgba(0, 242, 254, 0.12)', border: '1px solid rgba(0, 242, 254, 0.4)', color: '#00f2fe', padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontFamily: 'monospace', fontWeight: 600 }}>
+              CURRENT STATUS : PHASE 1 ACTIVE
+            </span>
           </div>
 
-          {/* LEVEL UP PROGRESS METER (RPG INFOGRAPHIC) */}
-          <div className="p-3.5 rounded-xl bg-[#0d121c] border border-slate-800/90 min-w-[280px]">
-            <div className="flex justify-between items-center text-xs font-mono mb-1.5">
-              <span className="text-slate-400 font-bold">เงื่อนไขปลดล็อก CLASS 2:</span>
-              <span className="text-amber-400 font-bold">{finnixProgressPct}% (ปิด Finnix 10k)</span>
-            </div>
-            <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800 mb-2">
-              <div
-                className="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full transition-all duration-700"
-                style={{ width: `${Math.max(5, finnixProgressPct)}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between text-[11px] font-mono text-slate-400">
-              <span>จ่ายแล้ว: {finnixPaid.toLocaleString()} ฿</span>
-              <span className="text-cyan-400">รางวัล: ปลดล็อกพอร์ต Cent รัน EA 612 ฿/ด. 🔓</span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🏛️</span>
+              <span>PHASE 1: CAPITAL RESTRUCTURING</span>
+            </h1>
+            <span style={{ fontSize: '13px', color: '#94a3b8', background: 'rgba(255, 255, 255, 0.05)', padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              (ปรับโครงสร้างเงินทุน • ชำระหนี้ดอกเบี้ยสูง • คัดกรอง EA Demo)
+            </span>
+          </div>
+
+          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+            การดำเนินงานปัจจุบัน: ควบคุมกระแสเงินสดจากงาน Active • ชำระคืนสินเชื่อ Finnix 10,000 ฿ • ทดสอบ EA ใน MT5 Demo • คุมความเสี่ยง BTC DCA 1,500 ฿/ด.
+          </p>
+        </div>
+
+        {/* STRATEGIC MILESTONE PROGRESS METER */}
+        <div
+          style={{
+            flex: '0 1 340px',
+            background: '#070a10',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontFamily: 'monospace' }}>
+            <span style={{ color: '#94a3b8', fontWeight: 600 }}>เกณฑ์ผ่านสู่ PHASE 2:</span>
+            <span style={{ color: '#fbbf24', fontWeight: 700 }}>{finnixProgressPct}% (ปิดยอด Finnix 10k)</span>
+          </div>
+          
+          <div style={{ width: '100%', height: '8px', background: '#030508', borderRadius: '999px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <div
+              style={{
+                width: `${Math.max(6, finnixProgressPct)}%`,
+                height: '100%',
+                borderRadius: '999px',
+                background: 'linear-gradient(90deg, #f59e0b, #10b981)',
+                transition: 'width 0.5s ease',
+              }}
+            ></div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>
+            <span>ชำระสะสม: {finnixPaid.toLocaleString()} ฿</span>
+            <span style={{ color: '#00f2fe' }}>ผลลัพธ์: ปลดล็อกกระแสเงินสด 612 ฿/ด.</span>
           </div>
         </div>
       </section>
 
-      {/* 2. MAIN BENTO GRID (4 CORNERSTONES) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+      {/* 2. MAIN BENTO GRID (3 COLUMNS) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px', alignItems: 'stretch' }}>
         
-        {/* LEFT: THE 3 PORTFOLIOS (RAY DALIO MODEL + BTC DCA) (4 COLS) */}
-        <div className="lg:col-span-4 mc-card p-4 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <span className="text-cyan-400">📊</span>
-              <span className="font-bold text-xs font-mono text-white tracking-wider uppercase">
-                The 3 Portfolios (Ray Dalio)
+        {/* CARD 1: THE 3 PORTFOLIOS (RAY DALIO MODEL + BTC DCA) */}
+        <div
+          style={{
+            background: '#0c0f17',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: '16px',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '14px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>📊</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff', letterSpacing: '0.5px' }}>
+                THE 3 PORTFOLIOS (RAY DALIO)
               </span>
             </div>
-            <span className="text-[10px] font-mono text-slate-400">Cash = Alpha + Beta</span>
+            <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>Cash = Alpha + Beta</span>
           </div>
 
-          <div className="space-y-2.5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {/* Port 1: Cash & Debt */}
-            <div className="p-3 rounded-xl bg-[#0d121c] border border-slate-800/80 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <span className="text-rose-400">🛡️</span> พอร์ต 1: เงินสดกินอยู่ & ปลดหนี้
+            <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: '#f43f5e' }}>🛡️</span> พอร์ต 1: เงินสดกินอยู่ & ปลดหนี้
                 </span>
-                <span className="text-[11px] font-mono text-rose-400 font-bold">หนี้รวม 56k</span>
+                <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#f43f5e', fontWeight: 700 }}>หนี้รวม 56k</span>
               </div>
-              <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
-                <div
-                  className="bg-gradient-to-r from-rose-500 to-amber-500 h-full rounded-full"
-                  style={{ width: `${debtProgressPct}%` }}
-                ></div>
+              <div style={{ width: '100%', height: '6px', background: '#020305', borderRadius: '999px', overflow: 'hidden' }}>
+                <div style={{ width: `${debtProgressPct}%`, height: '100%', background: 'linear-gradient(90deg, #f43f5e, #f59e0b)' }}></div>
               </div>
-              <div className="flex justify-between text-[10px] font-mono text-slate-400">
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontFamily: 'monospace', color: '#64748b' }}>
                 <span>จ่ายสะสม {totalDebtPaid.toLocaleString()} ฿ ({debtProgressPct}%)</span>
-                <span className="text-emerald-400">คลิป 30k เลี้ยงระบบ</span>
+                <span style={{ color: '#10b981' }}>คลิป 30k เลี้ยงระบบ</span>
               </div>
             </div>
 
             {/* Port 2: Alpha EA Engine */}
-            <div className="p-3 rounded-xl bg-[#0d121c] border border-slate-800/80 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <span className="text-cyan-400">🤖</span> พอร์ต 2: EA Cashflow (Alpha)
+            <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: '#00f2fe' }}>🤖</span> พอร์ต 2: EA Cashflow (Alpha)
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/50">
+                <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(0, 242, 254, 0.1)', color: '#00f2fe', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(0, 242, 254, 0.3)' }}>
                   MT5 Demo
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-tight">
+              <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.4 }}>
                 รันอัลกอริทึม 100% (GoldTuesday / BTCSnowball) หาเงินเสริมรายเดือน ไร้อารมณ์
               </p>
             </div>
 
-            {/* Port 3: BTC DCA Pressure Valve (NEW!) */}
-            <div className="p-3 rounded-xl bg-[#0d121c] border border-amber-500/30 space-y-2 relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <span className="text-amber-400">🪙</span> พอร์ต 3: BTC DCA (ระงับกิเลส)
+            {/* Port 3: BTC DCA Pressure Valve */}
+            <div style={{ background: '#07090f', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: '#f59e0b' }}>🪙</span> พอร์ต 3: BTC DCA (ระงับกิเลส)
                 </span>
-                <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-600/40">
+                <span style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
                   งบ 1,500 ฿/ด.
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-slate-400">เงื่อนไข: TRIX &gt; 0</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> BUY ZONE ACTIVE
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace' }}>
+                <span style={{ color: '#94a3b8' }}>เงื่อนไข: TRIX &gt; 0</span>
+                <span style={{ color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span> BUY ZONE ACTIVE
                 </span>
               </div>
-              <div className="text-[10px] text-slate-400 bg-slate-950 p-2 rounded-lg border border-slate-800 leading-tight">
+              <div style={{ fontSize: '10px', color: '#94a3b8', background: '#040508', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)', lineHeight: 1.4 }}>
                 💡 <strong>กฎเหล็ก:</strong> ซื้อ Spot เก็บยาวเท่านั้น ห้ามแตะ Futures/Margin ดับความ FOMO แบบมีกรอบคุมความเสี่ยง!
               </div>
             </div>
           </div>
 
-          <div className="text-[11px] font-mono text-slate-500 text-center pt-1 border-t border-slate-800/60">
+          <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b', textAlign: 'center', paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
             Meawbin Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"
           </div>
         </div>
 
-        {/* CENTER: ROADMAP & SAVE POINT CHECKLIST (4 COLS) */}
-        <div className="lg:col-span-4 mc-card p-4 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <span className="text-cyan-400">🗺️</span>
-              <span className="font-bold text-xs font-mono text-white tracking-wider uppercase">
-                Anti-Breaker Roadmap
+        {/* CARD 2: ROADMAP & SAVE POINT CHECKLIST */}
+        <div
+          style={{
+            background: '#0c0f17',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: '16px',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '14px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>🗺️</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff', letterSpacing: '0.5px' }}>
+                STRATEGIC ROADMAP (3 PHASES)
               </span>
             </div>
-            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
-              <button
-                onClick={() => setSelectedPhase(1)}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all ${
-                  selectedPhase === 1
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                P1
-              </button>
-              <button
-                onClick={() => setSelectedPhase(2)}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono transition-all ${
-                  selectedPhase === 2
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                P2
-              </button>
-              <button
-                onClick={() => setSelectedPhase(3)}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono transition-all ${
-                  selectedPhase === 3
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                P3
-              </button>
+            
+            <div style={{ display: 'flex', gap: '4px', background: '#07090f', padding: '2px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              {[1, 2, 3].map((num) => (
+                <button
+                  key={num}
+                  onClick={() => setSelectedPhase(num)}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: selectedPhase === num ? 'rgba(0, 242, 254, 0.2)' : 'transparent',
+                    color: selectedPhase === num ? '#00f2fe' : '#64748b',
+                    border: selectedPhase === num ? '1px solid rgba(0, 242, 254, 0.4)' : '1px solid transparent',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  P{num}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Dynamic Phase Content */}
+          {/* Phase 1 Content */}
           {selectedPhase === 1 && (
-            <div className="space-y-2.5">
-              <div className="flex justify-between items-center text-[10px] font-mono">
-                <span className="text-cyan-400 font-bold">PHASE 1 (ปัจจุบัน) : ต.ค. – พ.ย. 2026</span>
-                <span className="text-emerald-400">🟢 ACTIVE</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace' }}>
+                <span style={{ color: '#00f2fe', fontWeight: 700 }}>PHASE 1 (ปัจจุบัน) : ต.ค. – พ.ย. 2026</span>
+                <span style={{ color: '#10b981', fontWeight: 600 }}>🟢 ACTIVE</span>
               </div>
-              <h4 className="text-sm font-bold text-white">ปูฐานเงินสด & คัดเลือก EA (Demo)</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>วางรากฐานกระแสเงินสด & คัดกรอง EA (Demo)</h4>
+              <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.45 }}>
                 ทำคลิปผลิตเงินสดสม่ำเสมอ คุมรายจ่ายกินอยู่ ~220 ฿/วัน จ่ายหนี้ตรงเวลา และโยน EA เข้า MT5 Demo เพื่อดูสถิติจริงโดยไม่เสียเงิน
               </p>
-              <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
-                <div className="text-[10px] font-mono uppercase text-slate-500 font-bold tracking-wider">
+
+              <div style={{ paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ fontSize: '10px', fontFamily: 'monospace', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>
                   ภารกิจประจำเฟส:
                 </div>
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex items-center gap-2 text-emerald-300">
-                    <span className="text-emerald-400 font-bold font-mono">✓</span>
-                    <span className="line-through opacity-70">จ่ายหนี้ 4 บิลตรงเวลา (5,740 ฿)</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6ee7b7' }}>
+                    <span style={{ color: '#10b981', fontWeight: 700, fontFamily: 'monospace' }}>✓</span>
+                    <span style={{ textDecoration: 'line-through', opacity: 0.75 }}>จ่ายหนี้ 4 บิลตรงเวลา (5,740 ฿)</span>
                   </div>
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <span className="text-slate-500 font-bold font-mono">○</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1' }}>
+                    <span style={{ color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>○</span>
                     <span>ทำคลิปต่อเนื่อง 5-7 ชิ้น/สัปดาห์</span>
                   </div>
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <span className="text-slate-500 font-bold font-mono">○</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1' }}>
+                    <span style={{ color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>○</span>
                     <span>เปิด MT5 Demo รัน BTCSnowball หรือ Gold 1 กราฟ</span>
                   </div>
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <span className="text-slate-500 font-bold font-mono">○</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1' }}>
+                    <span style={{ color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>○</span>
                     <span>DCA BTC งบ 1,500 ฿ เมื่อ TRIX &gt; 0</span>
                   </div>
                 </div>
@@ -307,101 +361,143 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             </div>
           )}
 
+          {/* Phase 2 Content */}
           {selectedPhase === 2 && (
-            <div className="space-y-2.5">
-              <div className="flex justify-between items-center text-[10px] font-mono">
-                <span className="text-cyan-400 font-bold">PHASE 2 : พ.ย. – ธ.ค. 2026</span>
-                <span className="text-amber-400">⏳ NEXT QUEUE</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace' }}>
+                <span style={{ color: '#00f2fe', fontWeight: 700 }}>PHASE 2 : พ.ย. – ธ.ค. 2026</span>
+                <span style={{ color: '#f59e0b', fontWeight: 600 }}>⏳ NEXT QUEUE</span>
               </div>
-              <h4 className="text-sm font-bold text-white">Debt Snowball & Micro Pilot</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>Debt Snowball & Micro Pilot</h4>
+              <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.45 }}>
                 นำเงินส่วนเกินจากงานคลิป มาเร่งปิด Finnix 10k และนำเงินค่างวดที่ได้คืน 612 ฿/ด. ไปเปิดพอร์ต Cent ($20) รัน EA จริงตัวแรก
               </p>
-              <div className="space-y-1.5 pt-1 border-t border-slate-800/80 text-xs text-slate-400">
-                <div className="flex items-center gap-2"><span>○</span> ปิดหนี้ Finnix 10,000 ฿ 100%</div>
-                <div className="flex items-center gap-2"><span>○</span> เริ่มรัน EA บนพอร์ต Cent ความเสี่ยงจำกัด</div>
-                <div className="flex items-center gap-2"><span>○</span> กระแสเงินสดสุทธิเริ่มบวกเกิน 5,000 ฿</div>
+              <div style={{ paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', color: '#94a3b8' }}>
+                <div><span>○</span> ปิดหนี้ Finnix 10,000 ฿ 100%</div>
+                <div><span>○</span> เริ่มรัน EA บนพอร์ต Cent ความเสี่ยงจำกัด</div>
+                <div><span>○</span> กระแสเงินสดสุทธิเริ่มบวกเกิน 5,000 ฿</div>
               </div>
             </div>
           )}
 
+          {/* Phase 3 Content */}
           {selectedPhase === 3 && (
-            <div className="space-y-2.5">
-              <div className="flex justify-between items-center text-[10px] font-mono">
-                <span className="text-cyan-400 font-bold">PHASE 3 : ปี 2027 เป็นต้นไป</span>
-                <span className="text-slate-400">🔒 GOAL</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace' }}>
+                <span style={{ color: '#00f2fe', fontWeight: 700 }}>PHASE 3 : ปี 2027 เป็นต้นไป</span>
+                <span style={{ color: '#64748b', fontWeight: 600 }}>🔒 GOAL</span>
               </div>
-              <h4 className="text-sm font-bold text-white">Financial Sovereignty (Ray Dalio)</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>Financial Sovereignty (Ray Dalio)</h4>
+              <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.45 }}>
                 หนี้กลายเป็น 0.00 ฿ ถาวร ดอกเบี้ยหยุดไหลออก พอร์ต EA ทบต้นอัตโนมัติ เริ่มพอร์ต Beta ลงทุนยาว และมีเวลาลุยโปรเจกต์ใน Vault เต็มที่
               </p>
-              <div className="space-y-1.5 pt-1 border-t border-slate-800/80 text-xs text-slate-400">
-                <div className="flex items-center gap-2"><span>○</span> หนี้ 4 สถาบันหมดเกลี้ยง (0.00 ฿)</div>
-                <div className="flex items-center gap-2"><span>○</span> เงินสำรองฉุกเฉิน 3-6 เดือนในบัญชี</div>
-                <div className="flex items-center gap-2"><span>○</span> ปลดล็อกโปรเจกต์ปลูกต้นไม้ & ยูทูป</div>
+              <div style={{ paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', color: '#94a3b8' }}>
+                <div><span>○</span> หนี้ 4 สถาบันหมดเกลี้ยง (0.00 ฿)</div>
+                <div><span>○</span> เงินสำรองฉุกเฉิน 3-6 เดือนในบัญชี</div>
+                <div><span>○</span> ปลดล็อกโปรเจกต์ปลูกต้นไม้ & ยูทูป</div>
               </div>
             </div>
           )}
 
-          <div className="p-2 rounded-lg bg-[#0d121c] border border-slate-800 text-[10px] text-slate-400 font-mono">
-            💡 <strong>กฎไม่แหก:</strong> ตั้งเป้า 4-5 วัน/สัปดาห์ วันไหนล้า = วันพักตามแผน ไม่ใช่แหกแผน!
+          <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '8px', padding: '8px 10px', fontSize: '11px', color: '#94a3b8' }}>
+            💡 <strong>Execution Protocol:</strong> โฟกัสคงที่ 4-5 วัน/สัปดาห์ การพักผ่อนตามแผนงานถือเป็นวินัยเพื่อรักษาประสิทธิภาพระยะยาว
           </div>
         </div>
 
-        {/* RIGHT: MEMORY ANCHOR + PROJECT VAULT (4 COLS) */}
-        <div className="lg:col-span-4 mc-card p-4 flex flex-col justify-between space-y-3">
-          
-          {/* ANCHOR: TRUTH MIRROR (FOMO DEFENDER) */}
-          <div className="p-3 rounded-xl bg-[#0d121c] border border-cyan-500/30 space-y-2">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
-              <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                <span className="text-cyan-400">⚓</span> Memory Anchor (กระจกเตือนสติ)
+        {/* CARD 3: MEMORY ANCHOR + PROJECT VAULT */}
+        <div
+          style={{
+            background: '#0c0f17',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: '16px',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '14px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          {/* MONTHLY CASHFLOW & RUNWAY (REPLACES DUPLICATE ANCHOR) */}
+          <div style={{ background: '#07090f', border: '1px solid rgba(0, 242, 254, 0.25)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: '#10b981' }}>💵</span> กระแสเงินสด ต.ค. 2026 (Cash Flow)
               </span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300">
-                LOCKED RULES
+              <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                SURPLUS POSITIVE
               </span>
             </div>
-            <div className="space-y-1 text-[11px] text-slate-300 font-mono">
-              <div className="flex items-center gap-1.5 text-rose-300">
-                <span>🛑</span> งดเทรดมือ 100% (ป้องกัน Dopamine พัง)
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', margin: '2px 0' }}>
+              <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>รายรับคาดการณ์</div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#10b981' }}>~30,000 ฿</div>
               </div>
-              <div className="flex items-center gap-1.5 text-amber-300">
-                <span>🛑</span> ห้ามกดกู้ Finnix 10k เพิ่มเด็ดขาด
+              <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>รายจ่ายสะสม</div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#f43f5e' }}>{currentMonthExpense.toLocaleString()} ฿</div>
               </div>
-              <div className="flex items-center gap-1.5 text-emerald-300">
-                <span>✅</span> BTC ซื้อได้แค่งบ 1,500 ฿/ด. (Spot Only)
+              <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(0, 242, 254, 0.2)' }}>
+                <div style={{ fontSize: '10px', color: '#00f2fe' }}>กระแสเงินสดสุทธิ</div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#00f2fe' }}>+{netFreeCashFlow.toLocaleString()} ฿</div>
               </div>
             </div>
-            <div className="text-[10px] text-slate-400 bg-slate-950 p-1.5 rounded border border-slate-800/80">
-              <em>"16 ต.ค. FOMO ทอง / 26 ต.ค. FOMO BTC — รู้ทันสมองแล้ว ไม่หลงกลอีก!"</em>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace', color: '#94a3b8' }}>
+              <span>หนี้+บิลคงที่: {billExpense.toLocaleString()} ฿</span>
+              <span>กินอยู่: {lifeExpense.toLocaleString()} ฿</span>
+            </div>
+
+            <div style={{ fontSize: '10px', color: '#64748b', background: '#030508', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>🛡️ กระสุนเหลือสำหรับสโนว์บอลหนี้ & BTC DCA</span>
+              <span style={{ color: '#00f2fe' }}>ฉบับสติเต็ม → แท็บพัฒนาตนเอง</span>
             </div>
           </div>
 
           {/* PROJECT VAULT (IDEA PARKING LOT) */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
-              <div className="flex items-center gap-1.5">
-                <span className="text-amber-400">🅿️</span>
-                <span className="text-xs font-bold text-white font-mono uppercase">
-                  Project Vault (ลานจอดไอเดีย)
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: '#f59e0b' }}>🅿️</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', letterSpacing: '0.5px' }}>
+                  PROJECT VAULT (ไอเดียสำรองเพื่ออนาคต)
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-slate-400">{projects.length} ไอเดีย</span>
+              <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#64748b' }}>{projects.length} ไอเดีย</span>
             </div>
 
             {/* Add Idea Input Form */}
-            <form onSubmit={handleAddProject} className="flex gap-1.5">
+            <form onSubmit={handleAddProject} style={{ display: 'flex', gap: '6px' }}>
               <input
                 type="text"
-                placeholder="จดไอเดียใหม่ (เช่น ปลูกไฮโดร, ยูทูป)..."
+                placeholder="จดไอเดีย (เช่น ปลูกไฮโดร, ยูทูป)..."
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                style={{
+                  flex: 1,
+                  background: '#07090e',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '11px',
+                  color: '#ffffff',
+                  outline: 'none',
+                }}
               />
               <select
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none"
+                style={{
+                  background: '#07090e',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '8px',
+                  padding: '6px 8px',
+                  fontSize: '11px',
+                  color: '#94a3b8',
+                  outline: 'none',
+                }}
               >
                 <option value="HOBBY">🌱 ฮีลใจ</option>
                 <option value="MEDIA">🎥 ยูทูป</option>
@@ -411,16 +507,26 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
               <button
                 type="submit"
                 disabled={isAddingProject || !newTitle.trim()}
-                className="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold hover:bg-cyan-500/30 transition-all disabled:opacity-40"
+                style={{
+                  background: 'rgba(0, 242, 254, 0.18)',
+                  border: '1px solid rgba(0, 242, 254, 0.4)',
+                  color: '#00f2fe',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  opacity: isAddingProject || !newTitle.trim() ? 0.4 : 1,
+                }}
               >
                 +
               </button>
             </form>
 
-            {/* Projects Scrollable List */}
-            <div className="max-h-[160px] overflow-y-auto space-y-1.5 pr-1">
+            {/* Scrollable Project List */}
+            <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px' }}>
               {projects.length === 0 ? (
-                <div className="text-center py-4 text-xs text-slate-500">
+                <div style={{ textAlign: 'center', padding: '12px 0', fontSize: '11px', color: '#64748b' }}>
                   ยังไม่มีไอเดียในลานจอด — พิมพ์เพิ่มด้านบนได้เลย!
                 </div>
               ) : (
@@ -430,38 +536,61 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                   return (
                     <div
                       key={p.id}
-                      className={`flex items-center justify-between p-2 rounded-lg bg-[#0d121c] border border-slate-800/80 transition-all ${
-                        isDone ? 'opacity-40' : ''
-                      }`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        background: '#07090e',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        opacity: isDone ? 0.4 : 1,
+                      }}
                     >
-                      <div className="flex items-center gap-2 overflow-hidden pr-2">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', paddingRight: '6px' }}>
                         <button
                           onClick={() => handleToggleProject(p)}
-                          className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] font-mono ${
-                            isDone
-                              ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-bold'
-                              : 'border-slate-700 bg-slate-900 text-transparent'
-                          }`}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '4px',
+                            border: isDone ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.2)',
+                            background: isDone ? '#10b981' : '#030508',
+                            color: isDone ? '#000000' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
                         >
                           ✓
                         </button>
-                        <div className="truncate">
-                          <div className={`text-xs text-slate-200 truncate ${isDone ? 'line-through' : ''}`}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '11px', color: '#e2e8f0', textDecoration: isDone ? 'line-through' : 'none' }}>
                             {p.title}
-                          </div>
-                          {p.note && <div className="text-[10px] text-slate-500 truncate">{p.note}</div>}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                         <span
-                          className="text-[9px] font-mono px-1.5 py-0.5 rounded border"
-                          style={{ color: tagMeta.color, borderColor: `${tagMeta.color}40`, background: tagMeta.bg }}
+                          style={{
+                            fontSize: '9px',
+                            fontFamily: 'monospace',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            color: tagMeta.color,
+                            background: tagMeta.bg,
+                            border: `1px solid ${tagMeta.color}35`,
+                          }}
                         >
                           {tagMeta.label.split(' ')[0]}
                         </span>
                         <button
                           onClick={() => handleDeleteProject(p.id)}
-                          className="text-slate-600 hover:text-rose-400 text-xs px-1"
+                          style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '13px', padding: '0 2px' }}
                           title="ลบไอเดียนี้"
                         >
                           ×
@@ -474,7 +603,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             </div>
           </div>
 
-          <div className="text-[10px] text-slate-500 font-mono text-center pt-1 border-t border-slate-800/60">
+          <div style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace', textAlign: 'center', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
             จดทิ้งไว้ที่นี่ สมองจะเลิกพะวง แล้วกลับมาลุยงานหลักได้ 100%
           </div>
         </div>

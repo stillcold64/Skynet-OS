@@ -3789,3 +3789,50 @@ body {
   color: #00f2fe;
   box-shadow: 0 0 14px rgba(0, 242, 254, 0.25);
 }
+
+.mc-grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.mc-col-4 {
+  grid-column: span 4;
+}
+
+.mc-col-6 {
+  grid-column: span 6;
+}
+
+.mc-col-12 {
+  grid-column: span 12;
+}
+
+@media (max-width: 1024px) {
+  .mc-col-4, .mc-col-6 {
+    grid-column: span 12;
+  }
+}
+
+.mc-subbox {
+  background: #080b11;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.mc-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: #05070b;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mc-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
