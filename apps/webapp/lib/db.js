@@ -981,6 +981,52 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_daily_reflections_date ON daily_reflections(date);
 `);
 
+// 11. Daily Tracker (Continuous Activity State & Time Tracking with Category Heatmaps)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_tracker_activities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    emoji TEXT DEFAULT '⚡',
+    color TEXT DEFAULT '#64d2ff',
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS daily_time_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    activity_id INTEGER NOT NULL,
+    activity_name TEXT NOT NULL,
+    date TEXT NOT NULL, -- 'YYYY-MM-DD'
+    start_time TEXT NOT NULL, -- ISO timestamp (e.g. '2026-10-28T09:00:00.000Z')
+    end_time TEXT, -- ISO timestamp, NULL if ongoing
+    duration_minutes INTEGER DEFAULT 0,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_daily_time_logs_date ON daily_time_logs(date);
+  CREATE INDEX IF NOT EXISTS idx_daily_time_logs_activity ON daily_time_logs(activity_id);
+  CREATE INDEX IF NOT EXISTS idx_daily_time_logs_active ON daily_time_logs(end_time);
+`);
+
+// Seed default activities if empty
+const dailyActivityCount = db.prepare('SELECT COUNT(*) as count FROM daily_tracker_activities').get().count;
+if (dailyActivityCount === 0) {
+  const insertAct = db.prepare(`
+    INSERT INTO daily_tracker_activities (name, emoji, color, description, sort_order)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  insertAct.run('ทำงาน / สตรีม / วิจัย', '💻', '#64d2ff', 'เขียนโค้ด ตัดต่อ สตรีมมิ่ง วิจัย EA หรืองานประจำ', 1);
+  insertAct.run('เล่นเกม', '🎮', '#bf5af2', 'เล่นเกมเพื่อความบันเทิงและคลายเครียด', 2);
+  insertAct.run('พัฒนาตัวเอง / เทรดดิ้ง', '🧠', '#ffd60a', 'ศึกษาข้อมูล วางกลยุทธ์ ทำ Playbook ทบทวนระบบ', 3);
+  insertAct.run('ออกกำลังกาย / สุขภาพ', '💪', '#30d158', 'วิดพื้น ยืดเหยียด เดิน หรือออกกำลังกาย', 4);
+  insertAct.run('พักผ่อน / นอนหลับ', '😴', '#0a84ff', 'งีบหลับ พักสายตา หรือนอนพักผ่อนช่วงกลางคืน', 5);
+  insertAct.run('หย่อนใจ / สังสรรค์ / ผ่อนคลาย', '🌿', '#ff9f0a', 'กินข้าว ดูคลิป ผ่อนคลาย หรือกิจกรรมนอกบ้าน', 6);
+}
+
 export default db;
 
 

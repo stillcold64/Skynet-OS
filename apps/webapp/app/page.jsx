@@ -5,7 +5,7 @@ import PlaybookTab from './components/PlaybookTab';
 import JournalTab from './components/JournalTab';
 import TradeTrackerTab from './components/TradeTrackerTab';
 import FocusTab from './components/FocusTab';
-import MicroHabitsTab from './components/MicroHabitsTab';
+import DailyTrackerTab from './components/DailyTrackerTab';
 import MemoryAnchorTab from './components/MemoryAnchorTab';
 import DailyReflectionTab from './components/DailyReflectionTab';
 import ExpenseWaveChart from './components/ExpenseWaveChart';
@@ -568,8 +568,8 @@ export default function Home() {
                 className={`segmented-button ${activeTab === 'habits' ? 'active' : ''}`}
                 onClick={() => setActiveTab('habits')}
               >
-                <span>⚡</span>
-                <span>Micro Habits (รูทีน & นิสัยรายวัน)</span>
+                <span>⏱️</span>
+                <span>Daily Tracker (บันทึกเวลา & วินัยรายวัน)</span>
               </button>
             </>
           )}
@@ -1469,7 +1469,7 @@ export default function Home() {
       {activeTab === 'reflections' && <DailyReflectionTab />}
       {activeTab === 'anchor' && <MemoryAnchorTab />}
       {activeTab === 'focus' && <FocusTab />}
-      {activeTab === 'habits' && <MicroHabitsTab />}
+      {activeTab === 'habits' && <DailyTrackerTab />}
 
       {/* Bot Audit & Activity Log (Only in Personal Finance mode) */}
       {appMode === 'finance' && (
