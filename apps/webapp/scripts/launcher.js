@@ -35,6 +35,7 @@ process.on('unhandledRejection', (reason) => {
 
 let webProcess = null;
 let botProcess = null;
+let autoTrackerProcess = null;
 let isShuttingDown = false;
 let browserOpened = false;
 
@@ -78,6 +79,26 @@ function startTelegramBot() {
   });
 }
 
+// 2.5 Start Auto-Tracker Daemon (Game auto-detection & Sleep/Inactivity auto-stop)
+function startAutoTracker() {
+  if (isShuttingDown) return;
+  log('[*] Starting Auto-Tracker Daemon (Game & Inactivity Watcher)...');
+
+  const trackerScript = path.join(webappDir, 'scripts', 'auto_tracker_daemon.js');
+  autoTrackerProcess = spawn(process.execPath, [trackerScript], {
+    cwd: webappDir,
+    stdio: 'inherit',
+    env: process.env,
+  });
+
+  autoTrackerProcess.on('exit', (code, signal) => {
+    if (!isShuttingDown) {
+      log(`[WARN] Auto-Tracker Daemon exited (code: ${code}, signal: ${signal}). Restarting in 5s...`);
+      setTimeout(startAutoTracker, 5000);
+    }
+  });
+}
+
 // 3. Poll for port 3000 ready and open browser
 function openBrowserWhenReady(retries = 30) {
   if (retries <= 0 || isShuttingDown || browserOpened) return;
@@ -108,6 +129,7 @@ function shutdown() {
   log('\n[*] Shutting down Skynet OS services...');
   if (webProcess) webProcess.kill('SIGTERM');
   if (botProcess) botProcess.kill('SIGTERM');
+  if (autoTrackerProcess) autoTrackerProcess.kill('SIGTERM');
   setTimeout(() => process.exit(0), 1000);
 }
 
@@ -117,5 +139,6 @@ process.on('SIGTERM', shutdown);
 // Launch everything
 startWebServer();
 startTelegramBot();
+startAutoTracker();
 openBrowserWhenReady();
 

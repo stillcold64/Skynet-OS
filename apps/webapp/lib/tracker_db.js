@@ -94,12 +94,15 @@ export function getActiveSession() {
   const elapsedMs = Math.max(0, now.getTime() - start.getTime());
   const elapsedMinutes = Math.floor(elapsedMs / 60000);
   const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+  const todayBangkok = getBangkokDateStr(now);
+  const isStale = elapsedMinutes >= 300 || session.date !== todayBangkok;
 
   return {
     ...session,
     elapsedMinutes,
     elapsedSeconds,
     elapsedFormatted: formatDuration(elapsedMinutes),
+    isStale,
   };
 }
 
@@ -227,16 +230,26 @@ export function stopActiveSession(note = '', customEndTime = null) {
     return { action: 'none', message: 'ไม่มีกิจกรรมที่กำลังบันทึกเวลาอยู่' };
   }
 
-  const endIso = customEndTime || new Date().toISOString();
+  let endIso = customEndTime || new Date().toISOString();
+  if (customEndTime && customEndTime.length <= 5 && customEndTime.includes(':')) {
+    const [hh, mm] = customEndTime.split(':');
+    let targetDate = activeSession.date;
+    if (Number(hh) < 6) {
+      targetDate = shiftDays(activeSession.date, 1);
+    }
+    endIso = `${targetDate}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+07:00`;
+  }
+
   const startDt = new Date(activeSession.start_time);
   const endDt = new Date(endIso);
   const duration = Math.max(1, Math.round((endDt.getTime() - startDt.getTime()) / 60000));
+  const finalEndIso = new Date(endIso).toISOString();
 
   db.prepare(`
     UPDATE daily_time_logs 
     SET end_time = ?, duration_minutes = ?, note = COALESCE(NULLIF(?, ''), note), updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(endIso, duration, note, activeSession.id);
+  `).run(finalEndIso, duration, note, activeSession.id);
 
   const closedSession = db.prepare('SELECT * FROM daily_time_logs WHERE id = ?').get(activeSession.id);
 

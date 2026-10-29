@@ -64,8 +64,28 @@ export async function POST(request) {
 
     // 2. Stop ongoing session
     if (action === 'stop') {
-      const { note = '' } = body;
-      const result = stopActiveSession(note);
+      const { note = '', customEndTime = null } = body;
+      const result = stopActiveSession(note, customEndTime);
+      return NextResponse.json({ success: true, result });
+    }
+
+    // 2.5 Resolve stale session (e.g. user fell asleep, cut at 01:00 AM, optionally log sleep)
+    if (action === 'resolve_stale') {
+      const { customEndTime = '01:00', note = 'หลับแล้วลืมปิด', addSleepBlock = true } = body;
+      const result = stopActiveSession(note, customEndTime);
+      if (addSleepBlock && result.closedSession) {
+        const wakeTime = new Date().toISOString();
+        const sleepDate = getBangkokDateStr(new Date(wakeTime));
+        const sleepMins = Math.max(1, Math.round((new Date(wakeTime) - new Date(result.closedSession.end_time)) / 60000));
+        addManualLog({
+          activityId: 5, // พักผ่อน / นอนหลับ
+          date: sleepDate,
+          startTime: result.closedSession.end_time,
+          endTime: wakeTime,
+          durationMinutes: sleepMins,
+          note: 'นอนหลับข้ามคืน (ระบบบันทึกอัตโนมัติ)',
+        });
+      }
       return NextResponse.json({ success: true, result });
     }
 

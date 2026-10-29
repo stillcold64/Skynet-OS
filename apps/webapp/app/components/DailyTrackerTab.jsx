@@ -230,6 +230,36 @@ export default function DailyTrackerTab() {
     }
   };
 
+  // Resolve Stale Session (cut at specified time e.g. 01:00 AM, optionally log sleep)
+  const handleResolveStale = async (customEndTime = '01:00', addSleepBlock = true) => {
+    if (!activeSession || punchingId) return;
+    setPunchingId('resolve');
+
+    try {
+      const res = await fetch('/api/tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'resolve_stale',
+          customEndTime,
+          note: `ตัดจบเมื่อ ${customEndTime} น. (เผลอหลับ/ลืมปิด)`,
+          addSleepBlock,
+        }),
+      });
+
+      if (res.ok) {
+        showToast(`✂️ ตัดจบเวลา ${customEndTime} น. และบันทึกเวลานอนเรียบร้อย`);
+        await fetchData(false);
+      } else {
+        showToast('เกิดข้อผิดพลาดในการตัดจบเวลา');
+      }
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    } finally {
+      setPunchingId(null);
+    }
+  };
+
   // Save Manual Log
   const handleSaveManualLog = async (e) => {
     e.preventDefault();
@@ -539,6 +569,80 @@ export default function DailyTrackerTab() {
           </div>
         </div>
 
+        {/* STALE OVERNIGHT WARNING BANNER */}
+        {activeSession && activeSession.isStale && (
+          <div
+            style={{
+              background: 'rgba(255, 69, 58, 0.12)',
+              border: '1px solid rgba(255, 69, 58, 0.45)',
+              borderRadius: '12px',
+              padding: '14px 18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.3rem' }}>⚠️</span>
+              <div>
+                <strong style={{ color: '#ff453a', fontSize: '0.92rem' }}>
+                  ตรวจพบกิจกรรมเปิดค้างข้ามคืน / นานผิดปกติ (ผ่านไป {formatThaiDuration(activeSession.elapsedMinutes)})
+                </strong>
+                <div style={{ fontSize: '0.78rem', color: '#aeaeb2', marginTop: '2px' }}>
+                  เริ่มตั้งแต่: {activeSession.date} เวลา {formatTimeOnly(activeSession.start_time)} น. (หากคุณเผลอหลับ สามารถเลือกตัดจบเวลาได้ทันทีด้านล่าง ระบบจะบันทึกเวลานอนต่อให้เอง)
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '4px' }}>
+              <span style={{ fontSize: '0.78rem', color: '#8e8e93', fontWeight: '600' }}>ตัดจบด่วน:</span>
+              <button
+                onClick={() => handleResolveStale('01:00', true)}
+                style={{
+                  background: 'rgba(255, 69, 58, 0.2)',
+                  border: '1px solid #ff453a',
+                  color: '#fff',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                ✂️ ตัดจบตอนตี 1 (01:00 น.) + เซฟเวลานอน
+              </button>
+              <button
+                onClick={() => handleResolveStale('00:00', true)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#fff',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                }}
+              >
+                ✂️ ตัดจบเที่ยงคืน (00:00 น.)
+              </button>
+              <button
+                onClick={() => handleStop()}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#aeaeb2',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                }}
+              >
+                ⏹️ จบ ณ เวลาปัจจุบัน
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ACTIVE TIMER BANNER */}
         {activeSession ? (
           <div
@@ -755,6 +859,11 @@ export default function DailyTrackerTab() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#30d158' }}>
             <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#30d158' }} />
             <span>Google Sheets Auto-Sync (Silent Redundancy)</span>
+          </div>
+          <div>•</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#64d2ff' }}>
+            <span>⚡</span>
+            <span>Auto-Tracker เปิดใช้งาน (ตรวจจับ Dota 2 & เกม Steam อัตโนมัติ + ตัดจบเมื่อหลับเกิน 40 นาที)</span>
           </div>
         </div>
       </section>
