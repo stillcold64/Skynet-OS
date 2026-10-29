@@ -34,15 +34,25 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const [focusStats, setFocusStats] = useState(null);
   const [trackerActive, setTrackerActive] = useState(null);
   const [trackerToday, setTrackerToday] = useState(null);
+  const [todayLogs, setTodayLogs] = useState([]);
   const [liveElapsed, setLiveElapsed] = useState(0);
   const [isFocusToggling, setIsFocusToggling] = useState(false);
 
-  // Fetch Today's Actions (Focus + Daily Tracker)
+  // Reflection (Daily Logs & Plan) State
+  const [todayReflection, setTodayReflection] = useState({ finish_text: '', next_day_text: '', luck_text: '' });
+  const [yesterdayPlan, setYesterdayPlan] = useState('');
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
+  const [planInput, setPlanInput] = useState('');
+  const [finishInput, setFinishInput] = useState('');
+  const [isSavingReflection, setIsSavingReflection] = useState(false);
+
+  // Fetch Today's Actions (Focus + Daily Tracker + Daily Plan/Reflections)
   const fetchTodayActions = async () => {
     try {
-      const [focusRes, trackerRes] = await Promise.all([
+      const [focusRes, trackerRes, reflectionRes] = await Promise.all([
         fetch('/api/focus'),
         fetch('/api/tracker'),
+        fetch('/api/reflections'),
       ]);
       if (focusRes.ok) {
         const fData = await focusRes.json();
@@ -53,6 +63,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
         const tData = await trackerRes.json();
         setTrackerActive(tData.activeSession || null);
         setTrackerToday(tData.todayStats || null);
+        setTodayLogs(tData.todayLogs || []);
         if (tData.activeSession) {
           const start = new Date(tData.activeSession.start_time).getTime();
           setLiveElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
@@ -60,8 +71,41 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           setLiveElapsed(0);
         }
       }
+      if (reflectionRes.ok) {
+        const rData = await reflectionRes.json();
+        setTodayReflection(rData.today || { finish_text: '', next_day_text: '', luck_text: '' });
+        setPlanInput(rData.today?.next_day_text || '');
+        setFinishInput(rData.today?.finish_text || '');
+        const yest = (rData.history || []).find((h) => h.date !== rData.selectedDate && h.next_day_text);
+        if (yest) {
+          setYesterdayPlan(yest.next_day_text);
+        }
+      }
     } catch (err) {
       console.error('Failed to load today actions:', err);
+    }
+  };
+
+  // Save Reflection (Plan & Finish List)
+  const handleSaveReflection = async () => {
+    try {
+      setIsSavingReflection(true);
+      const res = await fetch('/api/reflections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          finish_text: finishInput,
+          next_day_text: planInput,
+        }),
+      });
+      if (res.ok) {
+        setIsEditingPlan(false);
+        fetchTodayActions();
+      }
+    } catch (e) {
+      console.error('Error saving reflection:', e);
+    } finally {
+      setIsSavingReflection(false);
     }
   };
 
@@ -460,7 +504,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           </div>
         </div>
 
-        {/* 2 Sub-Cards: Left = Top 3 Focus, Right = Daily Tracker */}
+        {/* 3 Sub-Cards: Left = Top 3 Focus, Middle = Daily Plan & Finished, Right = Daily Tracker */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
           
           {/* SUB-CARD 1: TOP 3 FOCUS */}
@@ -534,7 +578,133 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             </div>
           </div>
 
-          {/* SUB-CARD 2: DAILY ACTIVITY TRACKER */}
+          {/* SUB-CARD 2: DAILY PLAN & FINISHED (แผนที่ต้องทำ & สิ่งที่ทำเสร็จแล้ว) */}
+          <div
+            style={{
+              background: '#070a10',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📋</span> Daily Plan & Finished (แผน & สิ่งที่ทำเสร็จ)
+              </span>
+              <button
+                onClick={() => setIsEditingPlan(!isEditingPlan)}
+                style={{
+                  background: isEditingPlan ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: isEditingPlan ? '#10b981' : '#8e8e93',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                {isEditingPlan ? 'ปิดการแก้ไข' : '✏️ แก้ไข/จดเพิ่ม'}
+              </button>
+            </div>
+
+            {/* View or Edit mode */}
+            {isEditingPlan ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '10px', color: '#94a3b8', display: 'block', marginBottom: '2px' }}>
+                    🎯 แผนที่ต้องทำ (Plan / Next Day):
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={planInput}
+                    onChange={(e) => setPlanInput(e.target.value)}
+                    placeholder="เช่น ทำงานตัดต่อคลิป EP.3, วิจัย EA 1 ชั่วโมง"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      padding: '6px 8px',
+                      resize: 'none',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: '#94a3b8', display: 'block', marginBottom: '2px' }}>
+                    ✅ สิ่งที่ทำเสร็จแล้ววันนี้ (Finished List):
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={finishInput}
+                    onChange={(e) => setFinishInput(e.target.value)}
+                    placeholder="เช่น ตัดคลิปเสร็จ 1 ชิ้น, วิดพื้นครบ"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      padding: '6px 8px',
+                      resize: 'none',
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={handleSaveReflection}
+                  disabled={isSavingReflection}
+                  style={{
+                    background: '#10b981',
+                    color: '#000',
+                    border: 'none',
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: isSavingReflection ? 'wait' : 'pointer',
+                    alignSelf: 'flex-end',
+                  }}
+                >
+                  {isSavingReflection ? 'กำลังบันทึก...' : '💾 บันทึกแผน'}
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Today's Plan */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '8px 10px' }}>
+                  <div style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🎯</span> แผนที่ตั้งเป้าไว้ (Today's Plan):
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: todayReflection.next_day_text || yesterdayPlan ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                    {todayReflection.next_day_text || yesterdayPlan || 'ยังไม่ได้กำหนดแผนวันนี้ (กดปุ่ม ✏️ เพื่อพิมพ์เพิ่ม)'}
+                  </div>
+                </div>
+
+                {/* Finished List */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '8px 10px' }}>
+                  <div style={{ fontSize: '10px', color: '#34d399', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>✅</span> สิ่งที่ทำเสร็จแล้ววันนี้ (Finished List):
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: todayReflection.finish_text ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                    {todayReflection.finish_text || 'ยังไม่มีรายการที่บันทึกว่าเสร็จ (กด ✏️ เพื่อจดความสำเร็จ)'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.04)', paddingTop: '6px' }}>
+              <span>บันทึกความคืบหน้าสะสม</span>
+              <span style={{ color: '#10b981' }}>ซิงค์ Sheets เงียบ ๆ ☁️</span>
+            </div>
+          </div>
+
+          {/* SUB-CARD 3: DAILY ACTIVITY TRACKER & TODAY'S TIME LOGS */}
           <div
             style={{
               background: '#070a10',
@@ -549,10 +719,10 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#64d2ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>⏱️</span> Daily Tracker (กิจกรรม & วินัยเวลา)
+                <span>⏱️</span> Daily Tracker (กิจกรรม & ไทม์ไลน์วันนี้)
               </span>
               <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#94a3b8' }}>
-                บันทึกวันนี้: <strong style={{ color: '#ffffff' }}>{trackerToday?.totalFormatted || '0 นาที'}</strong>
+                รวมวันนี้: <strong style={{ color: '#ffffff' }}>{trackerToday?.totalFormatted || '0 นาที'}</strong>
               </span>
             </div>
 
@@ -655,6 +825,72 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Today's Chronological Time Logs (ไทม์ไลน์บันทึกเวลาจริงวันนี้) */}
+            <div style={{ background: '#04060a', border: '1px solid rgba(255, 255, 255, 0.04)', borderRadius: '8px', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#94a3b8', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+                <span>📜 ไทม์ไลน์ช่วงเวลาวันนี้:</span>
+                <span style={{ color: '#64d2ff' }}>{todayLogs.length} รอบ</span>
+              </div>
+              
+              {todayLogs.length === 0 ? (
+                <div style={{ fontSize: '10.5px', color: '#64748b', textAlign: 'center', padding: '4px 0' }}>
+                  ยังไม่มีประวัติการจับเวลาวันนี้
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '110px', overflowY: 'auto' }}>
+                  {todayLogs.map((log) => {
+                    const isOngoing = !log.end_time;
+                    const formatTime = (iso) => {
+                      if (!iso) return 'ปัจจุบัน';
+                      try {
+                        return new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+                      } catch (e) {
+                        return iso.slice(11, 16);
+                      }
+                    };
+                    const durH = Math.floor(log.duration_minutes / 60);
+                    const durM = log.duration_minutes % 60;
+                    const durFormatted = isOngoing
+                      ? `${Math.floor(liveElapsed / 60)} น.`
+                      : durH > 0
+                      ? `${durH} ชม. ${durM} น.`
+                      : `${durM} น.`;
+
+                    return (
+                      <div
+                        key={log.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '3px 6px',
+                          borderRadius: '4px',
+                          background: isOngoing ? 'rgba(48, 209, 88, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                          fontSize: '10.5px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{log.emoji || '⚡'}</span>
+                          <span style={{ color: '#ffffff', fontWeight: 600 }}>{log.activity_name}</span>
+                          {log.note && (
+                            <span style={{ color: '#64748b', fontSize: '9.5px' }}>({log.note.replace('Auto-detected: ', '').replace('Auto-stopped: ', '')})</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'monospace' }}>
+                          <span style={{ color: '#94a3b8' }}>
+                            {formatTime(log.start_time)} - {formatTime(log.end_time)}
+                          </span>
+                          <span style={{ color: isOngoing ? '#30d158' : '#64d2ff', fontWeight: 700 }}>
+                            {durFormatted}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Disciplines yet to do today (Uncompleted Activities Alert) */}
