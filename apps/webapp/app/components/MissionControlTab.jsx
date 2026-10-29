@@ -29,6 +29,83 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const [newCategory, setNewCategory] = useState('HOBBY');
   const [isAddingProject, setIsAddingProject] = useState(false);
 
+  // Today's Action & Routine Cockpit State
+  const [focusTop3, setFocusTop3] = useState([]);
+  const [focusStats, setFocusStats] = useState(null);
+  const [trackerActive, setTrackerActive] = useState(null);
+  const [trackerToday, setTrackerToday] = useState(null);
+  const [liveElapsed, setLiveElapsed] = useState(0);
+  const [isFocusToggling, setIsFocusToggling] = useState(false);
+
+  // Fetch Today's Actions (Focus + Daily Tracker)
+  const fetchTodayActions = async () => {
+    try {
+      const [focusRes, trackerRes] = await Promise.all([
+        fetch('/api/focus'),
+        fetch('/api/tracker'),
+      ]);
+      if (focusRes.ok) {
+        const fData = await focusRes.json();
+        setFocusTop3(fData.todayTop3 || []);
+        setFocusStats(fData.stats || null);
+      }
+      if (trackerRes.ok) {
+        const tData = await trackerRes.json();
+        setTrackerActive(tData.activeSession || null);
+        setTrackerToday(tData.todayStats || null);
+        if (tData.activeSession) {
+          const start = new Date(tData.activeSession.start_time).getTime();
+          setLiveElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+        } else {
+          setLiveElapsed(0);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load today actions:', err);
+    }
+  };
+
+  // Toggle Focus Check-in
+  const handleToggleFocus = async (task) => {
+    if (isFocusToggling) return;
+    setIsFocusToggling(true);
+    const nextCompleted = !task.is_done_today;
+    setFocusTop3((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, is_done_today: nextCompleted } : t))
+    );
+    try {
+      await fetch('/api/focus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'checkin',
+          taskId: task.id,
+          status: nextCompleted ? 'COMPLETED' : 'TOGGLE',
+        }),
+      });
+      fetchTodayActions();
+    } catch (e) {
+      console.error('Error toggling focus:', e);
+      fetchTodayActions();
+    } finally {
+      setIsFocusToggling(false);
+    }
+  };
+
+  // Punch Tracker Activity
+  const handlePunchTracker = async (activityId) => {
+    try {
+      await fetch('/api/tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'punch', activityId }),
+      });
+      fetchTodayActions();
+    } catch (e) {
+      console.error('Error punching tracker:', e);
+    }
+  };
+
   // Fetch Roadmap from API
   const fetchRoadmap = async () => {
     try {
@@ -61,7 +138,21 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   useEffect(() => {
     fetchRoadmap();
     fetchProjects();
+    fetchTodayActions();
   }, []);
+
+  // Real-time ticking clock for active tracker session
+  useEffect(() => {
+    if (!trackerActive) {
+      setLiveElapsed(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      const start = new Date(trackerActive.start_time).getTime();
+      setLiveElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [trackerActive]);
 
   // Roadmap Actions
   const handleToggleStep = async (step) => {
@@ -209,9 +300,9 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   // Specific Spending Drilldown (Leaks analysis)
   const snackExpense = transactions.filter((t) => (t.category || '').includes('ขนม')).reduce((sum, t) => sum + (t.amount || 0), 0) || 779;
   const zazaExpense = transactions.filter((t) => (t.category || '').toLowerCase().includes('zaza')).reduce((sum, t) => sum + (t.amount || 0), 0) || 1400;
-  const waterExpense = transactions.filter((t) => (t.category || '').includes('ค่าน้ำประปา')).reduce((sum, t) => sum + (t.amount || 0), 0) || 1525;
+  const waterExpense = transactions.filter((t) => (t.category || '').includes('ค่าน้ำประปา') || (t.category || '').includes('ค่าน้ำมัน')).reduce((sum, t) => sum + (t.amount || 0), 0) || 1525;
   const coffeeExpense = transactions.filter((t) => (t.category || '').includes('กาแฟ')).reduce((sum, t) => sum + (t.amount || 0), 0) || 655;
-  const gasExpense = transactions.filter((t) => (t.category || '').toLowerCase().includes('gas')).reduce((sum, t) => sum + (t.amount || 0), 0) || 400;
+  const gasExpense = transactions.filter((t) => (t.category || '').toLowerCase().includes('gas') || (t.category || '').includes('แก๊ส')).reduce((sum, t) => sum + (t.amount || 0), 0) || 400;
 
   // Paylater specifics (First target)
   const paylater = debtsData?.debts?.find((d) => d.name.toLowerCase().includes('paylater')) || {
@@ -222,6 +313,31 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const paylaterProgressPct = Math.min(100, Math.round((paylaterPaid / (paylater.initial_amount || 4568)) * 100)) || 54;
 
   const currentPhaseSteps = roadmapSteps.filter((s) => s.phase_num === selectedPhase);
+
+  // Today's Focus & Routine Checklist calculations
+  const focusCompletedCount = focusTop3.filter((t) => t.is_done_today).length;
+  const coreDisciplines = [
+    { id: 1, name: '💻 ทำงาน/วิจัย' },
+    { id: 3, name: '🧠 พัฒนาตัวเอง' },
+    { id: 4, name: '💪 ออกกำลังกาย' },
+  ];
+  const trackerBreakdownMap = {};
+  (trackerToday?.breakdown || []).forEach((b) => {
+    trackerBreakdownMap[b.activity_id] = b.totalMinutes;
+  });
+  if (trackerActive) {
+    trackerBreakdownMap[trackerActive.activity_id] = (trackerBreakdownMap[trackerActive.activity_id] || 0) + 1;
+  }
+  const uncompletedDisciplines = coreDisciplines
+    .filter((d) => !trackerBreakdownMap[d.id] || trackerBreakdownMap[d.id] <= 0)
+    .map((d) => d.name);
+
+  const formatTimerClock = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto 40px auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -312,6 +428,245 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>
             <span>ชำระสะสมแล้ว: {paylaterPaid.toLocaleString()} ฿</span>
             <span style={{ color: '#00f2fe' }}>ปลดล็อกคืนกระเป๋า: 1,261 ฿/ด.</span>
+          </div>
+        </div>
+      </section>
+
+      {/* 1.5 TODAY'S ACTION COCKPIT: TOP 3 FOCUS & DAILY ROUTINE TRACKER */}
+      <section
+        style={{
+          background: 'linear-gradient(165deg, rgba(16, 22, 36, 0.95) 0%, rgba(9, 13, 21, 0.95) 100%)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '18px 20px',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+        }}
+      >
+        {/* Section Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>🎯</span>
+            <span style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.3px' }}>
+              วาระ & วินัยประจำวันนี้ (Today's Actions & Routine Checklist)
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>
+              คลิกติ๊กเสร็จหรือสลับจับเวลาได้ทันทีจากหน้านี้
+            </span>
+          </div>
+        </div>
+
+        {/* 2 Sub-Cards: Left = Top 3 Focus, Right = Daily Tracker */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+          
+          {/* SUB-CARD 1: TOP 3 FOCUS */}
+          <div
+            style={{
+              background: '#070a10',
+              border: '1px solid rgba(255, 214, 10, 0.25)',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffd60a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🔥</span> Top 3 Focus (ภารกิจ 3 ข้อประจำวัน)
+              </span>
+              <span style={{ fontSize: '11px', fontFamily: 'monospace', color: focusCompletedCount === 3 ? '#30d158' : '#ffd60a', background: 'rgba(255, 214, 10, 0.1)', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                {focusCompletedCount}/3 สำเร็จแล้ว {focusCompletedCount === 3 && '🎉'}
+              </span>
+            </div>
+
+            {/* Task list with interactive toggle */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {focusTop3.length === 0 ? (
+                <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', padding: '12px 0' }}>
+                  กำลังโหลดภารกิจ 3 ข้อ...
+                </div>
+              ) : (
+                focusTop3.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => handleToggleFocus(task)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: task.is_done_today ? 'rgba(48, 209, 88, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                      border: task.is_done_today ? '1px solid rgba(48, 209, 88, 0.35)' : '1px solid rgba(255, 255, 255, 0.06)',
+                      cursor: isFocusToggling ? 'wait' : 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!task.is_done_today}
+                      readOnly
+                      style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#30d158' }}
+                    />
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: task.is_done_today ? '#94a3b8' : '#ffffff', textDecoration: task.is_done_today ? 'line-through' : 'none', flex: 1 }}>
+                      {task.title}
+                    </span>
+                    {task.is_done_today ? (
+                      <span style={{ fontSize: '10px', color: '#30d158', fontWeight: 700 }}>✓ ทำแล้ว</span>
+                    ) : (
+                      <span style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 600 }}>⏳ ยังไม่ทำ</span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Incomplete note */}
+            <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.04)', paddingTop: '6px' }}>
+              <span>{focusCompletedCount === 3 ? '🎉 ยอดเยี่ยม! วันนี้ทำครบ 3 ข้อแล้ว' : `เหลืออีก ${Math.max(0, 3 - focusCompletedCount)} ข้อที่ต้องทำให้เสร็จวันนี้`}</span>
+              <span style={{ color: '#00f2fe' }}>รักษาวินัยต่อเนื่อง 🔥</span>
+            </div>
+          </div>
+
+          {/* SUB-CARD 2: DAILY ACTIVITY TRACKER */}
+          <div
+            style={{
+              background: '#070a10',
+              border: trackerActive ? `1px solid ${trackerActive.color || '#64d2ff'}40` : '1px solid rgba(100, 210, 255, 0.25)',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#64d2ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>⏱️</span> Daily Tracker (กิจกรรม & วินัยเวลา)
+              </span>
+              <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#94a3b8' }}>
+                บันทึกวันนี้: <strong style={{ color: '#ffffff' }}>{trackerToday?.totalFormatted || '0 นาที'}</strong>
+              </span>
+            </div>
+
+            {/* Current Active Status */}
+            {trackerActive ? (
+              <div
+                style={{
+                  background: `${trackerActive.color || '#64d2ff'}18`,
+                  border: `1px solid ${trackerActive.color || '#64d2ff'}40`,
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>{trackerActive.emoji || '⚡'}</span>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff' }}>
+                      กำลังทำ: {trackerActive.activity_name}
+                    </div>
+                    <div style={{ fontSize: '10px', color: trackerActive.color || '#64d2ff' }}>
+                      {trackerActive.note ? `${trackerActive.note} • ` : ''}เริ่มเมื่อ {new Date(trackerActive.start_time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })} น.
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 800, color: '#ffffff' }}>
+                    {formatTimerClock(liveElapsed)}
+                  </span>
+                  <button
+                    onClick={() => handlePunchTracker(trackerActive.activity_id)}
+                    style={{
+                      background: 'rgba(255, 69, 58, 0.15)',
+                      border: '1px solid rgba(255, 69, 58, 0.4)',
+                      color: '#ff453a',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ⏹️ หยุด
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  ⚪ ยังไม่ได้เริ่มกิจกรรม • คลิกปุ่มด้านล่างเพื่อเริ่มจับเวลาทันที
+                </div>
+              </div>
+            )}
+
+            {/* Quick Punch Activity Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+              {[
+                { id: 1, name: 'ทำงาน', emoji: '💻', color: '#64d2ff' },
+                { id: 2, name: 'เล่นเกม', emoji: '🎮', color: '#bf5af2' },
+                { id: 3, name: 'พัฒนาตน', emoji: '🧠', color: '#ffd60a' },
+                { id: 4, name: 'ออกกำลัง', emoji: '💪', color: '#30d158' },
+                { id: 5, name: 'พักผ่อน', emoji: '😴', color: '#0a84ff' },
+              ].map((act) => {
+                const isActive = trackerActive && trackerActive.activity_id === act.id;
+                return (
+                  <button
+                    key={act.id}
+                    onClick={() => handlePunchTracker(act.id)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '2px',
+                      padding: '6px 4px',
+                      borderRadius: '6px',
+                      background: isActive ? `${act.color}30` : 'rgba(255, 255, 255, 0.04)',
+                      border: isActive ? `1.5px solid ${act.color}` : '1px solid rgba(255, 255, 255, 0.06)',
+                      color: '#ffffff',
+                      fontSize: '10px',
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <span style={{ fontSize: '14px' }}>{act.emoji}</span>
+                    <span style={{ whiteSpace: 'nowrap' }}>{act.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Disciplines yet to do today (Uncompleted Activities Alert) */}
+            <div style={{ fontSize: '10.5px', color: '#94a3b8', background: '#04060a', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>
+                {uncompletedDisciplines.length > 0 ? (
+                  <>⚠️ <strong style={{ color: '#f59e0b' }}>ยังไม่ได้ทำวันนี้:</strong> {uncompletedDisciplines.join(' • ')}</>
+                ) : (
+                  <>🎉 <strong style={{ color: '#30d158' }}>ยอดเยี่ยม:</strong> ทำครบทุกเสาหลักกิจกรรมวันนี้แล้ว!</>
+                )}
+              </span>
+            </div>
           </div>
         </div>
       </section>
