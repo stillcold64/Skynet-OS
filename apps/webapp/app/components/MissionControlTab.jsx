@@ -38,12 +38,14 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const [liveElapsed, setLiveElapsed] = useState(0);
   const [isFocusToggling, setIsFocusToggling] = useState(false);
 
-  // Reflection (Daily Logs & Plan) State
+  // Reflection (Daily Logs & Plan) State: 3 distinct items
   const [todayReflection, setTodayReflection] = useState({ finish_text: '', next_day_text: '', luck_text: '' });
   const [yesterdayPlan, setYesterdayPlan] = useState('');
+  const [yesterdayDate, setYesterdayDate] = useState('');
   const [isEditingPlan, setIsEditingPlan] = useState(false);
-  const [planInput, setPlanInput] = useState('');
+  const [todayPlanInput, setTodayPlanInput] = useState('');
   const [finishInput, setFinishInput] = useState('');
+  const [tomorrowPlanInput, setTomorrowPlanInput] = useState('');
   const [isSavingReflection, setIsSavingReflection] = useState(false);
 
   // Fetch Today's Actions (Focus + Daily Tracker + Daily Plan/Reflections)
@@ -73,12 +75,20 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
       }
       if (reflectionRes.ok) {
         const rData = await reflectionRes.json();
-        setTodayReflection(rData.today || { finish_text: '', next_day_text: '', luck_text: '' });
-        setPlanInput(rData.today?.next_day_text || '');
-        setFinishInput(rData.today?.finish_text || '');
+        const tRef = rData.today || { finish_text: '', next_day_text: '', luck_text: '' };
+        setTodayReflection(tRef);
+        setFinishInput(tRef.finish_text || '');
+        setTomorrowPlanInput(tRef.next_day_text || '');
+
         const yest = (rData.history || []).find((h) => h.date !== rData.selectedDate && h.next_day_text);
         if (yest) {
           setYesterdayPlan(yest.next_day_text);
+          setYesterdayDate(yest.date);
+          setTodayPlanInput(yest.next_day_text);
+        } else {
+          setYesterdayPlan('');
+          setYesterdayDate('');
+          setTodayPlanInput('');
         }
       }
     } catch (err) {
@@ -86,22 +96,34 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
     }
   };
 
-  // Save Reflection (Plan & Finish List)
+  // Save Reflection (Today's Plan, Finished List, and Tomorrow's Plan)
   const handleSaveReflection = async () => {
     try {
       setIsSavingReflection(true);
-      const res = await fetch('/api/reflections', {
+      // 1. Save Today's Finished List and Tomorrow's Plan
+      await fetch('/api/reflections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           finish_text: finishInput,
-          next_day_text: planInput,
+          next_day_text: tomorrowPlanInput,
         }),
       });
-      if (res.ok) {
-        setIsEditingPlan(false);
-        fetchTodayActions();
+
+      // 2. If user edited today's target/plan and there's a yesterday record
+      if (yesterdayDate && todayPlanInput !== yesterdayPlan) {
+        await fetch('/api/reflections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: yesterdayDate,
+            next_day_text: todayPlanInput,
+          }),
+        });
       }
+
+      setIsEditingPlan(false);
+      fetchTodayActions();
     } catch (e) {
       console.error('Error saving reflection:', e);
     } finally {
@@ -183,6 +205,13 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
     fetchRoadmap();
     fetchProjects();
     fetchTodayActions();
+
+    // Auto-poll tracker & today cockpit every 15 seconds so auto-detected apps/timers update live
+    const pollInterval = setInterval(() => {
+      fetchTodayActions();
+    }, 15000);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   // Real-time ticking clock for active tracker session
@@ -578,7 +607,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             </div>
           </div>
 
-          {/* SUB-CARD 2: DAILY PLAN & FINISHED (แผนที่ต้องทำ & สิ่งที่ทำเสร็จแล้ว) */}
+          {/* SUB-CARD 2: DAILY PLAN & FINISHED (แผนวันนี้, ทำเสร็จแล้ว, และแผนพรุ่งนี้) */}
           <div
             style={{
               background: '#070a10',
@@ -615,18 +644,18 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             {isEditingPlan ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div>
-                  <label style={{ fontSize: '10px', color: '#94a3b8', display: 'block', marginBottom: '2px' }}>
-                    🎯 แผนที่ต้องทำ (Plan / Next Day):
+                  <label style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                    🎯 1. แผนที่ตั้งเป้าไว้วันนี้ (Today's Plan):
                   </label>
                   <textarea
                     rows={2}
-                    value={planInput}
-                    onChange={(e) => setPlanInput(e.target.value)}
-                    placeholder="เช่น ทำงานตัดต่อคลิป EP.3, วิจัย EA 1 ชั่วโมง"
+                    value={todayPlanInput}
+                    onChange={(e) => setTodayPlanInput(e.target.value)}
+                    placeholder="เป้าหมายที่ตั้งใจจะทำวันนี้..."
                     style={{
                       width: '100%',
                       background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.25)',
                       borderRadius: '6px',
                       color: '#ffffff',
                       fontSize: '11px',
@@ -636,18 +665,39 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '10px', color: '#94a3b8', display: 'block', marginBottom: '2px' }}>
-                    ✅ สิ่งที่ทำเสร็จแล้ววันนี้ (Finished List):
+                  <label style={{ fontSize: '10px', color: '#34d399', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                    ✅ 2. สิ่งที่ทำเสร็จแล้ววันนี้ (Finished Today):
                   </label>
                   <textarea
                     rows={2}
                     value={finishInput}
                     onChange={(e) => setFinishInput(e.target.value)}
-                    placeholder="เช่น ตัดคลิปเสร็จ 1 ชิ้น, วิดพื้นครบ"
+                    placeholder="เช่น ตัดคลิปเสร็จ 1 ชิ้น, วิดพื้นครบ..."
                     style={{
                       width: '100%',
                       background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      border: '1px solid rgba(52, 211, 153, 0.25)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      padding: '6px 8px',
+                      resize: 'none',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                    🚀 3. แผนที่จะทำพรุ่งนี้ (Tomorrow's Plan):
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={tomorrowPlanInput}
+                    onChange={(e) => setTomorrowPlanInput(e.target.value)}
+                    placeholder="สิ่งที่จะลุยต่อในวันพรุ่งนี้..."
+                    style={{
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
                       borderRadius: '6px',
                       color: '#ffffff',
                       fontSize: '11px',
@@ -676,23 +726,33 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Today's Plan */}
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '8px 10px' }}>
+                {/* 1. Today's Plan */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '7px 10px' }}>
                   <div style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span>🎯</span> แผนที่ตั้งเป้าไว้ (Today's Plan):
+                    <span>🎯</span> 1. แผนที่ตั้งเป้าไว้วันนี้ (Today's Plan):
                   </div>
-                  <div style={{ fontSize: '11.5px', color: todayReflection.next_day_text || yesterdayPlan ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-                    {todayReflection.next_day_text || yesterdayPlan || 'ยังไม่ได้กำหนดแผนวันนี้ (กดปุ่ม ✏️ เพื่อพิมพ์เพิ่ม)'}
+                  <div style={{ fontSize: '11px', color: yesterdayPlan || todayPlanInput ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                    {yesterdayPlan || todayPlanInput || 'ยังไม่ได้กำหนดแผนวันนี้ (กด ✏️ เพื่อจดเป้าหมาย)'}
                   </div>
                 </div>
 
-                {/* Finished List */}
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '8px 10px' }}>
+                {/* 2. Finished List Today */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '7px 10px' }}>
                   <div style={{ fontSize: '10px', color: '#34d399', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span>✅</span> สิ่งที่ทำเสร็จแล้ววันนี้ (Finished List):
+                    <span>✅</span> 2. สิ่งที่ทำเสร็จแล้ววันนี้ (Finished Today):
                   </div>
-                  <div style={{ fontSize: '11.5px', color: todayReflection.finish_text ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: '11px', color: todayReflection.finish_text ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
                     {todayReflection.finish_text || 'ยังไม่มีรายการที่บันทึกว่าเสร็จ (กด ✏️ เพื่อจดความสำเร็จ)'}
+                  </div>
+                </div>
+
+                {/* 3. Tomorrow's Plan */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '7px 10px' }}>
+                  <div style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🚀</span> 3. แผนที่จะทำพรุ่งนี้ (Tomorrow's Plan):
+                  </div>
+                  <div style={{ fontSize: '11px', color: todayReflection.next_day_text ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                    {todayReflection.next_day_text || 'ยังไม่ได้วางแผนวันพรุ่งนี้ (กด ✏️ เพื่อวางเป้าหมายล่วงหน้า)'}
                   </div>
                 </div>
               </div>
