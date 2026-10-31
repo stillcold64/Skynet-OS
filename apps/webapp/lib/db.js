@@ -147,6 +147,67 @@ try {
   console.error('Error seeding project_vault:', e);
 }
 
+// 3.3 Portfolio Pillars & Sub-Portfolios (Editable 3-Port structure)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS portfolio_pillars (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pillar_code TEXT UNIQUE NOT NULL, -- 'CASH' | 'ALPHA' | 'BETA'
+    title TEXT NOT NULL,
+    badge TEXT,
+    emoji TEXT DEFAULT '📊',
+    color TEXT DEFAULT '#00f2fe',
+    sort_order INTEGER DEFAULT 1,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS portfolio_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pillar_code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    desc TEXT,
+    amount REAL DEFAULT 0,
+    status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE' | 'DEMO' | 'PENDING' | 'LOCKED'
+    sort_order INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default portfolio pillars and items if empty
+try {
+  const pillarCount = db.prepare('SELECT COUNT(*) as count FROM portfolio_pillars').get().count;
+  if (pillarCount === 0) {
+    const insertPillar = db.prepare(`
+      INSERT INTO portfolio_pillars (pillar_code, title, badge, emoji, color, sort_order, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertPillar.run('CASH', '1. CASH (ความอยู่รอด & ล้างหนี้)', 'หนี้คงเหลือ 51.1k', '💼', '#f43f5e', 1, 'Ray Dalio Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"');
+    insertPillar.run('ALPHA', '2. ALPHA (เครื่องยนต์อัตโนมัติ)', 'MT5 Demo Test', '🤖', '#00f2fe', 2, null);
+    insertPillar.run('BETA', '3. BETA (ความมั่งคั่งระยะยาว)', 'เริ่มหลังปลอดหนี้', '🌱', '#f59e0b', 3, null);
+
+    const insertItem = db.prepare(`
+      INSERT INTO portfolio_items (pillar_code, title, desc, amount, status, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    // CASH items
+    insertItem.run('CASH', 'เงินเดือนประจำ 15k: เลี้ยงชีพ & คุมบิล', 'ชำระสะสมตามเป้าหมาย', 15000, 'ACTIVE', 1);
+    insertItem.run('CASH', 'หนี้ 4 เจ้า: ชำระตรงเวลา', 'เป้าแรก: Paylater 2.1k', 51100, 'ACTIVE', 2);
+
+    // ALPHA items
+    insertItem.run('ALPHA', 'EA บอทเทรด', 'รัน Demo ทุน 0 ฿ (GoldTuesday / BTCSnowball)', 0, 'DEMO', 1);
+    insertItem.run('ALPHA', 'Cent Account ($20 ~ 700 ฿)', 'สเต็ปถัดไปหลังปลดหนี้', 700, 'PENDING', 2);
+    insertItem.run('ALPHA', 'เทรดมือ', 'Paper / Demo บน Playbook เท่านั้น (ห้ามเงินจริง)', 0, 'LOCKED', 3);
+
+    // BETA items
+    insertItem.run('BETA', 'DCA Bitcoin / Crypto Spot', 'เริ่มสะสมเมื่อปลอดหนี้ Shopee & Finnix', 1500, 'PENDING', 1);
+    insertItem.run('BETA', 'เงินสำรองฉุกเฉิน', 'ตั้งเป้า 3 เดือนในบัญชี (~36k ฿)', 36000, 'LOCKED', 2);
+  }
+} catch (e) {
+  console.error('Error seeding portfolio_pillars:', e);
+}
+
 // 4. Category Rules table (Rule Dictionary & Learning Memory)
 db.exec(`
   CREATE TABLE IF NOT EXISTS category_rules (

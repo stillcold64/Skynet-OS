@@ -48,6 +48,32 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const [tomorrowPlanInput, setTomorrowPlanInput] = useState('');
   const [isSavingReflection, setIsSavingReflection] = useState(false);
 
+  // Portfolio Structure State (3 Pillars & Sub-Portfolios from SQLite)
+  const defaultPillars = [
+    { pillar_code: 'CASH', title: '1. CASH (ความอยู่รอด & ล้างหนี้)', badge: 'หนี้คงเหลือ 51.1k', emoji: '💼', color: '#f43f5e', note: 'Ray Dalio Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"' },
+    { pillar_code: 'ALPHA', title: '2. ALPHA (เครื่องยนต์อัตโนมัติ)', badge: 'MT5 Demo Test', emoji: '🤖', color: '#00f2fe', note: null },
+    { pillar_code: 'BETA', title: '3. BETA (ความมั่งคั่งระยะยาว)', badge: 'เริ่มหลังปลอดหนี้', emoji: '🌱', color: '#f59e0b', note: null },
+  ];
+  const defaultItems = [
+    { id: 1, pillar_code: 'CASH', title: 'เงินเดือนประจำ 15k: เลี้ยงชีพ & คุมบิล', desc: 'ชำระสะสมตามเป้าหมาย', status: 'ACTIVE', sort_order: 1 },
+    { id: 2, pillar_code: 'CASH', title: 'หนี้ 4 เจ้า: ชำระตรงเวลา', desc: 'เป้าแรก: Paylater 2.1k', status: 'ACTIVE', sort_order: 2 },
+    { id: 3, pillar_code: 'ALPHA', title: 'EA บอทเทรด', desc: 'รัน Demo ทุน 0 ฿ (GoldTuesday / BTCSnowball)', status: 'DEMO', sort_order: 1 },
+    { id: 4, pillar_code: 'ALPHA', title: 'Cent Account ($20 ~ 700 ฿)', desc: 'สเต็ปถัดไปหลังปลดหนี้', status: 'PENDING', sort_order: 2 },
+    { id: 5, pillar_code: 'ALPHA', title: 'เทรดมือ', desc: 'Paper / Demo บน Playbook เท่านั้น (ห้ามเงินจริง)', status: 'LOCKED', sort_order: 3 },
+    { id: 6, pillar_code: 'BETA', title: 'DCA Bitcoin / Crypto Spot', desc: 'เริ่มสะสมเมื่อปลอดหนี้ Shopee & Finnix', status: 'PENDING', sort_order: 1 },
+    { id: 7, pillar_code: 'BETA', title: 'เงินสำรองฉุกเฉิน', desc: 'ตั้งเป้า 3 เดือนในบัญชี (~36k ฿)', status: 'LOCKED', sort_order: 2 },
+  ];
+
+  const [portfolioPillars, setPortfolioPillars] = useState([]);
+  const [portfolioItems, setPortfolioItems] = useState([]);
+  const [portfolioPrinciple, setPortfolioPrinciple] = useState('');
+  const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(false);
+  const [isEditingPortfolios, setIsEditingPortfolios] = useState(false);
+  const [editPillars, setEditPillars] = useState([]);
+  const [editItems, setEditItems] = useState([]);
+  const [editPrinciple, setEditPrinciple] = useState('');
+  const [isSavingPortfolios, setIsSavingPortfolios] = useState(false);
+
   // Fetch Today's Actions (Focus + Daily Tracker + Daily Plan/Reflections)
   const fetchTodayActions = async () => {
     try {
@@ -201,10 +227,29 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
     }
   };
 
+  // Fetch Portfolio Structure from API
+  const fetchPortfolios = async () => {
+    try {
+      setIsLoadingPortfolios(true);
+      const res = await fetch('/api/portfolios');
+      if (res.ok) {
+        const data = await res.json();
+        setPortfolioPillars(data.pillars || []);
+        setPortfolioItems(data.items || []);
+        setPortfolioPrinciple(data.principle || '');
+      }
+    } catch (err) {
+      console.error('Failed to load portfolio structure:', err);
+    } finally {
+      setIsLoadingPortfolios(false);
+    }
+  };
+
   useEffect(() => {
     fetchRoadmap();
     fetchProjects();
     fetchTodayActions();
+    fetchPortfolios();
 
     // Auto-poll tracker & today cockpit every 15 seconds so auto-detected apps/timers update live
     const pollInterval = setInterval(() => {
@@ -356,6 +401,79 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
       }
     } catch (err) {
       console.error('Failed to toggle project:', err);
+    }
+  };
+
+  // Portfolio Structure Edit Handlers
+  const handleStartEditPortfolios = () => {
+    const basePillars = portfolioPillars.length > 0 ? portfolioPillars : defaultPillars;
+    const baseItems = portfolioItems.length > 0 ? portfolioItems : defaultItems;
+
+    setEditPillars(JSON.parse(JSON.stringify(basePillars)));
+    setEditItems(JSON.parse(JSON.stringify(baseItems)));
+    setEditPrinciple(portfolioPrinciple || 'Ray Dalio Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"');
+    setIsEditingPortfolios(true);
+  };
+
+  const handleCancelEditPortfolios = () => {
+    setIsEditingPortfolios(false);
+  };
+
+  const handlePillarChange = (pillarCode, field, val) => {
+    setEditPillars((prev) =>
+      prev.map((p) => (p.pillar_code === pillarCode ? { ...p, [field]: val } : p))
+    );
+  };
+
+  const handleItemChange = (itemId, field, val) => {
+    setEditItems((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, [field]: val } : it))
+    );
+  };
+
+  const handleAddItem = (pillarCode) => {
+    const tempId = Date.now();
+    setEditItems((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        pillar_code: pillarCode,
+        title: 'พอร์ตใหม่ / แผนย่อย',
+        desc: 'คำอธิบายหรือเป้าหมาย',
+        status: 'ACTIVE',
+        amount: 0,
+        sort_order: prev.length + 1,
+      },
+    ]);
+  };
+
+  const handleDeleteItem = (itemId) => {
+    setEditItems((prev) => prev.filter((it) => it.id !== itemId));
+  };
+
+  const handleSavePortfolios = async () => {
+    try {
+      setIsSavingPortfolios(true);
+      const res = await fetch('/api/portfolios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pillars: editPillars,
+          items: editItems,
+          principle: editPrinciple,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPortfolioPillars(data.pillars || editPillars);
+        setPortfolioItems(data.items || editItems);
+        setPortfolioPrinciple(data.principle || editPrinciple);
+        setIsEditingPortfolios(false);
+      }
+    } catch (err) {
+      console.error('Failed to save portfolio structure:', err);
+    } finally {
+      setIsSavingPortfolios(false);
     }
   };
 
@@ -970,7 +1088,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
       {/* 2. MAIN BENTO GRID (3 COLUMNS) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px', alignItems: 'stretch' }}>
         
-        {/* CARD 1: THE 3 MACRO PILLARS (CASH, ALPHA, BETA WITH SUB-PORTS) */}
+        {/* CARD 1: THE 3 MACRO PILLARS (EDITABLE CASH, ALPHA, BETA WITH SUB-PORTS) */}
         <div
           style={{
             background: '#0c0f17',
@@ -985,80 +1103,408 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
           }}
         >
+          {/* Card Header with Edit Toggle */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '16px' }}>📊</span>
               <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff', letterSpacing: '0.5px' }}>
-                โครงสร้าง 3 พอร์ตหลัก (CASH • ALPHA • BETA)
+                โครงสร้างพอร์ตหลัก & แผนย่อย
               </span>
             </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {/* 1. CASH PILLAR */}
-            <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#f43f5e' }}>💼</span> 1. CASH (ความอยู่รอด & ล้างหนี้)
-                </span>
-                <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#f43f5e', fontWeight: 700 }}>หนี้คงเหลือ 51.1k</span>
-              </div>
-              
-              <div style={{ width: '100%', height: '6px', background: '#020305', borderRadius: '999px', overflow: 'hidden' }}>
-                <div style={{ width: `${debtProgressPct}%`, height: '100%', background: 'linear-gradient(90deg, #f43f5e, #f59e0b)' }}></div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '10px', fontFamily: 'monospace', color: '#94a3b8' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>• เงินเดือนประจำ 15k: เลี้ยงชีพ & คุมบิล</span>
-                  <span style={{ color: '#10b981' }}>ชำระสะสม {totalDebtPaid.toLocaleString()} ฿</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>• หนี้ 4 เจ้า: ชำระตรงเวลา</span>
-                  <span style={{ color: '#fbbf24' }}>เป้าแรก: Paylater 2.1k</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. ALPHA PILLAR */}
-            <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#00f2fe' }}>🤖</span> 2. ALPHA (เครื่องยนต์อัตโนมัติ)
-                </span>
-                <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(0, 242, 254, 0.1)', color: '#00f2fe', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(0, 242, 254, 0.3)' }}>
-                  MT5 Demo Test
-                </span>
-              </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '10px', fontFamily: 'monospace', color: '#94a3b8' }}>
-                <div>• <strong>EA บอทเทรด:</strong> รัน Demo ทุน 0 ฿ (GoldTuesday / BTCSnowball)</div>
-                <div>• <strong>Cent Account ($20 ~ 700 ฿):</strong> สเต็ปถัดไปหลังปลดหนี้</div>
-                <div style={{ color: '#64748b' }}>• <strong>เทรดมือ:</strong> Paper / Demo บน Playbook เท่านั้น (ห้ามเงินจริง)</div>
-              </div>
-            </div>
-
-            {/* 3. BETA PILLAR */}
-            <div style={{ background: '#07090f', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#f59e0b' }}>🌱</span> 3. BETA (ความมั่งคั่งระยะยาว)
-                </span>
-                <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#64748b' }}>
-                  เริ่มหลังปลอดหนี้
-                </span>
-              </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '10px', fontFamily: 'monospace', color: '#94a3b8' }}>
-                <div>• <strong>DCA Bitcoin / Crypto Spot:</strong> เริ่มสะสมเมื่อปลอดหนี้ Shopee & Finnix</div>
-                <div>• <strong>เงินสำรองฉุกเฉิน:</strong> ตั้งเป้า 3 เดือนในบัญชี (~36k ฿)</div>
-              </div>
+            
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {isEditingPortfolios ? (
+                <>
+                  <button
+                    onClick={handleCancelEditPortfolios}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#94a3b8',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    onClick={handleSavePortfolios}
+                    disabled={isSavingPortfolios}
+                    style={{
+                      background: '#00f2fe',
+                      border: 'none',
+                      color: '#000',
+                      fontWeight: 700,
+                      padding: '3px 10px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: isSavingPortfolios ? 'wait' : 'pointer',
+                    }}
+                  >
+                    {isSavingPortfolios ? 'กำลังบันทึก...' : '💾 บันทึก'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleStartEditPortfolios}
+                  style={{
+                    background: 'rgba(0, 242, 254, 0.1)',
+                    border: '1px solid rgba(0, 242, 254, 0.3)',
+                    color: '#00f2fe',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <span>✏️</span> ปรับแต่งพอร์ต
+                </button>
+              )}
             </div>
           </div>
 
-          <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b', textAlign: 'center', paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
-            Ray Dalio Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"
-          </div>
+          {/* VIEW MODE */}
+          {!isEditingPortfolios ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {(portfolioPillars.length > 0 ? portfolioPillars : defaultPillars).map((pillar) => {
+                const pItems = (portfolioItems.length > 0 ? portfolioItems : defaultItems).filter(
+                  (it) => it.pillar_code === pillar.pillar_code
+                );
+                const isCash = pillar.pillar_code === 'CASH';
+
+                return (
+                  <div
+                    key={pillar.pillar_code}
+                    style={{
+                      background: '#07090f',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderRadius: '12px',
+                      padding: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{pillar.emoji || '💼'}</span> {pillar.title}
+                      </span>
+                      {pillar.badge && (
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontFamily: 'monospace',
+                            color: pillar.color || '#00f2fe',
+                            background: `${pillar.color || '#00f2fe'}18`,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            border: `1px solid ${pillar.color || '#00f2fe'}40`,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {pillar.badge}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* If Cash pillar, show debt payoff progress */}
+                    {isCash && (
+                      <div style={{ width: '100%', height: '6px', background: '#020305', borderRadius: '999px', overflow: 'hidden' }}>
+                        <div style={{ width: `${debtProgressPct}%`, height: '100%', background: 'linear-gradient(90deg, #f43f5e, #f59e0b)' }}></div>
+                      </div>
+                    )}
+
+                    {/* Sub-items list */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '10.5px', fontFamily: 'monospace' }}>
+                      {pItems.map((item) => {
+                        const statusColors = {
+                          ACTIVE: { bg: 'rgba(16, 185, 129, 0.12)', text: '#10b981', label: 'ACTIVE' },
+                          DEMO: { bg: 'rgba(0, 242, 254, 0.12)', text: '#00f2fe', label: 'DEMO' },
+                          PENDING: { bg: 'rgba(245, 158, 11, 0.12)', text: '#f59e0b', label: 'NEXT' },
+                          LOCKED: { bg: 'rgba(255, 255, 255, 0.05)', text: '#64748b', label: 'LOCKED' },
+                        };
+                        const sc = statusColors[item.status] || statusColors.ACTIVE;
+
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '2px 4px',
+                              borderRadius: '4px',
+                              background: 'rgba(255, 255, 255, 0.015)',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#cbd5e1' }}>
+                              <span>•</span>
+                              <strong style={{ color: '#ffffff' }}>{item.title}</strong>
+                              {item.desc && <span style={{ color: '#94a3b8' }}>: {item.desc}</span>}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '9px',
+                                padding: '1px 5px',
+                                borderRadius: '3px',
+                                background: sc.bg,
+                                color: sc.text,
+                                border: `1px solid ${sc.text}33`,
+                                fontWeight: 700,
+                                flexShrink: 0,
+                                marginLeft: '6px',
+                              }}
+                            >
+                              {sc.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* EDIT MODE */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '420px', overflowY: 'auto' }}>
+              <div style={{ fontSize: '11px', color: '#00f2fe', background: 'rgba(0, 242, 254, 0.08)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(0, 242, 254, 0.2)' }}>
+                💡 <strong>โหมดแก้ไขพอร์ต:</strong> ปรับชื่อพอร์ตหลัก, เพิ่ม/ลดพอร์ตย่อย (EA, เทรดมือ, DCA) ได้อิสระตามต้องการ
+              </div>
+
+              {editPillars.map((p) => {
+                const itemsForPillar = editItems.filter((it) => it.pillar_code === p.pillar_code);
+
+                return (
+                  <div
+                    key={p.pillar_code}
+                    style={{
+                      background: '#07090f',
+                      border: '1px solid rgba(0, 242, 254, 0.3)',
+                      borderRadius: '10px',
+                      padding: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                    }}
+                  >
+                    {/* Pillar Title & Badge Edit */}
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        value={p.emoji || '📊'}
+                        onChange={(e) => handlePillarChange(p.pillar_code, 'emoji', e.target.value)}
+                        style={{
+                          width: '36px',
+                          textAlign: 'center',
+                          background: '#020305',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '6px',
+                          color: '#fff',
+                          fontSize: '12px',
+                          padding: '4px',
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={p.title || ''}
+                        onChange={(e) => handlePillarChange(p.pillar_code, 'title', e.target.value)}
+                        placeholder="ชื่อพอร์ตหลัก..."
+                        style={{
+                          flex: 2,
+                          background: '#020305',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '6px',
+                          color: '#fff',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          padding: '4px 8px',
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={p.badge || ''}
+                        onChange={(e) => handlePillarChange(p.pillar_code, 'badge', e.target.value)}
+                        placeholder="ป้ายสถานะ..."
+                        style={{
+                          flex: 1,
+                          background: '#020305',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '6px',
+                          color: p.color || '#00f2fe',
+                          fontSize: '10px',
+                          padding: '4px 6px',
+                        }}
+                      />
+                    </div>
+
+                    {/* Sub-items editing list */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {itemsForPillar.map((it) => (
+                        <div
+                          key={it.id}
+                          style={{
+                            display: 'flex',
+                            gap: '4px',
+                            alignItems: 'center',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            padding: '4px 6px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255, 255, 255, 0.06)',
+                          }}
+                        >
+                          <input
+                            type="text"
+                            value={it.title || ''}
+                            onChange={(e) => handleItemChange(it.id, 'title', e.target.value)}
+                            placeholder="ชื่อพอร์ตย่อย (เช่น EA BTCSnowball)"
+                            style={{
+                              flex: 1.2,
+                              background: '#020305',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '4px',
+                              color: '#fff',
+                              fontSize: '10.5px',
+                              padding: '3px 6px',
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={it.desc || ''}
+                            onChange={(e) => handleItemChange(it.id, 'desc', e.target.value)}
+                            placeholder="รายละเอียด / หมายเหตุ"
+                            style={{
+                              flex: 1.5,
+                              background: '#020305',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '4px',
+                              color: '#94a3b8',
+                              fontSize: '10.5px',
+                              padding: '3px 6px',
+                            }}
+                          />
+                          <select
+                            value={it.status || 'ACTIVE'}
+                            onChange={(e) => handleItemChange(it.id, 'status', e.target.value)}
+                            style={{
+                              background: '#020305',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '4px',
+                              color: '#00f2fe',
+                              fontSize: '10px',
+                              padding: '3px 4px',
+                            }}
+                          >
+                            <option value="ACTIVE">ACTIVE</option>
+                            <option value="DEMO">DEMO</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="LOCKED">LOCKED</option>
+                          </select>
+                          <button
+                            onClick={() => handleDeleteItem(it.id)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#f43f5e',
+                              cursor: 'pointer',
+                              padding: '2px 4px',
+                              fontSize: '12px',
+                            }}
+                            title="ลบรายการนี้"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => handleAddItem(p.pillar_code)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px dashed rgba(255, 255, 255, 0.15)',
+                        borderRadius: '6px',
+                        color: '#94a3b8',
+                        padding: '4px',
+                        fontSize: '10px',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                      }}
+                    >
+                      + เพิ่มพอร์ตย่อยในกลุ่มนี้
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Principle Edit */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <label style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>
+                  📜 หลักการเตือนใจด้านล่าง (Principle Note):
+                </label>
+                <input
+                  type="text"
+                  value={editPrinciple}
+                  onChange={(e) => setEditPrinciple(e.target.value)}
+                  placeholder="เช่น Ray Dalio Principle: 'แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด'"
+                  style={{
+                    background: '#020305',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '6px',
+                    color: '#94a3b8',
+                    fontSize: '10.5px',
+                    padding: '6px 8px',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', paddingTop: '4px' }}>
+                <button
+                  onClick={handleCancelEditPortfolios}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#94a3b8',
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleSavePortfolios}
+                  disabled={isSavingPortfolios}
+                  style={{
+                    background: '#00f2fe',
+                    border: 'none',
+                    color: '#000',
+                    fontWeight: 700,
+                    padding: '5px 16px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    cursor: isSavingPortfolios ? 'wait' : 'pointer',
+                  }}
+                >
+                  {isSavingPortfolios ? 'กำลังบันทึก...' : '💾 บันทึกโครงสร้างพอร์ต'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Principle Footer */}
+          {!isEditingPortfolios && (
+            <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b', textAlign: 'center', paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              {portfolioPrinciple || 'Ray Dalio Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"'}
+            </div>
+          )}
         </div>
 
         {/* CARD 2: INTERACTIVE & EDITABLE ROADMAP (REAL ROADMAP LADDER) */}
