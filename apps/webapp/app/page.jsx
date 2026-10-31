@@ -1030,7 +1030,7 @@ export default function Home() {
                 <span>ยอดหนี้คงเหลือรวม</span>
               </div>
               <div className="hero-value">{formatCurrency(debtsData.totalRemainingDebt)} ฿</div>
-              <div className="hero-sub">จากยอดหนี้ตั้งต้น {formatCurrency(debtsData.totalInitialDebt)} ฿</div>
+              <div className="hero-sub">จากยอดหนี้ตั้งต้น {formatCurrency(debtsData.totalInitialDebt)} ฿ {debtsData.totalBorrowedDebt > 0 ? `(+กู้เพิ่ม ${formatCurrency(debtsData.totalBorrowedDebt)} ฿)` : ''}</div>
             </div>
 
             <div className="glass-panel monthly-hero-card average">
@@ -1245,10 +1245,16 @@ export default function Home() {
                     </div>
                     <div className="amount-col paid">
                       <label>ชำระแล้ว ({debt.paymentsCount} ครั้ง)</label>
-                      <div className="val">-{formatCurrency(debt.paidAmount)} ฿</div>
+                      <div className="val" style={{ color: '#30d158' }}>-{formatCurrency(debt.paidAmount)} ฿</div>
                     </div>
+                    {debt.borrowedAmount > 0 && (
+                      <div className="amount-col" style={{ color: '#fda4af' }}>
+                        <label>กู้เพิ่ม ({debt.borrowingsCount || 1} ครั้ง)</label>
+                        <div className="val" style={{ color: '#fda4af' }}>+{formatCurrency(debt.borrowedAmount)} ฿</div>
+                      </div>
+                    )}
                     <div className="amount-col rem">
-                      <label>คงเหลือ</label>
+                      <label>คงเหลือจริง</label>
                       <div className="val">{formatCurrency(debt.remainingAmount)} ฿</div>
                     </div>
                   </div>
@@ -1277,8 +1283,13 @@ export default function Home() {
                       </div>
                       {debt.payments.map((p) => (
                         <div key={p.id} className="debt-history-item">
-                          <span>[{p.date}] {p.category}</span>
-                          <strong style={{ color: '#30d158' }}>-{formatCurrency(p.amount)} ฿</strong>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{p.type === 'รายรับ' ? '⚠️' : '✅'}</span>
+                            <span>[{p.date}] {p.category}</span>
+                          </div>
+                          <strong style={{ color: p.type === 'รายรับ' ? '#fda4af' : '#30d158' }}>
+                            {p.type === 'รายรับ' ? `+กู้ ${formatCurrency(p.amount)} ฿` : `-${formatCurrency(p.amount)} ฿`}
+                          </strong>
                         </div>
                       ))}
                     </div>

@@ -8,6 +8,7 @@ export async function GET() {
 
     let totalInitialDebt = 0;
     let totalPaidDebt = 0;
+    let totalBorrowedDebt = 0;
 
     const debts = debtsRows.map((debt) => {
       const keywords = debt.keywords
@@ -18,15 +19,24 @@ export async function GET() {
       // Find transactions that match any of the debt keywords
       const matchedTransactions = allTransactions.filter((tx) => {
         const cat = (tx.category || '').toLowerCase();
-        return keywords.some((kw) => cat.includes(kw));
+        const raw = (tx.raw_text || '').toLowerCase();
+        return keywords.some((kw) => cat.includes(kw) || raw.includes(kw));
       });
 
-      const paidAmount = Math.round(matchedTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0) * 100) / 100;
-      const remainingAmount = Math.round(Math.max(0, debt.initial_amount - paidAmount) * 100) / 100;
-      const progressPct = debt.initial_amount > 0 ? Math.min(100, (paidAmount / debt.initial_amount) * 100) : 0;
+      // Distinguish repayments vs emergency borrowings
+      const repayments = matchedTransactions.filter((tx) => tx.type !== 'รายรับ');
+      const borrowings = matchedTransactions.filter((tx) => tx.type === 'รายรับ');
+
+      const paidAmount = Math.round(repayments.reduce((sum, tx) => sum + (tx.amount || 0), 0) * 100) / 100;
+      const borrowedAmount = Math.round(borrowings.reduce((sum, tx) => sum + (tx.amount || 0), 0) * 100) / 100;
+      // Remaining debt = Initial principal + extra borrowings - repayments
+      const remainingAmount = Math.round(Math.max(0, debt.initial_amount + borrowedAmount - paidAmount) * 100) / 100;
+      const effectiveInitial = debt.initial_amount + borrowedAmount;
+      const progressPct = effectiveInitial > 0 ? Math.min(100, (paidAmount / effectiveInitial) * 100) : 0;
 
       totalInitialDebt += debt.initial_amount;
       totalPaidDebt += paidAmount;
+      totalBorrowedDebt += borrowedAmount;
 
       return {
         id: debt.id,
@@ -36,17 +46,21 @@ export async function GET() {
         interestRate: debt.interest_rate,
         note: debt.note,
         paidAmount,
+        borrowedAmount,
         remainingAmount,
         progressPct: parseFloat(progressPct.toFixed(1)),
-        paymentsCount: matchedTransactions.length,
+        paymentsCount: repayments.length,
+        borrowingsCount: borrowings.length,
         payments: matchedTransactions,
       };
     });
 
     totalInitialDebt = Math.round(totalInitialDebt * 100) / 100;
     totalPaidDebt = Math.round(totalPaidDebt * 100) / 100;
-    const totalRemainingDebt = Math.round(Math.max(0, totalInitialDebt - totalPaidDebt) * 100) / 100;
-    const overallProgressPct = totalInitialDebt > 0 ? parseFloat(((totalPaidDebt / totalInitialDebt) * 100).toFixed(1)) : 0;
+    totalBorrowedDebt = Math.round(totalBorrowedDebt * 100) / 100;
+    const totalRemainingDebt = Math.round(Math.max(0, totalInitialDebt + totalBorrowedDebt - totalPaidDebt) * 100) / 100;
+    const effectiveTotalPrincipal = totalInitialDebt + totalBorrowedDebt;
+    const overallProgressPct = effectiveTotalPrincipal > 0 ? parseFloat(((totalPaidDebt / effectiveTotalPrincipal) * 100).toFixed(1)) : 0;
 
     // Investment Drawdown
     const drawdown = db.prepare('SELECT * FROM investment_drawdown ORDER BY id DESC LIMIT 1').get() || {
@@ -62,6 +76,7 @@ export async function GET() {
       debts,
       totalInitialDebt,
       totalPaidDebt,
+      totalBorrowedDebt,
       totalRemainingDebt,
       overallProgressPct: parseFloat(overallProgressPct.toFixed(1)),
       drawdown: {

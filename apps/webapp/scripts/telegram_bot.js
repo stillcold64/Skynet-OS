@@ -237,6 +237,7 @@ const CATEGORY_EMOJI = {
   BILL: '📄',
   INVESTING: '📈',
   ETC: '📦',
+  INCOME: '💵',
 };
 
 // Scheduler: Individual Reminder Check per Task (including smart catch-up)
@@ -745,17 +746,31 @@ async function poll() {
 
         if (result.success && result.items.length > 0) {
           const ggsSynced = await syncToGoogleSheets(result.items, rawText);
-          const total = result.items.reduce((sum, it) => sum + it.amount, 0);
+          const expenses = result.items.filter((it) => it.type !== 'รายรับ');
+          const incomes = result.items.filter((it) => it.type === 'รายรับ');
+          const expTotal = expenses.reduce((sum, it) => sum + it.amount, 0);
+          const incTotal = incomes.reduce((sum, it) => sum + it.amount, 0);
           const hasBill = result.items.some((it) => it.category_group === 'BILL');
 
-          let reply = `${isEdited ? '✏️ <b>อัปเดตใหม่เรียบร้อย</b>' : '⚡ <b>บันทึกแล้ว</b>'} (${result.count} รายการ | รวม <b>${total.toLocaleString()} ฿</b>)\n`;
+          let summaryTag = '';
+          if (expTotal > 0 && incTotal > 0) {
+            summaryTag = `จ่าย <b>${expTotal.toLocaleString()} ฿</b> | เข้า <b>+${incTotal.toLocaleString()} ฿</b>`;
+          } else if (incTotal > 0) {
+            summaryTag = `เงินเข้า/กู้ <b>+${incTotal.toLocaleString()} ฿</b>`;
+          } else {
+            summaryTag = `รวม <b>${expTotal.toLocaleString()} ฿</b>`;
+          }
+
+          let reply = `${isEdited ? '✏️ <b>อัปเดตใหม่เรียบร้อย</b>' : '⚡ <b>บันทึกแล้ว</b>'} (${result.count} รายการ | ${summaryTag})\n`;
           for (const item of result.items) {
-            const emoji = CATEGORY_EMOJI[item.category_group] || '•';
+            const emoji = CATEGORY_EMOJI[item.category_group] || (item.type === 'รายรับ' ? '💵' : '•');
             const aliasDisplay =
               item.original_alias && item.original_alias.toLowerCase() !== item.category.toLowerCase()
                 ? ` (<i>${item.original_alias}</i>)`
                 : '';
-            reply += `• [${item.date}] ${emoji} <b>${item.category}</b>${aliasDisplay}: ${item.amount.toLocaleString()} ฿\n`;
+            const sign = item.type === 'รายรับ' ? '+' : '';
+            const noteSuffix = item.type === 'รายรับ' ? ' <i>(รายรับ/เงินเข้า)</i>' : '';
+            reply += `• [${item.date}] ${emoji} <b>${item.category}</b>${aliasDisplay}: ${sign}${item.amount.toLocaleString()} ฿${noteSuffix}\n`;
           }
           if (ggsSynced) {
             reply += `☁️ ซิงค์ Google Sheets แล้ว\n`;

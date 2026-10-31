@@ -416,11 +416,13 @@ export function normalizeItemName(rawItemName) {
       .get(cleanLower, strippedPrefix);
 
     if (aliasRecord) {
+      const cls = classifyItem(aliasRecord.canonical_name);
       return {
         canonicalName: aliasRecord.canonical_name,
         originalAlias,
-        categoryGroup: aliasRecord.category_group,
-        suggestedType: aliasRecord.suggested_type || 'ค่าใช้จ่าย',
+        categoryGroup: aliasRecord.category_group || cls.categoryGroup,
+        subCategory: cls.subCategory || 'ทั่วไป',
+        suggestedType: aliasRecord.suggested_type || cls.suggestedType || 'ค่าใช้จ่าย',
         matchedBy: 'alias_table',
       };
     }
@@ -487,41 +489,61 @@ export function normalizeItemName(rawItemName) {
     };
   }
 
-  // Loans & Installments
+  // Loans & Installments (Detect Repayment vs Borrowing/Loan Inflow)
+  const isBorrowing =
+    cleanLower.includes('กู้') ||
+    cleanLower.includes('ยืม') ||
+    cleanLower.includes('กู้เพิ่ม') ||
+    cleanLower.includes('ถอนเงิน');
+
   if (cleanLower.includes('paylater') || cleanLower.includes('spaylater')) {
     return {
-      canonicalName: 'Shopee Paylater',
+      canonicalName: isBorrowing ? 'Shopee Paylater (กู้เพิ่ม)' : 'Shopee Paylater',
       originalAlias,
-      categoryGroup: 'BILL',
-      suggestedType: 'ค่าใช้จ่าย',
-      matchedBy: 'heuristic_paylater',
+      categoryGroup: isBorrowing ? 'INCOME' : 'BILL',
+      subCategory: isBorrowing ? 'เงินกู้ฉุกเฉิน' : 'หนี้สิน 4 เจ้า',
+      suggestedType: isBorrowing ? 'รายรับ' : 'ค่าใช้จ่าย',
+      matchedBy: isBorrowing ? 'heuristic_paylater_loan' : 'heuristic_paylater',
     };
   }
   if (cleanLower.includes('easycash') || cleanLower.includes('easaycash') || cleanLower.includes('easymoney') || cleanLower.includes('easy money')) {
     return {
-      canonicalName: 'EasyCash',
+      canonicalName: isBorrowing ? 'EasyCash (กู้เพิ่ม)' : 'EasyCash',
       originalAlias,
-      categoryGroup: 'BILL',
-      suggestedType: 'ค่าใช้จ่าย',
-      matchedBy: 'heuristic_easycash',
+      categoryGroup: isBorrowing ? 'INCOME' : 'BILL',
+      subCategory: isBorrowing ? 'เงินกู้ฉุกเฉิน' : 'หนี้สิน 4 เจ้า',
+      suggestedType: isBorrowing ? 'รายรับ' : 'ค่าใช้จ่าย',
+      matchedBy: isBorrowing ? 'heuristic_easycash_loan' : 'heuristic_easycash',
     };
   }
   if (cleanLower.includes('finnix') || cleanLower.includes('ฟินนิกซ์')) {
     return {
-      canonicalName: 'Finnix',
+      canonicalName: isBorrowing ? 'Finnix (กู้เพิ่ม)' : 'Finnix',
       originalAlias,
-      categoryGroup: 'BILL',
-      suggestedType: 'ค่าใช้จ่าย',
-      matchedBy: 'heuristic_finnix',
+      categoryGroup: isBorrowing ? 'INCOME' : 'BILL',
+      subCategory: isBorrowing ? 'เงินกู้ฉุกเฉิน' : 'หนี้สิน 4 เจ้า',
+      suggestedType: isBorrowing ? 'รายรับ' : 'ค่าใช้จ่าย',
+      matchedBy: isBorrowing ? 'heuristic_finnix_loan' : 'heuristic_finnix',
     };
   }
   if (cleanLower.includes('thunder') || cleanLower.includes('ธันเดอ')) {
     return {
-      canonicalName: 'Money Thunder',
+      canonicalName: isBorrowing ? 'Money Thunder (กู้เพิ่ม)' : 'Money Thunder',
       originalAlias,
-      categoryGroup: 'BILL',
-      suggestedType: 'ค่าใช้จ่าย',
-      matchedBy: 'heuristic_thunder',
+      categoryGroup: isBorrowing ? 'INCOME' : 'BILL',
+      subCategory: isBorrowing ? 'เงินกู้ฉุกเฉิน' : 'หนี้สิน 4 เจ้า',
+      suggestedType: isBorrowing ? 'รายรับ' : 'ค่าใช้จ่าย',
+      matchedBy: isBorrowing ? 'heuristic_thunder_loan' : 'heuristic_thunder',
+    };
+  }
+  if (isBorrowing) {
+    return {
+      canonicalName: 'กู้เงินฉุกเฉิน',
+      originalAlias,
+      categoryGroup: 'INCOME',
+      subCategory: 'เงินกู้ฉุกเฉิน',
+      suggestedType: 'รายรับ',
+      matchedBy: 'heuristic_general_loan',
     };
   }
 
