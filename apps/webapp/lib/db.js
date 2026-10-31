@@ -44,6 +44,10 @@ try {
   if (!hasRawText) {
     db.exec("ALTER TABLE transactions ADD COLUMN raw_text TEXT");
   }
+  const hasSubCategory = tableInfo.some((col) => col.name === 'sub_category');
+  if (!hasSubCategory) {
+    db.exec("ALTER TABLE transactions ADD COLUMN sub_category TEXT NOT NULL DEFAULT 'ทั่วไป'");
+  }
 } catch (e) {
   console.error('Migration error on transactions table:', e);
 }

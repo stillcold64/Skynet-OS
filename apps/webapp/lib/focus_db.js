@@ -122,6 +122,27 @@ export function deleteFocusTask(id) {
   return { success: true };
 }
 
+export function getLogicalFocusDate(now = new Date()) {
+  try {
+    const hourFormatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      hour12: false,
+    });
+    const hour = parseInt(hourFormatter.format(now), 10);
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+    });
+    const todayStr = dateFormatter.format(now);
+    if (hour < 4) {
+      return shiftDays(todayStr, -1);
+    }
+    return todayStr;
+  } catch (e) {
+    return now.toISOString().slice(0, 10);
+  }
+}
+
 function shiftDays(dateStr, offsetDays) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + offsetDays));

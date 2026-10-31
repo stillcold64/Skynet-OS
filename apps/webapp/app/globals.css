@@ -327,6 +327,7 @@ body {
 .category-card.bill::before { background: var(--bill-color); box-shadow: 0 2px 10px var(--bill-color); }
 .category-card.investing::before { background: var(--investing-color); box-shadow: 0 2px 10px var(--investing-color); }
 .category-card.etc::before { background: var(--etc-color); box-shadow: 0 2px 10px var(--etc-color); }
+.category-card.income::before { background: #10b981; box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4); }
 
 .card-top {
   display: flex;
@@ -349,6 +350,7 @@ body {
 .category-card.bill .card-title { color: var(--bill-color); }
 .category-card.investing .card-title { color: var(--investing-color); }
 .category-card.etc .card-title { color: var(--etc-color); }
+.category-card.income .card-title { color: #10b981; }
 
 .card-amount {
   font-size: 22px;
@@ -3836,3 +3838,5 @@ body {
   border-radius: 999px;
   transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.item-group-select.INCOME { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4); }

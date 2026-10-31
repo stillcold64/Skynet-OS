@@ -38,6 +38,7 @@ export async function GET(request) {
       BILL: 0,
       INVESTING: 0,
       ETC: 0,
+      INCOME: 0,
     };
 
     for (const g of groups) {
@@ -51,7 +52,8 @@ export async function GET(request) {
       .prepare(`
         SELECT 
           COALESCE(SUM(CASE WHEN type = 'ค่าใช้จ่าย' THEN amount ELSE 0 END), 0) AS totalExpense,
-          COALESCE(SUM(CASE WHEN type = 'การลงทุน' THEN amount ELSE 0 END), 0) AS totalInvestment
+          COALESCE(SUM(CASE WHEN type = 'การลงทุน' THEN amount ELSE 0 END), 0) AS totalInvestment,
+          COALESCE(SUM(CASE WHEN type = 'รายรับ' THEN amount ELSE 0 END), 0) AS totalIncome
         FROM transactions
         ${month ? "WHERE date LIKE ?" : ""}
       `)
@@ -118,7 +120,38 @@ export async function GET(request) {
       months: monthRows,
     };
 
+    // Sub-category totals for granular leak analysis
+    const subCategories = db.prepare(`
+      SELECT 
+        COALESCE(sub_category, 'ทั่วไป') as sub_category,
+        category_group,
+        type,
+        COALESCE(SUM(amount), 0) as total,
+        COUNT(id) as count
+      FROM transactions
+      ${month ? "WHERE date LIKE ?" : ""}
+      GROUP BY sub_category, category_group, type
+      ORDER BY total DESC
+    `).all(...params);
+
+    // Top item leaks breakdown
+    const itemLeaks = db.prepare(`
+      SELECT 
+        category,
+        category_group,
+        COALESCE(sub_category, 'ทั่วไป') as sub_category,
+        COALESCE(SUM(amount), 0) as total,
+        COUNT(id) as count
+      FROM transactions
+      ${month ? "WHERE date LIKE ?" : ""}
+      GROUP BY category, category_group, sub_category
+      ORDER BY total DESC
+    `).all(...params);
+
     return NextResponse.json({
+      subCategories,
+      itemLeaks,
+      totalIncome: typeTotals.totalIncome || 0,
       transactions,
       groupTotals,
       totalExpense: typeTotals.totalExpense,
@@ -160,7 +193,7 @@ export async function DELETE(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json();
-    const { id, date, category, category_group, amount, note } = body;
+    const { id, date, category, category_group, sub_category, type, amount, note } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Missing transaction id' }, { status: 400 });
@@ -177,13 +210,14 @@ export async function PATCH(request) {
     const updatedAmount =
       amount !== undefined && !isNaN(parseFloat(amount)) ? parseFloat(amount) : existing.amount;
     const updatedNote = note !== undefined ? note : existing.note;
-    const updatedType = updatedGroup === 'INVESTING' ? 'การลงทุน' : 'ค่าใช้จ่าย';
+    const updatedSubCategory = sub_category !== undefined ? sub_category.trim() : (existing.sub_category || 'ทั่วไป');
+    const updatedType = type || (updatedGroup === 'INVESTING' ? 'การลงทุน' : updatedGroup === 'INCOME' ? 'รายรับ' : 'ค่าใช้จ่าย');
 
     db.prepare(`
       UPDATE transactions 
-      SET date = ?, category = ?, category_group = ?, type = ?, amount = ?, note = ?
+      SET date = ?, category = ?, category_group = ?, sub_category = ?, type = ?, amount = ?, note = ?
       WHERE id = ?
-    `).run(updatedDate, updatedCategory, updatedGroup, updatedType, updatedAmount, updatedNote, id);
+    `).run(updatedDate, updatedCategory, updatedGroup, updatedSubCategory, updatedType, updatedAmount, updatedNote, id);
 
     // If category name or group changed, also learn it in category_rules
     if (updatedCategory && updatedGroup) {

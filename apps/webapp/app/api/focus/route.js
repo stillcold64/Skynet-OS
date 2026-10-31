@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
+  getLogicalFocusDate,
   getAllFocusTasks,
   getActiveTop3Tasks,
   createFocusTask,
@@ -14,7 +15,7 @@ import {
 } from '@/lib/focus_db';
 
 function getBangkokTodayStr() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+  return getLogicalFocusDate();
 }
 
 export async function GET(request) {

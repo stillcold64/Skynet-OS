@@ -483,17 +483,41 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const totalDebtPaid = Math.max(0, totalDebtInitial - totalDebtRemaining);
   const debtProgressPct = Math.min(100, Math.round((totalDebtPaid / totalDebtInitial) * 100)) || 17;
 
-  // Monthly Cash Flow
-  const currentMonthExpense = transactions.reduce((sum, t) => sum + (t.amount || 0), 0) || 18524;
-  const realSalary = 15000;
-  const netBurnRate = Math.round((realSalary - currentMonthExpense) * 100) / 100;
+  // Monthly Cash Flow & Real Inflow
+  const expenseTransactions = transactions.filter((t) => t.type !== 'รายรับ');
+  const incomeTransactions = transactions.filter((t) => t.type === 'รายรับ');
 
-  // Specific Spending Drilldown (Leaks analysis)
-  const snackExpense = transactions.filter((t) => (t.category || '').includes('ขนม')).reduce((sum, t) => sum + (t.amount || 0), 0) || 779;
-  const zazaExpense = transactions.filter((t) => (t.category || '').toLowerCase().includes('zaza')).reduce((sum, t) => sum + (t.amount || 0), 0) || 1400;
-  const waterExpense = transactions.filter((t) => (t.category || '').includes('ค่าน้ำประปา') || (t.category || '').includes('ค่าน้ำมัน')).reduce((sum, t) => sum + (t.amount || 0), 0) || 1525;
-  const coffeeExpense = transactions.filter((t) => (t.category || '').includes('กาแฟ')).reduce((sum, t) => sum + (t.amount || 0), 0) || 655;
-  const gasExpense = transactions.filter((t) => (t.category || '').toLowerCase().includes('gas') || (t.category || '').includes('แก๊ส')).reduce((sum, t) => sum + (t.amount || 0), 0) || 400;
+  const currentMonthExpense = expenseTransactions.reduce((sum, t) => sum + (t.amount || 0), 0) || 18524;
+  const extraIncome = incomeTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const baseSalary = 15000;
+  const totalIncome = baseSalary + extraIncome;
+  const netBurnRate = Math.round((totalIncome - currentMonthExpense) * 100) / 100;
+
+  // Granular Sub-category Aggregations from actual transactions
+  const subCategoryTotals = {};
+  transactions.forEach((t) => {
+    const sc = t.sub_category || 'ทั่วไป';
+    if (!subCategoryTotals[sc]) {
+      subCategoryTotals[sc] = { total: 0, count: 0, type: t.type || 'ค่าใช้จ่าย', group: t.category_group };
+    }
+    subCategoryTotals[sc].total += (t.amount || 0);
+    subCategoryTotals[sc].count += 1;
+  });
+
+  const foodExpense = subCategoryTotals['อาหาร/มื้อหลัก']?.total || 0;
+  const coffeeExpense = subCategoryTotals['กาแฟ/เครื่องดื่ม']?.total || 0;
+  const snackExpense = subCategoryTotals['ขนม 7-11/ของหวาน']?.total || 0;
+  const zazaExpense = subCategoryTotals['Zaza/หย่อนใจ']?.total || 0;
+  const groceryExpense = subCategoryTotals['ของใช้/วัตถุดิบ']?.total || 0;
+  const petExpense = subCategoryTotals['สัตว์เลี้ยง (แมว)']?.total || 0;
+  const transportExpense = subCategoryTotals['ค่าน้ำมัน/เดินทาง']?.total || 0;
+  const gameExpense = subCategoryTotals['เกม/บันเทิง']?.total || 0;
+  const debtExpense = subCategoryTotals['หนี้สิน 4 เจ้า']?.total || 0;
+  const utilitiesExpense = subCategoryTotals['ค่าน้ำ/ค่าไฟ']?.total || 0;
+  const rentBillExpense = subCategoryTotals['ค่าห้อง/เน็ต/บิล']?.total || 0;
+  const loanIncome = subCategoryTotals['เงินกู้ฉุกเฉิน']?.total || 0;
+  const waterExpense = utilitiesExpense || 1525;
+  const gasExpense = transportExpense || 400;
 
   // Paylater specifics (First target)
   const paylater = debtsData?.debts?.find((d) => d.name.toLowerCase().includes('paylater')) || {
@@ -1753,51 +1777,93 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           }}
         >
           {/* MONTHLY CASHFLOW & LEAK DRILLDOWN */}
-          <div style={{ background: '#07090f', border: '1px solid rgba(244, 63, 94, 0.3)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ background: '#07090f', border: `1px solid ${netBurnRate >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'}`, borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ color: '#f59e0b' }}>💵</span> กระแสเงินสด ต.ค. 2026 (เงินเดือนจริง)
+                <span style={{ color: '#10b981' }}>💵</span> กระแสเงินสด & หมวดเจาะลึก (ต.ค. 2026)
               </span>
-              <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(244, 63, 94, 0.15)', color: '#fda4af', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(244, 63, 94, 0.4)' }}>
-                ดึงเงินเก็บ {Math.abs(netBurnRate).toLocaleString()} ฿
+              <span style={{
+                fontSize: '10px',
+                fontFamily: 'monospace',
+                background: netBurnRate >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+                color: netBurnRate >= 0 ? '#6ee7b7' : '#fda4af',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: `1px solid ${netBurnRate >= 0 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)'}`,
+                fontWeight: 700,
+              }}>
+                {netBurnRate >= 0 ? `กระแสเงินสดบวก +${netBurnRate.toLocaleString()} ฿` : `ดึงเงินเก็บ ${Math.abs(netBurnRate).toLocaleString()} ฿`}
               </span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', margin: '2px 0' }}>
               <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                <div style={{ fontSize: '10px', color: '#64748b' }}>เงินเดือนประจำ</div>
-                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#ffffff' }}>15,000 ฿</div>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>
+                  รายรับรวม ${extraIncome > 0 ? `(+กู้ ${extraIncome.toLocaleString()})` : ''}
+                </div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#10b981' }}>{totalIncome.toLocaleString()} ฿</div>
               </div>
               <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
                 <div style={{ fontSize: '10px', color: '#64748b' }}>รายจ่ายสะสมจริง</div>
                 <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#f43f5e' }}>{currentMonthExpense.toLocaleString()} ฿</div>
               </div>
-              <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.25)' }}>
-                <div style={{ fontSize: '10px', color: '#fda4af' }}>ส่วนต่างดึงเงินเก็บ</div>
-                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#fda4af' }}>{netBurnRate.toLocaleString()} ฿</div>
+              <div style={{ background: '#030508', padding: '6px 4px', borderRadius: '6px', border: `1px solid ${netBurnRate >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.25)'}` }}>
+                <div style={{ fontSize: '10px', color: netBurnRate >= 0 ? '#6ee7b7' : '#fda4af' }}>{netBurnRate >= 0 ? 'คงเหลือสุทธิ' : 'ส่วนต่างดึงเงินเก็บ'}</div>
+                <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: netBurnRate >= 0 ? '#10b981' : '#fda4af' }}>
+                  {netBurnRate >= 0 ? `+${netBurnRate.toLocaleString()}` : netBurnRate.toLocaleString()} ฿
+                </div>
               </div>
             </div>
 
-            {/* Granular Spending Drilldown */}
-            <div style={{ background: '#04060a', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {/* Granular Spending Drilldown (Beyond 5 Macro Groups) */}
+            <div style={{ background: '#04060a', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#94a3b8', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
-                <span>🔍 เจาะลึกจุดรั่วสำคัญในเดือนนี้:</span>
-                <span style={{ color: '#f59e0b' }}>รวม {((snackExpense || 779) + (zazaExpense || 1400) + (waterExpense || 1525)).toLocaleString()} ฿</span>
+                <span>🔍 เจาะลึกหมวดย่อยที่ใช้จ่ายจริง (Sub-categories):</span>
+                <span style={{ color: '#f59e0b' }}>หย่อนใจรวม {(snackExpense + zazaExpense + gameExpense).toLocaleString()} ฿</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', fontSize: '10px', fontFamily: 'monospace' }}>
-                <div style={{ color: '#cbd5e1' }}>🍪 ขนม 7-11: <strong style={{ color: '#f59e0b' }}>{snackExpense.toLocaleString()} ฿</strong></div>
-                <div style={{ color: '#cbd5e1' }}>🌿 Zaza: <strong style={{ color: '#f43f5e' }}>{zazaExpense.toLocaleString()} ฿</strong></div>
-                <div style={{ color: '#cbd5e1' }}>💧 น้ำประปา: <strong style={{ color: '#00f2fe' }}>{waterExpense.toLocaleString()} ฿</strong></div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontFamily: 'monospace', color: '#64748b', paddingTop: '2px' }}>
-                <span>☕ กาแฟ: {coffeeExpense.toLocaleString()} ฿</span>
-                <span>⛽ น้ำมัน: {gasExpense.toLocaleString()} ฿</span>
-                <span>📄 หนี้ 4 เจ้า: 5,740 ฿</span>
+              {/* Category pills grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', fontSize: '9.5px', fontFamily: 'monospace' }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>🍚 ข้าว:</span> <strong style={{ color: '#cbd5e1' }}>{foodExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>☕ กาแฟ:</span> <strong style={{ color: '#cbd5e1' }}>{coffeeExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(244, 63, 94, 0.08)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(244, 63, 94, 0.2)' }}>
+                  <span style={{ color: '#fda4af' }}>🌿 Zaza:</span> <strong style={{ color: '#f43f5e' }}>{zazaExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(245, 158, 11, 0.08)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                  <span style={{ color: '#fde68a' }}>🍪 ขนม:</span> <strong style={{ color: '#f59e0b' }}>{snackExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>🛒 ของใช้:</span> <strong style={{ color: '#cbd5e1' }}>{groceryExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>🐱 แมว:</span> <strong style={{ color: '#cbd5e1' }}>{petExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>⛽ น้ำมัน:</span> <strong style={{ color: '#cbd5e1' }}>{transportExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(168, 85, 247, 0.08)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+                  <span style={{ color: '#d8b4fe' }}>🎮 เกม:</span> <strong style={{ color: '#c084fc' }}>{gameExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>💡 น้ำ/ไฟ:</span> <strong style={{ color: '#00f2fe' }}>{utilitiesExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>🏠 ค่าห้อง:</span> <strong style={{ color: '#cbd5e1' }}>{rentBillExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>💳 หนี้ 4 เจ้า:</span> <strong style={{ color: '#ffd60a' }}>{debtExpense.toLocaleString()} ฿</strong>
+                </div>
+                <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                  <span style={{ color: '#6ee7b7' }}>💵 กู้ฉุกเฉิน:</span> <strong style={{ color: '#10b981' }}>+{loanIncome.toLocaleString()} ฿</strong>
+                </div>
               </div>
             </div>
 
             <div style={{ fontSize: '10px', color: '#94a3b8', background: '#030508', padding: '6px 8px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.05)', lineHeight: 1.4 }}>
-              💡 <strong>ความจริง:</strong> ขนม ({snackExpense} ฿) + Zaza ({zazaExpense} ฿) + ค่าน้ำผิดปกติ ({waterExpense} ฿) = 3,704 ฿ ถ้าคุมงบหย่อนใจ Zaza+ขนม ให้อยู่ในงบ ~1,500 ฿ และค่าน้ำกลับมาปกติ เงินเดือน 15k จะเหลือบวกทันทีโดยไม่ต้องหักดิบ!
+              💡 <strong>วิเคราะห์จุดรั่ว:</strong> ขนม ({snackExpense.toLocaleString()} ฿) + Zaza ({zazaExpense.toLocaleString()} ฿) + เกม ({gameExpense.toLocaleString()} ฿) = {(snackExpense + zazaExpense + gameExpense).toLocaleString()} ฿ | ค่าน้ำไฟสะสม {utilitiesExpense.toLocaleString()} ฿ | เงินกู้ฉุกเฉิน {loanIncome.toLocaleString()} ฿ บันทึกเป็นรายรับ ไม่ดึงให้รายจ่ายบวมผิดปกติ
             </div>
           </div>
 

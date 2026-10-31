@@ -100,52 +100,281 @@ function resolveDate(day, month = null, year = null) {
  * LIFE | EXTRAVAGANT | BILL | INVESTING | ETC
  */
 export function classifyItem(itemName) {
-  let nameLower = itemName.toLowerCase().trim();
+  let nameLower = (itemName || '').toLowerCase().trim();
 
   // Normalize common Thai keyboard typo: 'ข้าง' instead of 'ข้าว'
   if (/^ข้าง(มัน|ผัด|หมู|ไก่|ไข่|กะเพรา|กระเพรา|แกง|เหนียว|ต้ม|จาน)/.test(nameLower)) {
     nameLower = nameLower.replace(/^ข้าง/, 'ข้าว');
   }
 
-  // Load rules sorted by length descending so longer phrases match first
-  const rules = db
-    .prepare('SELECT * FROM category_rules ORDER BY LENGTH(keyword) DESC')
-    .all();
-
-  for (const rule of rules) {
-    const kw = rule.keyword.toLowerCase();
-    if (nameLower.includes(kw)) {
-      return {
-        categoryGroup: rule.category_group,
-        suggestedType: rule.suggested_type || 'ค่าใช้จ่าย',
-        matchedKeyword: kw,
-      };
-    }
-  }
-
-  // Smart food & living heuristics
+  // 1. INCOME / LOAN / REVENUE (รายรับ & เงินกู้ฉุกเฉิน)
   if (
-    nameLower.includes('มันไก่') ||
-    nameLower.includes('หมูกรอบ') ||
-    nameLower.includes('กะเพรา') ||
-    nameLower.includes('กระเพรา') ||
-    nameLower.includes('ก๋วยเตี๋ยว') ||
-    nameLower.includes('บะหมี่') ||
-    nameLower.includes('สุกี้') ||
-    nameLower.includes('สุ้กี้') ||
-    nameLower.includes('กินข้าว') ||
-    nameLower.includes('ถอนตังกินข้าว') ||
-    nameLower.includes('ข้าว')
+    nameLower.includes('กู้เงิน') ||
+    nameLower.includes('เงินกู้') ||
+    nameLower.includes('ยืมเงิน') ||
+    nameLower.includes('ฟีกู้เงิน') ||
+    nameLower.startsWith('กู้')
   ) {
-    return { categoryGroup: 'LIFE', suggestedType: 'ค่าใช้จ่าย', matchedKeyword: 'food_heuristic' };
+    return {
+      categoryGroup: 'INCOME',
+      subCategory: 'เงินกู้ฉุกเฉิน',
+      suggestedType: 'รายรับ',
+      matchedKeyword: 'loan_income',
+    };
   }
 
-  // Fallback defaults if not matched
-  if (nameLower.includes('invest') || nameLower.includes('trade')) {
-    return { categoryGroup: 'INVESTING', suggestedType: 'การลงทุน', matchedKeyword: 'fallback' };
+  if (
+    nameLower.includes('เงินเดือน') ||
+    nameLower.includes('เงินเข้า') ||
+    nameLower.includes('รายรับ') ||
+    nameLower.includes('รายได้') ||
+    nameLower.includes('ขายของ') ||
+    nameLower.includes('ได้เงิน') ||
+    nameLower.includes('แม่ช่วย') ||
+    nameLower.includes('แม่ให้') ||
+    nameLower.includes('คืนเงิน') ||
+    nameLower.includes('โอนเข้า')
+  ) {
+    return {
+      categoryGroup: 'INCOME',
+      subCategory: 'เงินเดือน/รายได้',
+      suggestedType: 'รายรับ',
+      matchedKeyword: 'salary_income',
+    };
   }
 
-  return { categoryGroup: 'ETC', suggestedType: 'ค่าใช้จ่าย', matchedKeyword: null };
+  // 2. INVESTING (การลงทุน)
+  if (
+    nameLower.includes('ลงทุน') ||
+    nameLower.includes('trade') ||
+    nameLower.includes('หุ้น') ||
+    nameLower.includes('กองทุน') ||
+    nameLower.includes('crypto') ||
+    nameLower.includes('btc') ||
+    nameLower.includes('dca') ||
+    nameLower.includes('ทอง')
+  ) {
+    return {
+      categoryGroup: 'INVESTING',
+      subCategory: 'คริปโต/สินทรัพย์',
+      suggestedType: 'การลงทุน',
+      matchedKeyword: 'investing',
+    };
+  }
+
+  // 3. BILL / DEBT / UTILITIES (บิลประจำ & หนี้สิน)
+  if (
+    nameLower.includes('paylater') ||
+    nameLower.includes('easycash') ||
+    nameLower.includes('easaycash') ||
+    nameLower.includes('thunder') ||
+    nameLower.includes('ธันเดอ') ||
+    nameLower.includes('finnix') ||
+    nameLower.includes('ผ่อน') ||
+    nameLower.includes('หนี้')
+  ) {
+    return {
+      categoryGroup: 'BILL',
+      subCategory: 'หนี้สิน 4 เจ้า',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'debt',
+    };
+  }
+
+  if (
+    nameLower.includes('ค่าไฟ') ||
+    nameLower.includes('ไฟฟ้า') ||
+    nameLower.includes('ค่าน้ำ') ||
+    nameLower.includes('ประปา')
+  ) {
+    return {
+      categoryGroup: 'BILL',
+      subCategory: 'ค่าน้ำ/ค่าไฟ',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'utilities',
+    };
+  }
+
+  if (
+    nameLower.includes('wifi') ||
+    nameLower.includes('เน็ต') ||
+    nameLower.includes('เน็ตบ้าน') ||
+    nameLower.includes('โทรศัพท์') ||
+    nameLower.includes('ค่าห้อง') ||
+    nameLower.includes('ค่าบัตร')
+  ) {
+    return {
+      categoryGroup: 'BILL',
+      subCategory: 'ค่าห้อง/เน็ต/บิล',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'fixed_bills',
+    };
+  }
+
+  // 4. EXTRAVAGANT (หย่อนใจ / ฟุ่มเฟือย / รูรั่ว)
+  if (
+    nameLower.includes('zaza') ||
+    nameLower.includes('กระดาษโรล') ||
+    nameLower.includes('โรล')
+  ) {
+    return {
+      categoryGroup: 'EXTRAVAGANT',
+      subCategory: 'Zaza/หย่อนใจ',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'zaza',
+    };
+  }
+
+  if (
+    nameLower.includes('ขนม') ||
+    nameLower.includes('เค้ก') ||
+    nameLower.includes('ไอติม') ||
+    nameLower.includes('ของหวาน') ||
+    nameLower.includes('เบเกอรี่')
+  ) {
+    return {
+      categoryGroup: 'EXTRAVAGANT',
+      subCategory: 'ขนม 7-11/ของหวาน',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'snack',
+    };
+  }
+
+  if (
+    nameLower.includes('เกม') ||
+    nameLower.includes('เติมเกม') ||
+    nameLower.includes('dota') ||
+    nameLower.includes('steam') ||
+    nameLower.includes('gpu') ||
+    nameLower.includes('yt')
+  ) {
+    return {
+      categoryGroup: 'EXTRAVAGANT',
+      subCategory: 'เกม/บันเทิง',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'entertainment',
+    };
+  }
+
+  if (
+    nameLower.includes('เบียร์') ||
+    nameLower.includes('เหล้า') ||
+    nameLower.includes('หวย') ||
+    nameLower.includes('บอนชอน') ||
+    nameLower.includes('ช้อปปิ้ง') ||
+    nameLower.includes('shopping')
+  ) {
+    return {
+      categoryGroup: 'EXTRAVAGANT',
+      subCategory: 'สังสรรค์/ช้อปปิ้ง',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'extravagant_social',
+    };
+  }
+
+  // 5. LIFE (ปัจจัย 4 / จำเป็นในชีวิต)
+  if (
+    nameLower.includes('กาแฟ') ||
+    nameLower.includes('คาเฟ่') ||
+    nameLower.includes('น้ำปั่น') ||
+    nameLower.includes('ชา')
+  ) {
+    return {
+      categoryGroup: 'LIFE',
+      subCategory: 'กาแฟ/เครื่องดื่ม',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'coffee_drink',
+    };
+  }
+
+  if (
+    nameLower.includes('แมว') ||
+    nameLower.includes('อาหารแมว') ||
+    nameLower.includes('ทรายแมว')
+  ) {
+    return {
+      categoryGroup: 'LIFE',
+      subCategory: 'สัตว์เลี้ยง (แมว)',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'pet_cat',
+    };
+  }
+
+  if (
+    nameLower.includes('gas') ||
+    nameLower.includes('น้ำมัน') ||
+    nameLower.includes('เดินทาง') ||
+    nameLower.includes('รถ')
+  ) {
+    return {
+      categoryGroup: 'LIFE',
+      subCategory: 'ค่าน้ำมัน/เดินทาง',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'transport_gas',
+    };
+  }
+
+  if (
+    nameLower.includes('makro') ||
+    nameLower.includes('lotus') ||
+    nameLower.includes('mr.diy') ||
+    nameLower.includes('7-11') ||
+    nameLower.includes('เซเว่น') ||
+    nameLower.includes('ตลาด') ||
+    nameLower.includes('ของใช้') ||
+    nameLower.includes('ไข่')
+  ) {
+    return {
+      categoryGroup: 'LIFE',
+      subCategory: 'ของใช้/วัตถุดิบ',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'groceries',
+    };
+  }
+
+  if (
+    nameLower.includes('ยา') ||
+    nameLower.includes('หมอ') ||
+    nameLower.includes('ซ่อม') ||
+    nameLower.includes('ปลูกผัก')
+  ) {
+    return {
+      categoryGroup: 'LIFE',
+      subCategory: 'สุขภาพ/ซ่อมแซม',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'health_maintenance',
+    };
+  }
+
+  if (
+    nameLower.includes('ข้าว') ||
+    nameLower.includes('กะเพรา') ||
+    nameLower.includes('ไก่ทอด') ||
+    nameLower.includes('หมูกรอบ') ||
+    nameLower.includes('ก๋วยเตี๋ยว') ||
+    nameLower.includes('สุกี้') ||
+    nameLower.includes('หม่าล่า') ||
+    nameLower.includes('ส้มตำ') ||
+    nameLower.includes('ยำ') ||
+    nameLower.includes('eat') ||
+    nameLower.includes('อาหาร') ||
+    nameLower.includes('กินข้าว')
+  ) {
+    return {
+      categoryGroup: 'LIFE',
+      subCategory: 'อาหาร/มื้อหลัก',
+      suggestedType: 'ค่าใช้จ่าย',
+      matchedKeyword: 'food_meal',
+    };
+  }
+
+  // Fallback defaults
+  return {
+    categoryGroup: 'ETC',
+    subCategory: 'เบ็ดเตล็ด/อื่น ๆ',
+    suggestedType: 'ค่าใช้จ่าย',
+    matchedKeyword: null,
+  };
 }
 
 /**
@@ -343,6 +572,7 @@ export function normalizeItemName(rawItemName) {
     canonicalName: clean,
     originalAlias,
     categoryGroup: classification.categoryGroup,
+    subCategory: classification.subCategory || 'ทั่วไป',
     suggestedType: classification.suggestedType,
     matchedBy: classification.matchedKeyword || 'classification_rule',
   };
@@ -392,6 +622,7 @@ export function parseTelegramMessage(rawMessage) {
           category: norm.canonicalName,
           original_alias: norm.originalAlias,
           category_group: norm.categoryGroup,
+          sub_category: norm.subCategory || 'ทั่วไป',
           type: norm.suggestedType,
           amount,
           note: norm.originalAlias.toLowerCase() !== norm.canonicalName.toLowerCase()
@@ -423,8 +654,8 @@ export function ingestMessage(rawMessage, telegramMsgId = null) {
     }
 
     const insertTx = db.prepare(`
-      INSERT INTO transactions (date, type, category, category_group, amount, note, raw_text)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (date, type, category, category_group, sub_category, amount, note, raw_text)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertedIds = [];
@@ -435,6 +666,7 @@ export function ingestMessage(rawMessage, telegramMsgId = null) {
           item.type,
           item.category,
           item.category_group,
+          item.sub_category || 'ทั่วไป',
           item.amount,
           item.note,
           item.raw_text

@@ -7,6 +7,7 @@ import { ingestMessage, classifyItem, undoBotLog, undoLastBotLog } from '../lib/
 import { backupAllToGoogleSheets } from './backup_to_sheets.js';
 import {
   getActiveTop3Tasks,
+  getLogicalFocusDate,
   getAllFocusTasks,
   toggleFocusCheckIn,
   getTodayCheckIns,
@@ -105,7 +106,7 @@ const healthServer = http.createServer(async (req, res) => {
   if (req.url === '/ping_focus' && req.method === 'POST') {
     const chatId = getSetting('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID;
     if (chatId) {
-      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+      const todayStr = getLogicalFocusDate();
       const { text, keyboard } = renderFocusChecklist(todayStr);
       await sendMessage(chatId, text, {
         parse_mode: 'HTML',
@@ -393,7 +394,7 @@ async function poll() {
           const messageId = cq.message.message_id;
           setSetting('telegram_chat_id', chatId);
 
-          const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+          const todayStr = getLogicalFocusDate();
 
           if (cqData.startsWith('toggle_task_') || cqData.startsWith('ok_task_')) {
             const taskId = parseInt(cqData.replace('toggle_task_', '').replace('ok_task_', ''), 10);
@@ -530,7 +531,7 @@ async function poll() {
         // Check if user says "โอเค" / "ok" / "ทำแล้ว"
         const isOk = /^(โอเค|โอเคร|เค|ok|okay|okey|done|เสร็จ|เรียบร้อย)(\s*\d+)?$/i.test(lower);
         if (isOk) {
-          const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+          const todayStr = getLogicalFocusDate();
           const todayTop3 = getTodayCheckIns(todayStr);
 
           // Check if user specified a number (e.g. "โอเค 1", "ok 2")
@@ -580,7 +581,7 @@ async function poll() {
           lower === 'เป้าหมาย' ||
           lower === 'รูทีน'
         ) {
-          const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+          const todayStr = getLogicalFocusDate();
           const { text, keyboard } = renderFocusChecklist(todayStr);
 
           await sendMessage(chatId, text, {
@@ -617,7 +618,7 @@ async function poll() {
           await sendMessage(chatId, reply, { parse_mode: 'HTML' });
 
           // Send the interactive checklist alongside start
-          const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+          const todayStr = getLogicalFocusDate();
           const { text, keyboard } = renderFocusChecklist(todayStr);
           await sendMessage(chatId, text, {
             parse_mode: 'HTML',

@@ -17,6 +17,7 @@ const CATEGORY_META = {
   BILL: { name: 'BILL', emoji: '📄', label: 'บิล / หนี้สิน / คงที่', color: 'var(--bill-color)' },
   INVESTING: { name: 'INVESTING', emoji: '📈', label: 'การลงทุน / ออมเงิน', color: 'var(--investing-color)' },
   ETC: { name: 'ETC', emoji: '📦', label: 'เบ็ดเตล็ด / อื่น ๆ', color: 'var(--etc-color)' },
+  INCOME: { name: 'INCOME', emoji: '💵', label: 'รายรับ / เงินกู้ฉุกเฉิน', color: '#10b981' },
 };
 
 export default function Home() {
@@ -73,6 +74,7 @@ export default function Home() {
     date: '',
     category: '',
     category_group: 'LIFE',
+    sub_category: 'ทั่วไป',
     amount: '',
   });
   const [loading, setLoading] = useState(true);
@@ -160,6 +162,7 @@ export default function Home() {
       date: tx.date,
       category: tx.category,
       category_group: tx.category_group,
+      sub_category: tx.sub_category || 'ทั่วไป',
       amount: String(tx.amount),
     });
   };
@@ -177,6 +180,7 @@ export default function Home() {
           date: txFormData.date,
           category: txFormData.category,
           category_group: txFormData.category_group,
+          sub_category: txFormData.sub_category,
           amount: parseFloat(txFormData.amount),
         }),
       });
@@ -211,7 +215,7 @@ export default function Home() {
           ? {
               ...t,
               category_group: newGroup,
-              type: newGroup === 'INVESTING' ? 'การลงทุน' : 'ค่าใช้จ่าย',
+              type: newGroup === 'INVESTING' ? 'การลงทุน' : newGroup === 'INCOME' ? 'รายรับ' : 'ค่าใช้จ่าย',
             }
           : t
       )
@@ -963,11 +967,29 @@ export default function Home() {
                             <option value="BILL">📄 BILL</option>
                             <option value="INVESTING">📈 INVESTING</option>
                             <option value="ETC">📦 ETC</option>
+                            <option value="INCOME">💵 INCOME</option>
                           </select>
                         </td>
-                        <td className="quant-td-desc">{item.category}</td>
-                        <td className="quant-td-amount">
-                          {formatCurrency(item.amount)} ฿
+                        <td className="quant-td-desc">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span>{item.category}</span>
+                            {item.sub_category && item.sub_category !== 'ทั่วไป' && (
+                              <span style={{
+                                fontSize: '10px',
+                                fontFamily: 'monospace',
+                                background: item.type === 'รายรับ' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                color: item.type === 'รายรับ' ? '#6ee7b7' : '#94a3b8',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                border: item.type === 'รายรับ' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                              }}>
+                                {item.sub_category}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="quant-td-amount" style={{ color: item.type === 'รายรับ' ? '#10b981' : undefined }}>
+                          {item.type === 'รายรับ' ? '+' : ''}{formatCurrency(item.amount)} ฿
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
@@ -2086,6 +2108,7 @@ export default function Home() {
                   <option value="BILL">📄 BILL (บิล / หนี้สิน / คงที่)</option>
                   <option value="INVESTING">📈 INVESTING (การลงทุน / ออมเงิน)</option>
                   <option value="ETC">📦 ETC (เบ็ดเตล็ด)</option>
+                  <option value="INCOME">💵 INCOME (รายรับ / เงินกู้ฉุกเฉิน)</option>
                 </select>
               </div>
 
