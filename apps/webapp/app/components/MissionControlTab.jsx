@@ -51,7 +51,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   // Portfolio Structure State (3 Pillars & Sub-Portfolios from SQLite)
   const defaultPillars = [
     { pillar_code: 'CASH', title: '1. CASH (ความอยู่รอด & ล้างหนี้)', badge: 'หนี้คงเหลือ 51.1k', emoji: '💼', color: '#f43f5e', note: 'Ray Dalio Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"' },
-    { pillar_code: 'ALPHA', title: '2. ALPHA (เครื่องยนต์อัตโนมัติ)', badge: 'MT5 Demo Test', emoji: '🤖', color: '#00f2fe', note: null },
+    { pillar_code: 'ALPHA', title: '2. ALPHA (เครื่องยนต์อัตโนมัติ)', badge: 'MT5 Demo Test', emoji: '🤖', color: '#00f2fe', note: 'Trading Principle: "ขาดทุนคือส่วนหนึ่งของเกม หัวใจคือคุม Risk ไม่ให้ตาย แล้วเรียนรู้ Pattern ข้อผิดพลาดเพื่ออยู่รอดในระยะยาว"' },
     { pillar_code: 'BETA', title: '3. BETA (ความมั่งคั่งระยะยาว)', badge: 'เริ่มหลังปลอดหนี้', emoji: '🌱', color: '#f59e0b', note: null },
   ];
   const defaultItems = [

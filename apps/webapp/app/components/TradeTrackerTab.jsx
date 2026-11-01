@@ -221,6 +221,57 @@ export default function TradeTrackerTab() {
           </div>
         )}
       </div>
+      {/* TRADING SYSTEM MANIFESTO & PHILOSOPHY */}
+      <div
+        className="glass-panel"
+        style={{
+          marginTop: '12px',
+          background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(0, 0, 0, 0.45))',
+          border: '1px solid rgba(14, 165, 233, 0.25)',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '6px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>🧠</span> TRADING SYSTEM MANIFESTO (ปรัชญาระบบเทรด & สัจธรรมความน่าจะเป็น)
+          </span>
+          <span style={{ fontSize: '10px', color: '#94a3b8', fontFamily: 'monospace' }}>
+            PROBABILISTIC EDGE • NO HOLY GRAIL
+          </span>
+        </div>
+
+        <div style={{ fontSize: '11px', color: '#cbd5e1', lineHeight: '1.6', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px' }}>
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+            <strong style={{ color: '#ffffff' }}>1. แม่น 100% ไม่มีจริง:</strong>
+            <p style={{ margin: '3px 0 0 0', color: '#94a3b8' }}>
+              ผลลัพธ์มีทั้ง %Win และ %Loss เสมอ ไม่มีกลยุทธ์ใดในตลาดผันผวนที่ไม่ขาดทุน การยอมรับสัจธรรมนี้จะปลดล็อกอารมณ์กลัวการขาดทุน
+            </p>
+          </div>
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+            <strong style={{ color: '#ffffff' }}>2. ขาดทุนคือส่วนหนึ่งของเกม:</strong>
+            <p style={{ margin: '3px 0 0 0', color: '#94a3b8' }}>
+              สาระของ Trading System คือมีแผนรับมือกับผลขาดทุน จำกัดความเสียหาย ไม่ทำให้หมดตัว และไม่กระทบภาพรวมระยะยาว
+            </p>
+          </div>
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+            <strong style={{ color: '#ffffff' }}>3. ดึง Pattern ข้อผิดพลาดมาสร้างกำไร:</strong>
+            <p style={{ margin: '3px 0 0 0', color: '#94a3b8' }}>
+              Pattern ความผิดพลาดของคนมีไม่กี่แบบ ถ้ารับรู้เร็ว บันทึกสม่ำเสมอ และไม่ทำผิดซ้ำ ย่อมเปลี่ยน Loss เป็นกำไรและประสบการณ์
+            </p>
+          </div>
+          <div style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+            <strong style={{ color: '#f59e0b' }}>4. อยู่รอด ไม่หลงทางลัดขายฝัน:</strong>
+            <p style={{ margin: '3px 0 0 0', color: '#cbd5e1' }}>
+              การสร้างผลตอบแทนที่เหมาะสมกับความเสี่ยงอย่างต่อเนื่อง (Risk-Adjusted Return) คือหัวใจของการยืนระยะ ยิ่งอยู่นาน ยิ่งใกล้ความสำเร็จ
+            </p>
+          </div>
+        </div>
+      </div>
+
 
       {/* 2. STATS OVERVIEW BAR */}
       <div className="tracker-stats-grid">
