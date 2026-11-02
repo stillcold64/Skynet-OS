@@ -107,7 +107,27 @@ export function classifyItem(itemName) {
     nameLower = nameLower.replace(/^ข้าง/, 'ข้าว');
   }
 
-  // 1. INCOME / LOAN / REVENUE (รายรับ & เงินกู้ฉุกเฉิน)
+  // 1. INCOME / LOAN / REVENUE / LOTTERY (รายรับ, เงินกู้ฉุกเฉิน, และโชคลาภ)
+  if (
+    nameLower.includes('ถูกหวย') ||
+    nameLower.includes('ถูกรางวัล') ||
+    nameLower.includes('ถูกลอตเตอรี่') ||
+    nameLower.includes('ถูกลอตเตอรี') ||
+    nameLower.includes('ถูกสลาก') ||
+    nameLower.includes('ได้รางวัล') ||
+    nameLower.includes('ขึ้นเงินหวย') ||
+    nameLower.includes('ลาภลอย') ||
+    nameLower.includes('เงินรางวัล')
+  ) {
+    return {
+      categoryGroup: 'INCOME',
+      subCategory: 'โชคลาภ/เงินรางวัล',
+      suggestedType: 'รายรับ',
+      matchedKeyword: 'lottery_income',
+    };
+  }
+
+
   if (
     nameLower.includes('กู้เงิน') ||
     nameLower.includes('เงินกู้') ||
@@ -428,6 +448,27 @@ export function normalizeItemName(rawItemName) {
     }
   } catch (e) {
     console.error('Error querying item_aliases:', e);
+  }
+
+  // Lottery & Prize Winnings (โชคลาภ / ถูกหวย)
+  if (
+    cleanLower.includes('ถูกหวย') ||
+    cleanLower.includes('ถูกรางวัล') ||
+    cleanLower.includes('ถูกลอตเตอรี่') ||
+    cleanLower.includes('ถูกลอตเตอรี') ||
+    cleanLower.includes('ถูกสลาก') ||
+    cleanLower.includes('ขึ้นเงินหวย') ||
+    cleanLower.includes('ลาภลอย') ||
+    cleanLower.includes('เงินรางวัล')
+  ) {
+    return {
+      canonicalName: 'ถูกหวย / รางวัล',
+      originalAlias,
+      categoryGroup: 'INCOME',
+      subCategory: 'โชคลาภ/เงินรางวัล',
+      suggestedType: 'รายรับ',
+      matchedBy: 'heuristic_lottery_win',
+    };
   }
 
   // 3. Smart bill & recurring cost heuristics (High Precision Substrings)

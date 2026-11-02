@@ -516,6 +516,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const utilitiesExpense = subCategoryTotals['ค่าน้ำ/ค่าไฟ']?.total || 0;
   const rentBillExpense = subCategoryTotals['ค่าห้อง/เน็ต/บิล']?.total || 0;
   const loanIncome = subCategoryTotals['เงินกู้ฉุกเฉิน']?.total || 0;
+  const lotteryIncome = subCategoryTotals['โชคลาภ/เงินรางวัล']?.total || 0;
   const waterExpense = utilitiesExpense || 1525;
   const gasExpense = transportExpense || 400;
 
@@ -1859,6 +1860,11 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                 <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                   <span style={{ color: '#6ee7b7' }}>💵 กู้ฉุกเฉิน:</span> <strong style={{ color: '#10b981' }}>+{loanIncome.toLocaleString()} ฿</strong>
                 </div>
+                {lotteryIncome > 0 && (
+                  <div style={{ background: 'rgba(16, 185, 129, 0.15)', padding: '3px 5px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+                    <span style={{ color: '#6ee7b7' }}>🎉 ถูกหวย:</span> <strong style={{ color: '#10b981' }}>+{lotteryIncome.toLocaleString()} ฿</strong>
+                  </div>
+                )}
               </div>
             </div>
 

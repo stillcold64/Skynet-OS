@@ -761,7 +761,12 @@ async function poll() {
             summaryTag = `รวม <b>${expTotal.toLocaleString()} ฿</b>`;
           }
 
-          let reply = `${isEdited ? '✏️ <b>อัปเดตใหม่เรียบร้อย</b>' : '⚡ <b>บันทึกแล้ว</b>'} (${result.count} รายการ | ${summaryTag})\n`;
+          const hasLottery = result.items.some((it) => it.sub_category === 'โชคลาภ/เงินรางวัล');
+          let reply = '';
+          if (hasLottery) {
+            reply += '🎉 <b>ยินดีด้วยครับ! มีโชคลาภเงินเข้าพอร์ต 🍀</b>\n';
+          }
+          reply += `${isEdited ? '✏️ <b>อัปเดตใหม่เรียบร้อย</b>' : '⚡ <b>บันทึกแล้ว</b>'} (${result.count} รายการ | ${summaryTag})\n`;
           for (const item of result.items) {
             const emoji = CATEGORY_EMOJI[item.category_group] || (item.type === 'รายรับ' ? '💵' : '•');
             const aliasDisplay =
