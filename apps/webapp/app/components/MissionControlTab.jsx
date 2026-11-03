@@ -46,6 +46,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const [todayPlanInput, setTodayPlanInput] = useState('');
   const [finishInput, setFinishInput] = useState('');
   const [tomorrowPlanInput, setTomorrowPlanInput] = useState('');
+  const [luckInput, setLuckInput] = useState('');
   const [isSavingReflection, setIsSavingReflection] = useState(false);
 
   // Portfolio Structure State (3 Pillars & Sub-Portfolios from SQLite)
@@ -105,6 +106,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
         setTodayReflection(tRef);
         setFinishInput(tRef.finish_text || '');
         setTomorrowPlanInput(tRef.next_day_text || '');
+        setLuckInput(tRef.luck_text || '');
 
         const yest = (rData.history || []).find((h) => h.date !== rData.selectedDate && h.next_day_text);
         if (yest) {
@@ -126,13 +128,14 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   const handleSaveReflection = async () => {
     try {
       setIsSavingReflection(true);
-      // 1. Save Today's Finished List and Tomorrow's Plan
+      // 1. Save Today's Finished List, Tomorrow's Plan, and Dump Luck Daily
       await fetch('/api/reflections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           finish_text: finishInput,
           next_day_text: tomorrowPlanInput,
+          luck_text: luckInput,
         }),
       });
 
@@ -750,7 +753,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             </div>
           </div>
 
-          {/* SUB-CARD 2: DAILY PLAN & FINISHED (แผนวันนี้, ทำเสร็จแล้ว, และแผนพรุ่งนี้) */}
+          {/* SUB-CARD 2: บันทึกทบทวนประจำวัน (Dump Luck / Finish List / Next Day Plan) */}
           <div
             style={{
               background: '#070a10',
@@ -765,7 +768,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>📋</span> Daily Plan & Finished (แผน & สิ่งที่ทำเสร็จ)
+                <span>📝</span> บันทึกทบทวนประจำวัน (Daily Reflection)
               </span>
               <button
                 onClick={() => setIsEditingPlan(!isEditingPlan)}
@@ -786,19 +789,20 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
             {/* View or Edit mode */}
             {isEditingPlan ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* 1. Dump Luck Daily (dl) */}
                 <div>
-                  <label style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                    🎯 1. แผนที่ตั้งเป้าไว้วันนี้ (Today's Plan):
+                  <label style={{ fontSize: '10px', color: '#ffd60a', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                    🍀 Dump Luck Daily (dl) — วันนี้โชคดีเรื่องอะไร 1 เรื่อง?
                   </label>
                   <textarea
                     rows={2}
-                    value={todayPlanInput}
-                    onChange={(e) => setTodayPlanInput(e.target.value)}
-                    placeholder="เป้าหมายที่ตั้งใจจะทำวันนี้..."
+                    value={luckInput}
+                    onChange={(e) => setLuckInput(e.target.value)}
+                    placeholder="พิมพ์เรื่องโชคดีวันนี้ 1 เรื่อง... (หรือพิมพ์ในบอท: dl ลูกค้าคอนเฟิร์มงานไว)"
                     style={{
                       width: '100%',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(56, 189, 248, 0.25)',
+                      background: 'rgba(255, 214, 10, 0.04)',
+                      border: '1px solid rgba(255, 214, 10, 0.25)',
                       borderRadius: '6px',
                       color: '#ffffff',
                       fontSize: '11px',
@@ -807,19 +811,20 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                     }}
                   />
                 </div>
+                {/* 2. Finish List (f) */}
                 <div>
-                  <label style={{ fontSize: '10px', color: '#34d399', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                    ✅ 2. สิ่งที่ทำเสร็จแล้ววันนี้ (Finished Today):
+                  <label style={{ fontSize: '10px', color: '#30d158', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                    🏁 Finish List (f) — วันนี้ทำอะไรเสร็จแล้วบ้าง?
                   </label>
                   <textarea
                     rows={2}
                     value={finishInput}
                     onChange={(e) => setFinishInput(e.target.value)}
-                    placeholder="เช่น ตัดคลิปเสร็จ 1 ชิ้น, วิดพื้นครบ..."
+                    placeholder="• ตัดต่อคลิป EP.2 เสร็จแล้ว&#10;• วิดพื้นครบ 50 ที&#10;(หรือพิมพ์ในบอท: f ตัดต่อคลิปจบ)"
                     style={{
                       width: '100%',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(52, 211, 153, 0.25)',
+                      background: 'rgba(48, 209, 88, 0.04)',
+                      border: '1px solid rgba(48, 209, 88, 0.25)',
                       borderRadius: '6px',
                       color: '#ffffff',
                       fontSize: '11px',
@@ -828,19 +833,20 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                     }}
                   />
                 </div>
+                {/* 3. Next Day Plan (ndl) */}
                 <div>
-                  <label style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                    🚀 3. แผนที่จะทำพรุ่งนี้ (Tomorrow's Plan):
+                  <label style={{ fontSize: '10px', color: '#64d2ff', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                    🚀 Next Day Plan (ndl) — พรุ่งนี้จะทำอะไรต่อ?
                   </label>
                   <textarea
                     rows={2}
                     value={tomorrowPlanInput}
                     onChange={(e) => setTomorrowPlanInput(e.target.value)}
-                    placeholder="สิ่งที่จะลุยต่อในวันพรุ่งนี้..."
+                    placeholder="• วางสตอรี่บอร์ดคลิปใหม่&#10;• จ่ายบิลค่าไฟ&#10;(หรือพิมพ์ในบอท: ndl เริ่มคลิปใหม่)"
                     style={{
                       width: '100%',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                      background: 'rgba(100, 210, 255, 0.04)',
+                      border: '1px solid rgba(100, 210, 255, 0.25)',
                       borderRadius: '6px',
                       color: '#ffffff',
                       fontSize: '11px',
@@ -849,50 +855,74 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                     }}
                   />
                 </div>
+                {/* Today's Plan (read-only from yesterday's ndl) */}
+                {(yesterdayPlan || todayPlanInput) && (
+                  <div style={{ background: 'rgba(56, 189, 248, 0.04)', border: '1px solid rgba(56, 189, 248, 0.15)', borderRadius: '6px', padding: '6px 8px' }}>
+                    <div style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700, marginBottom: '2px' }}>
+                      🎯 แผนที่ตั้งไว้เมื่อวาน (Today's Plan จาก ndl เมื่อวาน):
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                      {yesterdayPlan || todayPlanInput}
+                    </div>
+                  </div>
+                )}
                 <button
                   onClick={handleSaveReflection}
                   disabled={isSavingReflection}
                   style={{
-                    background: '#10b981',
-                    color: '#000',
+                    background: 'linear-gradient(135deg, #0a84ff 0%, #0066cc 100%)',
+                    color: '#fff',
                     border: 'none',
-                    padding: '5px 12px',
-                    borderRadius: '6px',
+                    padding: '6px 16px',
+                    borderRadius: '8px',
                     fontSize: '11px',
                     fontWeight: 700,
                     cursor: isSavingReflection ? 'wait' : 'pointer',
                     alignSelf: 'flex-end',
+                    boxShadow: '0 4px 16px rgba(10, 132, 255, 0.3)',
                   }}
                 >
-                  {isSavingReflection ? 'กำลังบันทึก...' : '💾 บันทึกแผน'}
+                  {isSavingReflection ? '⏳ กำลังบันทึก...' : '💾 บันทึกข้อมูล'}
                 </button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* 1. Today's Plan */}
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '7px 10px' }}>
-                  <div style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span>🎯</span> 1. แผนที่ตั้งเป้าไว้วันนี้ (Today's Plan):
+                {/* Today's Plan (from yesterday's ndl) */}
+                {(yesterdayPlan || todayPlanInput) && (
+                  <div style={{ background: 'rgba(56, 189, 248, 0.04)', border: '1px solid rgba(56, 189, 248, 0.15)', borderRadius: '8px', padding: '7px 10px' }}>
+                    <div style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>🎯</span> แผนที่ตั้งไว้เมื่อวาน (Today's Plan):
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#ffffff', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                      {yesterdayPlan || todayPlanInput}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: yesterdayPlan || todayPlanInput ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-                    {yesterdayPlan || todayPlanInput || 'ยังไม่ได้กำหนดแผนวันนี้ (กด ✏️ เพื่อจดเป้าหมาย)'}
+                )}
+
+                {/* Dump Luck Daily (dl) */}
+                <div style={{ background: 'rgba(255, 214, 10, 0.04)', border: '1px solid rgba(255, 214, 10, 0.15)', borderRadius: '8px', padding: '7px 10px' }}>
+                  <div style={{ fontSize: '10px', color: '#ffd60a', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🍀</span> Dump Luck Daily (dl):
+                  </div>
+                  <div style={{ fontSize: '11px', color: todayReflection.luck_text ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                    {todayReflection.luck_text || 'ยังไม่ได้เขียนเรื่องโชคดี (กด ✏️ เพื่อจดโชคดีประจำวัน)'}
                   </div>
                 </div>
 
-                {/* 2. Finished List Today */}
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '7px 10px' }}>
-                  <div style={{ fontSize: '10px', color: '#34d399', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span>✅</span> 2. สิ่งที่ทำเสร็จแล้ววันนี้ (Finished Today):
+                {/* Finish List (f) */}
+                <div style={{ background: 'rgba(48, 209, 88, 0.04)', border: '1px solid rgba(48, 209, 88, 0.15)', borderRadius: '8px', padding: '7px 10px' }}>
+                  <div style={{ fontSize: '10px', color: '#30d158', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🏁</span> Finish List (f):
                   </div>
                   <div style={{ fontSize: '11px', color: todayReflection.finish_text ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
                     {todayReflection.finish_text || 'ยังไม่มีรายการที่บันทึกว่าเสร็จ (กด ✏️ เพื่อจดความสำเร็จ)'}
                   </div>
                 </div>
 
-                {/* 3. Tomorrow's Plan */}
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '7px 10px' }}>
-                  <div style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span>🚀</span> 3. แผนที่จะทำพรุ่งนี้ (Tomorrow's Plan):
+                {/* Next Day Plan (ndl) */}
+                <div style={{ background: 'rgba(100, 210, 255, 0.04)', border: '1px solid rgba(100, 210, 255, 0.15)', borderRadius: '8px', padding: '7px 10px' }}>
+                  <div style={{ fontSize: '10px', color: '#64d2ff', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🚀</span> Next Day Plan (ndl):
                   </div>
                   <div style={{ fontSize: '11px', color: todayReflection.next_day_text ? '#ffffff' : '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
                     {todayReflection.next_day_text || 'ยังไม่ได้วางแผนวันพรุ่งนี้ (กด ✏️ เพื่อวางเป้าหมายล่วงหน้า)'}
