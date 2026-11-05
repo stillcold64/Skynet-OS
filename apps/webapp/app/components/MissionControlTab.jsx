@@ -1636,8 +1636,8 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           </div>
 
           {/* Phase Header Info */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
-            <span style={{ color: '#00f2fe', fontWeight: 700 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '11px', fontFamily: 'monospace' }}>
+            <span style={{ color: '#00f2fe', fontWeight: 700, flex: '1 1 180px', minWidth: 0 }}>
               {editingPhaseTitle ? (
                 <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px' }}>
                   PHASE {selectedPhase}:
@@ -1646,13 +1646,15 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
                   <button onClick={() => setEditingPhaseTitle(false)} title="ยกเลิก" style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>×</button>
                 </span>
               ) : (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                   {`PHASE ${selectedPhase} (${selectedPhase === 1 ? 'ปัจจุบัน' : selectedPhase === 2 ? 'ถัดไป' : 'เป้าหมาย'}): ${phaseTitles[selectedPhase] || ''}`}
-                  <button onClick={handleStartEditPhaseTitle} title="แก้ชื่อเฟส" aria-label={`แก้ชื่อเฟส ${selectedPhase}`} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '11px', padding: '2px' }}>✏️</button>
                 </span>
               )}
             </span>
-            <span style={{ color: selectedPhase === 1 ? '#10b981' : '#64748b', fontWeight: 600 }}>
+            {!editingPhaseTitle && (
+              <button onClick={handleStartEditPhaseTitle} title={`แก้ชื่อเฟส ${selectedPhase}`} style={{ background: 'rgba(0, 242, 254, 0.08)', border: '1px solid rgba(0, 242, 254, 0.25)', borderRadius: '5px', color: '#00f2fe', cursor: 'pointer', fontSize: '10px', padding: '4px 7px', whiteSpace: 'nowrap' }}>✏️ แก้ชื่อ</button>
+            )}
+            <span style={{ color: selectedPhase === 1 ? '#10b981' : '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
               {selectedPhase === 1 ? '🟢 ACTIVE' : selectedPhase === 2 ? '⏳ NEXT' : '🔒 GOAL'}
             </span>
           </div>
