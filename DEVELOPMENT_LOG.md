@@ -1,6 +1,6 @@
 # Skynet OS — Development Log
 
-> Living handoff note: what this project is for, what is in place, and the current point to continue from. Update this file when a meaningful feature or project decision changes. It is not a general wish list.
+> Living handoff note maintained by the assistant as the user's project secretary. It records the project's purpose, verified state, user-directed goals, and deferred topics so work can resume without repetition.
 
 ## Project purpose
 
@@ -29,15 +29,27 @@ For finance, the system should preserve the original message and an audit trail,
 - The current code supports numbered Beta accounts (`Beta 1`, `Beta 2`, …). The user's latest direction is to start from the Beta portfolio that actually exists and keep the setup simple. Before expanding account creation or adding strategy fields, confirm the real account naming and the intended treatment of a single deposit split across accounts. Do not silently reinterpret an internal transfer as new money.
 - The feature only records user-entered events. It does not initiate transfers or trades.
 
-## Recommended continuation point
+## Existing Beta feature — outstanding verification
 
-1. Deploy the Apps Script handler as a new version and verify the webhook's upsert-by-event-key behavior with a clearly marked test event; confirm a retry updates the same row and cancellation updates its status without appending a duplicate.
-2. Verify the Telegram-to-SQLite-to-dashboard-to-Sheets path using one small, real user-authorized entry. Confirm the bot's reply reflects actual Sheets confirmation and that the dashboard shows the same entry. Preserve the event/audit history.
-3. Resolve the portfolio-model question before adding more finance features: which Beta account is the initial one, and how should a single external deposit split across multiple accounts be recorded?
-4. Add the strategy/rules view only after the Beta record flow is reliable. Keep rules visible with the account so they can guide decisions, without presenting a strategy label as proof of performance.
-5. Once core flows are dependable, improve visual organization incrementally. Keeping the home screen as a useful cockpit is reasonable; group or simplify crowded sections based on actual use rather than redesigning every page first.
+- The Apps Script handler has not been deployed, and the production Telegram flow has not been verified with a real message. These are known completion gaps in the already-implemented Beta feature, not authorization to make a real financial entry or send a test to production. Coordinate the test with the user when they want to continue this feature.
 
-“Usable” means the core entry, audit, display, undo, and backup paths have been verified. Do not wait for a vague goal of 100% completion before making focused usability improvements.
+## User-directed goals and deferred topics
+
+Only the user sets the next goal and its timing. When the user mentions a future idea or a problem to revisit, record it here with its status. Do not treat a parked topic as permission to inspect or change it. When the user says to start, promote that item to active work and update this log with the result.
+
+### Parked — waiting for the user to say start
+
+- **Master Blueprint Save control:** the user says the Save control is hard to find and wants to fix it later. Do not investigate or edit it until the user asks to start.
+- **Portfolio strategies/rules:** the user wants each tracked portfolio eventually associated with a strategy/ruleset to help reduce emotional decisions. Keep the first Beta recording flow simple; do not add strategy features until the user prioritizes them.
+- **Portfolio split/accounting model:** the user is concerned one deposit split across portfolios could be counted twice. Before changing the model, settle how external deposits and internal transfers should be represented. Cash is currently kept outside this tracker.
+- **Home page organization:** the user finds some pages cluttered but likes the home screen as a convenient overview. Defer visual restructuring while the core flows are being made reliable; revisit when the user asks.
+
+## Project secretary workflow
+
+- Treat the user's latest explicit goal as the active item; do not independently pick the next feature from the parked list.
+- Before work, check this log and repository rules to avoid repeating completed work. After work, record what changed, what was verified, what remains incomplete, and the commit containing it.
+- Keep confirmed decisions separate from ideas and unresolved questions. If the user changes direction, update the log rather than preserving stale plans as current instructions.
+- A feature is operationally complete when its core paths have been verified in the intended environment. Do not use an undefined “100%” target as a reason to block later focused work.
 
 ## Continuation and safety checklist
 
