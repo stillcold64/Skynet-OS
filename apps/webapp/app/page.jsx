@@ -10,6 +10,7 @@ import MemoryAnchorTab from './components/MemoryAnchorTab';
 import DailyReflectionTab from './components/DailyReflectionTab';
 import ExpenseWaveChart from './components/ExpenseWaveChart';
 import MissionControlTab from './components/MissionControlTab';
+import BetaPortfolioDashboard from './components/BetaPortfolioDashboard';
 
 const CATEGORY_META = {
   LIFE: { name: 'LIFE', emoji: '🌿', label: 'ชีวิตประจำวัน / อาหาร', color: 'var(--life-color)' },
@@ -28,7 +29,7 @@ export default function Home() {
 
   // Mode state: 'mission' | 'finance' | 'trading' | 'selfdev' (Command Center & 3 Core Pillars)
   const [appMode, setAppMode] = useState('mission');
-  // Tab state: 'mission' | 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'focus' | 'habits'
+  // Tab state: 'mission' | 'calendar' | 'debts' | 'tracker' | 'playbook' | 'journal' | 'beta' | 'focus' | 'habits'
   const [activeTab, setActiveTab] = useState('mission');
 
   const handleSwitchMode = (mode) => {
@@ -40,7 +41,7 @@ export default function Home() {
         setActiveTab('calendar');
       }
     } else if (mode === 'trading') {
-      if (activeTab !== 'tracker' && activeTab !== 'playbook' && activeTab !== 'journal') {
+      if (activeTab !== 'tracker' && activeTab !== 'playbook' && activeTab !== 'journal' && activeTab !== 'beta') {
         setActiveTab('tracker');
       }
     } else if (mode === 'selfdev') {
@@ -521,6 +522,13 @@ export default function Home() {
 
           {appMode === 'trading' && (
             <>
+              <button
+                className={`segmented-button ${activeTab === 'beta' ? 'active' : ''}`}
+                onClick={() => setActiveTab('beta')}
+              >
+                <span>🌱</span>
+                <span>พอร์ต Beta</span>
+              </button>
               <button
                 className={`segmented-button ${activeTab === 'tracker' ? 'active' : ''}`}
                 onClick={() => setActiveTab('tracker')}
@@ -1497,6 +1505,7 @@ export default function Home() {
       {activeTab === 'tracker' && <TradeTrackerTab />}
       {activeTab === 'playbook' && <PlaybookTab />}
       {activeTab === 'journal' && <JournalTab />}
+      {activeTab === 'beta' && <BetaPortfolioDashboard />}
 
       {/* SELF-DEVELOPMENT TABS */}
       {activeTab === 'reflections' && <DailyReflectionTab />}

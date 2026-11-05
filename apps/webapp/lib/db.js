@@ -78,6 +78,43 @@ try {
   console.error('Migration error on bot_logs table:', e);
 }
 
+// Beta investment accounts and their append-only cashflow ledger.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS beta_portfolios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_code TEXT NOT NULL UNIQUE,
+    account_number INTEGER NOT NULL,
+    display_name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS beta_cashflows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_key TEXT NOT NULL UNIQUE,
+    portfolio_id INTEGER NOT NULL,
+    direction TEXT NOT NULL CHECK (direction IN ('DEPOSIT', 'WITHDRAWAL')),
+    amount REAL NOT NULL CHECK (amount > 0),
+    currency TEXT NOT NULL DEFAULT 'THB',
+    event_date TEXT NOT NULL,
+    source TEXT NOT NULL,
+    raw_text TEXT NOT NULL,
+    telegram_chat_id TEXT,
+    telegram_msg_id INTEGER,
+    bot_log_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'CANCELLED')),
+    sheet_sync_status TEXT NOT NULL DEFAULT 'PENDING' CHECK (sheet_sync_status IN ('PENDING', 'SYNCED')),
+    sheet_sync_error TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (portfolio_id) REFERENCES beta_portfolios(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_beta_cashflows_portfolio_date
+    ON beta_cashflows(portfolio_id, event_date DESC, id DESC);
+  CREATE INDEX IF NOT EXISTS idx_beta_cashflows_bot_log ON beta_cashflows(bot_log_id);
+  CREATE INDEX IF NOT EXISTS idx_beta_cashflows_sync ON beta_cashflows(sheet_sync_status, id);
+`);
+
 // 3.1 Project Vault (Idea Parking Lot for high-creative mind)
 db.exec(`
   CREATE TABLE IF NOT EXISTS project_vault (

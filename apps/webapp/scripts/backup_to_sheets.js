@@ -1,6 +1,7 @@
 import db from '../lib/db.js';
 import fs from 'fs';
 import path from 'path';
+import { getBetaCashflowsForSheet, updateBetaCashflowSync } from '../lib/beta_portfolios.js';
 
 function getWebhookUrl() {
   let url = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
@@ -79,6 +80,41 @@ export async function backupAllToGoogleSheets(customUrl) {
   } catch (err) {
     console.error('Fetch error:', err.message);
     return { success: false, error: err.message };
+  }
+}
+
+export async function syncBetaCashflowsToGoogleSheets(customUrl) {
+  const url = customUrl || getWebhookUrl();
+  if (!url) {
+    updateBetaCashflowSync(false, 'GOOGLE_SHEETS_WEBHOOK_URL is not configured');
+    return { success: false, error: 'No webhook URL provided' };
+  }
+
+  const events = getBetaCashflowsForSheet();
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sync_beta_cashflows', type: 'BETA_CASHFLOWS', events }),
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = null; }
+
+    if (!res.ok || data?.success !== true || Number(data.count) !== events.length) {
+      const error = data?.error || data?.message || `Webhook did not confirm the full Beta ledger (HTTP ${res.status}; expected ${events.length}, received ${data?.count ?? 'unknown'})`;
+      updateBetaCashflowSync(false, error);
+      return { success: false, error, count: events.length };
+    }
+
+    updateBetaCashflowSync(true);
+    return { success: true, count: events.length, response: data };
+  } catch (err) {
+    console.error('Beta portfolio sync error:', err.message);
+    updateBetaCashflowSync(false, err.message);
+    return { success: false, error: err.message, count: events.length };
   }
 }
 

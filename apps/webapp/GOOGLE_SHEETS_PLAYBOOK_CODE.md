@@ -1,6 +1,6 @@
 # ☁️ Google Apps Script Webhook Code สำหรับ Skynet OS (แยก 6 หมวดหมู่อัตโนมัติ)
 
-สคริปต์นี้เป็นระบบ **Smart Multi-Tab Router** ติดตั้งบน Google Sheets เพื่อแยกบันทึกข้อมูลออกเป็น **6 แท็บหมวดหมู่อย่างเป็นระเบียบ 100%** ไม่ปะปนกันเด็ดขาด:
+สคริปต์นี้เป็นระบบ **Smart Multi-Tab Router** ติดตั้งบน Google Sheets เพื่อแยกบันทึกข้อมูลตามประเภท โดย Beta ใช้ event key สำหรับอัปเดตแถวเดิมอย่าง idempotent:
 
 | แท็บใน Google Sheets | ข้อมูลที่จัดเก็บ | แหล่งที่มา |
 | :--- | :--- | :--- |
@@ -10,6 +10,7 @@
 | **🧠_ปฏิทินอารมณ์_สติ** | บันทึกอารมณ์รายวัน/รายไม้ (FOMO, CALM, คะแนนวินัย, ข้อคิดเตือนสติ) | Skynet OS — Emotion Journal |
 | **🔥_เป้าหมาย_รูทีน_Heatmap** | เช็คอิน Top 3 Focus, ตอบ 'โอเค' บอท, Streak, ประวัติความสม่ำเสมอ | Telegram Bot & Web Heatmap |
 | **⚡_นิสัย_Micro_Habits** | เช็คอินนิสัยรายวัน (ตัดคลิป, ดื่มน้ำ, สเก็ตช์), Streak รายข้อ, % ความคืบหน้า | Skynet OS — Micro Habits Tracker |
+| **🌱_Beta_Cashflows** | เงินเข้า/ถอนรายพอร์ต Beta พร้อม event key, Telegram ID และสถานะ sync | Telegram Bot |
 
 ---
 
@@ -35,6 +36,71 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // =========================================================================
+    // 📂 หมวดที่ 0: 🌱 Beta cashflow ledger (upsert by immutable event_id)
+    // =========================================================================
+    if (data.action === "sync_beta_cashflows" || data.type === "BETA_CASHFLOWS") {
+      var betaLock = LockService.getScriptLock();
+      betaLock.waitLock(10000);
+      try {
+        var betaSheetName = "🌱_Beta_Cashflows";
+        var betaSheet = ss.getSheetByName(betaSheetName) || ss.getSheetByName("Beta_Cashflows");
+        var betaHeader = [
+          "event_id", "local_id", "portfolio_code", "portfolio_name", "account_number",
+          "direction", "amount", "currency", "event_date", "status", "source",
+          "raw_text", "telegram_chat_id", "telegram_msg_id", "bot_log_id",
+          "sheet_sync_status", "created_at", "updated_at"
+        ];
+        if (!betaSheet) betaSheet = ss.insertSheet(betaSheetName);
+        if (betaSheet.getLastRow() === 0) {
+          betaSheet.getRange(1, 1, 1, betaHeader.length).setValues([betaHeader]);
+          betaSheet.setFrozenRows(1);
+        }
+
+        var betaRowsByEvent = {};
+        var betaLastRow = betaSheet.getLastRow();
+        if (betaLastRow > 1) {
+          var betaKeys = betaSheet.getRange(2, 1, betaLastRow - 1, 1).getValues();
+          for (var bi = 0; bi < betaKeys.length; bi++) {
+            if (betaKeys[bi][0]) betaRowsByEvent[String(betaKeys[bi][0])] = bi + 2;
+          }
+        }
+
+        var betaEvents = data.events || [];
+        var betaInserted = 0;
+        var betaUpdated = 0;
+        for (var bj = 0; bj < betaEvents.length; bj++) {
+          var be = betaEvents[bj];
+          var eventId = String(be.event_key || ("db:" + be.id));
+          var betaValues = [[
+            eventId, be.id, be.portfolio_code, be.display_name, be.account_number,
+            be.direction, Number(be.amount), be.currency, be.event_date, be.status,
+            be.source, be.raw_text || "", be.telegram_chat_id || "", be.telegram_msg_id || "",
+            be.bot_log_id || "", "SYNCED", be.created_at, be.updated_at
+          ]];
+          var betaExistingRow = betaRowsByEvent[eventId];
+          if (betaExistingRow) {
+            betaSheet.getRange(betaExistingRow, 1, 1, betaHeader.length).setValues(betaValues);
+            betaUpdated++;
+          } else {
+            var betaNewRow = betaSheet.getLastRow() + 1;
+            betaSheet.getRange(betaNewRow, 1, 1, betaHeader.length).setValues(betaValues);
+            betaRowsByEvent[eventId] = betaNewRow;
+            betaInserted++;
+          }
+        }
+        return ContentService.createTextOutput(JSON.stringify({
+          success: true,
+          count: betaEvents.length,
+          inserted: betaInserted,
+          updated: betaUpdated,
+          sheet: betaSheetName
+        })).setMimeType(ContentService.MimeType.JSON);
+      } finally {
+        betaLock.releaseLock();
+      }
+    }
 
     // =========================================================================
     // 📂 หมวดที่ 1: 🎯 พิมพ์เขียว_Playbook (Playbook Setups Library)

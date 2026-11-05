@@ -4,7 +4,8 @@
 
 import db from '../lib/db.js';
 import { ingestMessage, classifyItem, undoBotLog, undoLastBotLog } from '../lib/parser.js';
-import { backupAllToGoogleSheets } from './backup_to_sheets.js';
+import { backupAllToGoogleSheets, syncBetaCashflowsToGoogleSheets } from './backup_to_sheets.js';
+import { getPendingBetaCashflowCount, parseBetaCashflowMessage, recordBetaCashflow } from '../lib/beta_portfolios.js';
 import {
   getActiveTop3Tasks,
   getLogicalFocusDate,
@@ -468,16 +469,18 @@ async function poll() {
             const logId = parseInt(cqData.replace('undo_log_', ''), 10);
             const undoRes = undoBotLog(logId);
             if (undoRes.success) {
-              await answerCallbackQuery(cq.id, `🗑️ ลบ ${undoRes.deletedCount} รายการเรียบร้อย`);
+              const undoCount = undoRes.deletedCount + (undoRes.cancelledBetaCashflowCount || 0);
+              const betaSync = undoRes.cancelledBetaCashflowCount ? await syncBetaCashflowsToGoogleSheets() : null;
+              await answerCallbackQuery(cq.id, `🗑️ ยกเลิก ${undoCount} รายการเรียบร้อย`);
               await editMessageText(
                 chatId,
                 messageId,
-                `🗑️ <b>ยกเลิกและลบรายการชุดนี้เรียบร้อยแล้ว ✅</b>\n<i>(ลบออก ${undoRes.deletedCount} รายการ: "${undoRes.rawMessage}")</i>\n☁️ ซิงค์คืนค่า Google Sheets แล้ว`,
+                `🗑️ <b>ยกเลิกรายการชุดนี้เรียบร้อยแล้ว ✅</b>\n<i>(ยกเลิก ${undoCount} รายการ: "${undoRes.rawMessage}")</i>${undoRes.cancelledBetaCashflowCount ? (betaSync?.success ? '\n☁️ อัปเดตสถานะ Beta ใน Google Sheets แล้ว' : '\n⚠️ Google Sheets ยังไม่ยืนยัน; จะลองซิงค์ซ้ำอัตโนมัติ') : '\n☁️ ส่งคืนสถานะ Google Sheets แล้ว'}`,
                 {
                   reply_markup: { inline_keyboard: [] },
                 }
               );
-              backupAllToGoogleSheets().catch((err) => console.error('Undo sync error:', err.message));
+              if (!undoRes.cancelledBetaCashflowCount) backupAllToGoogleSheets().catch((err) => console.error('Undo sync error:', err.message));
             } else {
               await answerCallbackQuery(cq.id, `⚠️ ${undoRes.message || 'ไม่สามารถยกเลิกได้'}`);
             }
@@ -507,6 +510,10 @@ async function poll() {
             if (prevLog) {
               const rollbackRes = undoBotLog(prevLog.id);
               console.log(`✏️ [EDITED_MESSAGE] Rollback previous log #${prevLog.id} (deleted ${rollbackRes.deletedCount} items)`);
+              if (rollbackRes.cancelledBetaCashflowCount) {
+                const betaSync = await syncBetaCashflowsToGoogleSheets();
+                if (!betaSync.success) console.warn('[BETA] Edited cashflow cancellation remains pending for Google Sheets sync.');
+              }
             }
           } catch (e) {
             console.error('Error handling edited message rollback:', e.message);
@@ -517,15 +524,54 @@ async function poll() {
         if (/^(ลบ|ยกเลิก|undo|ลบล่าสุด|ยกเลิกล่าสุด)$/i.test(rawText)) {
           const undoRes = undoLastBotLog();
           if (undoRes.success) {
+            const undoCount = undoRes.deletedCount + (undoRes.cancelledBetaCashflowCount || 0);
+            const betaSync = undoRes.cancelledBetaCashflowCount ? await syncBetaCashflowsToGoogleSheets() : null;
             await sendMessage(
               chatId,
-              `🗑️ <b>ยกเลิกรายการล่าสุดเรียบร้อยแล้ว ✅</b>\n• ลบออก: <b>${undoRes.deletedCount}</b> รายการ\n• ข้อความเดิม: <i>"${undoRes.rawMessage}"</i>\n☁️ ซิงค์คืนสถานะ Google Sheets แล้ว`,
+              `🗑️ <b>ยกเลิกรายการล่าสุดเรียบร้อยแล้ว ✅</b>\n• ยกเลิก: <b>${undoCount}</b> รายการ\n• ข้อความเดิม: <i>"${undoRes.rawMessage}"</i>${undoRes.cancelledBetaCashflowCount ? (betaSync?.success ? '\n☁️ อัปเดตสถานะ Beta ใน Google Sheets แล้ว' : '\n⚠️ Google Sheets ยังไม่ยืนยัน; จะลองซิงค์ซ้ำอัตโนมัติ') : '\n☁️ ซิงค์คืนสถานะ Google Sheets แล้ว'}`,
               { parse_mode: 'HTML' }
             );
-            backupAllToGoogleSheets().catch((err) => console.error('Undo sync error:', err.message));
+            if (!undoRes.cancelledBetaCashflowCount) backupAllToGoogleSheets().catch((err) => console.error('Undo sync error:', err.message));
           } else {
             await sendMessage(chatId, `⚠️ ${undoRes.message || 'ไม่มีรายการล่าสุดให้ยกเลิก'}`);
           }
+          continue;
+        }
+
+        // Beta portfolio records live in their own append-only ledger, not the expense parser.
+        const betaCashflow = parseBetaCashflowMessage(rawText);
+        if (betaCashflow) {
+          if (betaCashflow.error) {
+            await sendMessage(chatId, `⚠️ ${betaCashflow.error}`);
+            continue;
+          }
+
+          const saved = recordBetaCashflow({
+            eventKey: `TG:${chatId}:${msg.message_id}:${msg.edit_date || 0}`,
+            accountNumber: betaCashflow.accountNumber,
+            direction: betaCashflow.direction,
+            amount: betaCashflow.amount,
+            eventDate: betaCashflow.eventDate,
+            rawText,
+            telegramChatId: chatId,
+            telegramMsgId: msg.message_id,
+          });
+
+          if (saved.duplicate) {
+            await sendMessage(chatId, `ℹ️ ข้อความนี้ถูกบันทึกแล้วเป็นรายการ ${saved.id} ไม่มีการเพิ่มซ้ำครับ`);
+            continue;
+          }
+
+          const sheetSync = await syncBetaCashflowsToGoogleSheets();
+          const directionLabel = betaCashflow.direction === 'DEPOSIT' ? 'เติมเข้า' : 'ถอนออก';
+          const amountPrefix = betaCashflow.direction === 'DEPOSIT' ? '+' : '−';
+          const sheetStatus = sheetSync.success
+            ? '\n☁️ Google Sheets ยืนยันข้อมูลครบแล้ว'
+            : '\n⚠️ บันทึกในเครื่องแล้ว; Google Sheets ยังไม่ยืนยันและจะลองซิงค์ซ้ำอัตโนมัติ';
+          await sendMessage(chatId,
+            `✅ <b>บันทึกพอร์ต BETA-${betaCashflow.accountNumber} แล้ว</b>\n• ${directionLabel}: <b>${amountPrefix}${betaCashflow.amount.toLocaleString()} ฿</b>\n• วันที่: ${betaCashflow.eventDate}\n• Event ID: <code>${saved.id}</code>${sheetStatus}`,
+            { reply_markup: { inline_keyboard: [[{ text: '↩️ ยกเลิกรายการนี้', callback_data: `undo_log_${saved.botLogId}` }]] } }
+          );
           continue;
         }
 
@@ -615,6 +661,8 @@ async function poll() {
           reply += `• Focus: พิมพ์ <code>/focus</code> หรือ <b>"โอเค"</b>\n`;
           reply += `• บิลคงเหลือ: พิมพ์ <code>/bills</code> หรือ <b>"ฟิกคอส"</b>\n`;
           reply += `• บันทึกเงิน: พิมพ์ <i>"ข้าว 50 กาแฟ 40"</i>\n`;
+          reply += `• เติมพอร์ต Beta: พิมพ์ <i>"เติมเงินพอร์ตเบต้า 2 1500"</i>\n`;
+          reply += `• ถอนจากพอร์ต Beta: พิมพ์ <i>"ถอนเงินพอร์ตเบต้า 2 500"</i>\n`;
           reply += `• สอนคำศัพท์: พิมพ์ <i>"จำว่า ค่าน้ำ คือ ค่าน้ำประปา"</i>\n`;
           await sendMessage(chatId, reply, { parse_mode: 'HTML' });
 
@@ -833,5 +881,14 @@ setInterval(() => {
     poll();
   }
 }, 20000);
+
+// Retry any Beta ledger events that Google Sheets did not confirm.
+setInterval(() => {
+  if (getPendingBetaCashflowCount() > 0) {
+    syncBetaCashflowsToGoogleSheets().then((result) => {
+      if (!result.success) console.warn('[BETA] Google Sheets sync retry remains pending:', result.error);
+    }).catch((err) => console.error('[BETA] Google Sheets sync retry failed:', err.message));
+  }
+}, 5 * 60 * 1000);
 
 poll();

@@ -1,4 +1,5 @@
 import db from './db.js';
+import { cancelBetaCashflowsByBotLog } from './beta_portfolios.js';
 
 /**
  * Split text by date markers:
@@ -798,17 +799,22 @@ export function undoBotLog(logId) {
       parsedItems = JSON.parse(log.parsed_data || '[]');
     } catch (e) {}
     for (const item of parsedItems) {
-      const res = db.prepare('DELETE FROM transactions WHERE raw_text = ? AND date = ?').run(item.raw_text, item.date);
-      deletedCount += res.changes;
+      if (typeof item.raw_text === 'string' && typeof item.date === 'string') {
+        const res = db.prepare('DELETE FROM transactions WHERE raw_text = ? AND date = ?').run(item.raw_text, item.date);
+        deletedCount += res.changes;
+      }
     }
   }
 
-  db.prepare('UPDATE bot_logs SET status = "CANCELLED" WHERE id = ?').run(logId);
+  const cancelledBetaCashflowCount = cancelBetaCashflowsByBotLog(logId);
+
+  db.prepare("UPDATE bot_logs SET status = 'CANCELLED' WHERE id = ?").run(logId);
 
   return {
     success: true,
     logId,
     deletedCount,
+    cancelledBetaCashflowCount,
     rawMessage: log.raw_message,
   };
 }
