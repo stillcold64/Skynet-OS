@@ -15,6 +15,9 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
 
   // Roadmap State (Loaded from SQLite)
   const [roadmapSteps, setRoadmapSteps] = useState([]);
+  const [phaseTitles, setPhaseTitles] = useState({ 1: 'ความอยู่รอด & ฆ่าหนี้ Paylater', 2: 'สโนว์บอลปิด Finnix 9.4k & ขยายเงินสด', 3: 'ปลอดหนี้ 100% & สร้างพอร์ตมั่งคั่ง' });
+  const [editingPhaseTitle, setEditingPhaseTitle] = useState(false);
+  const [editPhaseTitle, setEditPhaseTitle] = useState('');
   const [isLoadingRoadmap, setIsLoadingRoadmap] = useState(false);
   const [editingStepId, setEditingStepId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
@@ -209,6 +212,7 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
       if (res.ok) {
         const data = await res.json();
         setRoadmapSteps(data.steps || []);
+        if (data.phaseTitles) setPhaseTitles((prev) => ({ ...prev, ...data.phaseTitles }));
       }
     } catch (err) {
       console.error('Failed to load roadmap:', err);
@@ -276,6 +280,28 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
   }, [trackerActive]);
 
   // Roadmap Actions
+  const handleStartEditPhaseTitle = () => {
+    setEditPhaseTitle(phaseTitles[selectedPhase] || '');
+    setEditingPhaseTitle(true);
+  };
+
+  const handleSavePhaseTitle = async () => {
+    if (!editPhaseTitle.trim()) return;
+    try {
+      const res = await fetch('/api/roadmap', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phase_num: selectedPhase, title: editPhaseTitle.trim() }),
+      });
+      if (res.ok) {
+        setPhaseTitles((prev) => ({ ...prev, [selectedPhase]: editPhaseTitle.trim() }));
+        setEditingPhaseTitle(false);
+      }
+    } catch (err) {
+      console.error('Failed to save phase title:', err);
+    }
+  };
+
   const handleToggleStep = async (step) => {
     const nextStatus = step.status === 'DONE' ? 'IN_PROGRESS' : 'DONE';
     try {
@@ -1610,11 +1636,21 @@ export default function MissionControlTab({ debtsData, transactions = [] }) {
           </div>
 
           {/* Phase Header Info */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
             <span style={{ color: '#00f2fe', fontWeight: 700 }}>
-              {selectedPhase === 1 && 'PHASE 1 (ปัจจุบัน): ความอยู่รอด & ฆ่าหนี้ Paylater'}
-              {selectedPhase === 2 && 'PHASE 2 (ถัดไป): สโนว์บอลปิด Finnix 9.4k & ขยายเงินสด'}
-              {selectedPhase === 3 && 'PHASE 3 (เป้าหมาย): ปลอดหนี้ 100% & สร้างพอร์ตมั่งคั่ง'}
+              {editingPhaseTitle ? (
+                <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px' }}>
+                  PHASE {selectedPhase}:
+                  <input autoFocus value={editPhaseTitle} onChange={(e) => setEditPhaseTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSavePhaseTitle(); if (e.key === 'Escape') setEditingPhaseTitle(false); }} aria-label={`ชื่อเฟส ${selectedPhase}`} style={{ width: 'min(220px, 55vw)', background: '#020305', border: '1px solid rgba(0, 242, 254, 0.5)', borderRadius: '5px', padding: '4px 6px', fontSize: '11px', color: '#fff' }} />
+                  <button onClick={handleSavePhaseTitle} title="บันทึกชื่อเฟส" style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer' }}>✓</button>
+                  <button onClick={() => setEditingPhaseTitle(false)} title="ยกเลิก" style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>×</button>
+                </span>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  {`PHASE ${selectedPhase} (${selectedPhase === 1 ? 'ปัจจุบัน' : selectedPhase === 2 ? 'ถัดไป' : 'เป้าหมาย'}): ${phaseTitles[selectedPhase] || ''}`}
+                  <button onClick={handleStartEditPhaseTitle} title="แก้ชื่อเฟส" aria-label={`แก้ชื่อเฟส ${selectedPhase}`} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '11px', padding: '2px' }}>✏️</button>
+                </span>
+              )}
             </span>
             <span style={{ color: selectedPhase === 1 ? '#10b981' : '#64748b', fontWeight: 600 }}>
               {selectedPhase === 1 ? '🟢 ACTIVE' : selectedPhase === 2 ? '⏳ NEXT' : '🔒 GOAL'}

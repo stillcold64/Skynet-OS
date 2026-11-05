@@ -106,6 +106,18 @@ db.exec(`
   );
 `);
 
+// Editable display titles for the three roadmap phases.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS roadmap_phase_titles (
+    phase_num INTEGER PRIMARY KEY CHECK (phase_num BETWEEN 1 AND 3),
+    title TEXT NOT NULL
+  );
+`);
+const insertPhaseTitle = db.prepare('INSERT OR IGNORE INTO roadmap_phase_titles (phase_num, title) VALUES (?, ?)');
+insertPhaseTitle.run(1, 'ความอยู่รอด & ฆ่าหนี้ Paylater');
+insertPhaseTitle.run(2, 'สโนว์บอลปิด Finnix 9.4k & ขยายเงินสด');
+insertPhaseTitle.run(3, 'ปลอดหนี้ 100% & สร้างพอร์ตมั่งคั่ง');
+
 // Seed default roadmap steps if empty
 try {
   const stepCount = db.prepare('SELECT COUNT(*) as count FROM roadmap_steps').get().count;

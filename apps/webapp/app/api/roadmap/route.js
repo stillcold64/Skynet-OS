@@ -4,7 +4,8 @@ import db from '@/lib/db';
 export async function GET() {
   try {
     const steps = db.prepare('SELECT * FROM roadmap_steps ORDER BY phase_num ASC, step_order ASC, id ASC').all();
-    return NextResponse.json({ steps });
+    const phaseTitles = Object.fromEntries(db.prepare('SELECT phase_num, title FROM roadmap_phase_titles').all().map(({ phase_num, title }) => [phase_num, title]));
+    return NextResponse.json({ steps, phaseTitles });
   } catch (err) {
     console.error('Error fetching roadmap steps:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -79,6 +80,23 @@ export async function PATCH(req) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Error updating roadmap step:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req) {
+  try {
+    const { phase_num, title } = await req.json();
+    if (![1, 2, 3].includes(Number(phase_num))) {
+      return NextResponse.json({ error: 'Invalid phase number' }, { status: 400 });
+    }
+    if (typeof title !== 'string' || !title.trim()) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    }
+    db.prepare('UPDATE roadmap_phase_titles SET title = ? WHERE phase_num = ?').run(title.trim(), Number(phase_num));
+    return NextResponse.json({ success: true, title: title.trim() });
+  } catch (err) {
+    console.error('Error updating roadmap phase title:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
