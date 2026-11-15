@@ -526,8 +526,8 @@ export default function Home() {
                 className={`segmented-button ${activeTab === 'beta' ? 'active' : ''}`}
                 onClick={() => setActiveTab('beta')}
               >
-                <span>🌱</span>
-                <span>พอร์ต Beta</span>
+                <span>🏛️</span>
+                <span>3 พอร์ต (Alpha • Beta • Cash DCA)</span>
               </button>
               <button
                 className={`segmented-button ${activeTab === 'tracker' ? 'active' : ''}`}
