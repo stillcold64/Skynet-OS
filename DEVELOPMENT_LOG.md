@@ -39,6 +39,14 @@ Only the user sets the next goal and its timing. When the user mentions a future
 
 ### Parked — waiting for the user to say start
 
+- **iPhone Home Screen Widget (Scriptable Dashboard):**
+  - **Concept & Goal:** ทำ Widget แสดงผลสวยงามบนหน้าจอ Home Screen ของ iPhone โดยใช้แอป Scriptable (แบบโพสต์ของคุณ tangy_project)
+  - **User Core Requirement:** **ใส่ข้อมูลจากในบอท Telegram พอ (Single Input Source)** ส่วนบน iPhone ทำหน้าที่เป็นแค่ **แดชบอร์ดแสดงผล (View-Only Dashboard Widget)** ไม่ต้องพิมพ์ป้อนข้อมูลซ้ำซ้อน
+  - **Key Metrics to Display on iPhone:**
+    - ยอดค่าใช้จ่ายวันนี้ (Today's Spend) & กราฟแท่งย้อนหลัง 7 วัน
+    - ยอดสะสมประจำสัปดาห์ / ประจำเดือน
+    - ยอดพอร์ตลงทุน 3 พอร์ต (Alpha, Beta Grid, Cash DCA)
+  - **Architecture:** Scriptable บน iPhone จะดึงข้อมูลสรุป (JSON) ผ่าน Google Sheets Webhook ของ Skynet OS หรือ API โดยตรงแบบ Real-time / Periodic Refresh
 - **Master Blueprint Save control:** the user says the Save control is hard to find and wants to fix it later. Do not investigate or edit it until the user asks to start.
 - **Portfolio strategies/rules:** the user wants each tracked portfolio eventually associated with a strategy/ruleset to help reduce emotional decisions. Keep the first Beta recording flow simple; do not add strategy features until the user prioritizes them.
 - **Portfolio split/accounting model:** the user is concerned one deposit split across portfolios could be counted twice. Before changing the model, settle how external deposits and internal transfers should be represented. Cash is currently kept outside this tracker.
