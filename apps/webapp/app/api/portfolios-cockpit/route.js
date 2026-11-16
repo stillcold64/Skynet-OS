@@ -9,7 +9,6 @@ export async function GET(request) {
     const pillars = db.prepare('SELECT * FROM portfolio_pillars ORDER BY sort_order ASC, id ASC').all();
     const items = db.prepare('SELECT * FROM portfolio_items ORDER BY sort_order ASC, id ASC').all();
 
-    // Default current month if not provided
     const now = new Date();
     const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const targetMonth = month || currentMonthStr;
@@ -22,9 +21,8 @@ export async function GET(request) {
          OR category LIKE '%ลงทุน%'
          OR category LIKE '%dca%'
          OR category LIKE '%พอร์ต%'
-         OR category LIKE '%crypto%'
-         OR category LIKE '%btc%'
-         OR category LIKE '%gold%'
+         OR category LIKE '%beta%'
+         OR category LIKE '%alpha%'
          OR raw_text LIKE '%ลงทุน%'
          OR raw_text LIKE '%dca%'
          OR raw_text LIKE '%พอร์ต%'
@@ -33,42 +31,76 @@ export async function GET(request) {
       ORDER BY date DESC, id DESC
     `).all();
 
-    // Monthly breakdown & total breakdown by portfolio pillar
-    // Rule mapping:
-    // - ALPHA: EA, robot, mt5, demo, cent, alpha
-    // - BETA: grid, btc, xau, gold, snowball, beta, ซื้อรอบ
-    // - CASH: dca, spxc, ออม, สะสม, สำรอง, cash, คริปโตทั่วไป (fallback default for general 'ลงทุน' or 'dca')
-    const classifyTxToPillar = (tx) => {
-      const text = `${tx.category || ''} ${tx.sub_category || ''} ${tx.raw_text || ''}`.toLowerCase();
+    // Classification Rule:
+    // 1. ALPHA: ea, robot, mt5, cent, alpha
+    // 2. BETA: beta, grid, snowball, gold, btc (when not explicitly labeled dca)
+    // 3. CASH / DCA: dca, spxc, ออม, สะสม, สำรอง, cash
+    const classifyTx = (tx) => {
+      const text = `${tx.category || ''} ${tx.sub_category || ''} ${tx.raw_text || ''} ${tx.note || ''}`.toLowerCase();
+      
       if (text.includes('alpha') || text.includes('ea') || text.includes('cent') || text.includes('mt5')) {
-        return 'ALPHA';
+        return {
+          pillarCode: 'ALPHA',
+          symbol: 'EA / Cent',
+          displayName: 'พอร์ต Alpha',
+          badgeColor: '#00f2fe',
+          emoji: '🤖',
+        };
       }
-      if (text.includes('beta') || text.includes('grid') || text.includes('snowball') || (text.includes('gold') && !text.includes('dca'))) {
-        return 'BETA';
-      }
-      // Default DCA, investment reserve, general crypto investing goes to CASH / DCA pillar
-      return 'CASH';
-    };
 
-    const monthlyTxs = transactions.filter((t) => (t.date || '').startsWith(targetMonth));
+      if (text.includes('beta') || text.includes('grid') || text.includes('snowball')) {
+        return {
+          pillarCode: 'BETA',
+          symbol: 'THB (Grid Capital)',
+          displayName: 'พอร์ต Beta (Grid Buy)',
+          badgeColor: '#f59e0b',
+          emoji: '🌱',
+        };
+      }
+
+      // Extract symbol for DCA (e.g. SPXC, BTC, ETH)
+      let symbol = 'DCA Asset';
+      if (text.includes('spxc')) symbol = 'SPXC';
+      else if (text.includes('btc')) symbol = 'BTC';
+      else if (text.includes('eth')) symbol = 'ETH';
+      else if (text.includes('gold') || text.includes('ทอง')) symbol = 'GOLD';
+
+      return {
+        pillarCode: 'CASH',
+        symbol,
+        displayName: 'พอร์ตแคช / DCA ระยะยาว',
+        badgeColor: '#10b981',
+        emoji: '💼',
+      };
+    };
 
     const portfolioStats = {
-      ALPHA: { totalAllTime: 0, totalThisMonth: 0, countThisMonth: 0, items: [] },
-      BETA: { totalAllTime: 0, totalThisMonth: 0, countThisMonth: 0, items: [] },
-      CASH: { totalAllTime: 0, totalThisMonth: 0, countThisMonth: 0, items: [] },
+      ALPHA: { totalAllTime: 0, totalThisMonth: 0, countThisMonth: 0 },
+      BETA: { totalAllTime: 0, totalThisMonth: 0, countThisMonth: 0 },
+      CASH: { totalAllTime: 0, totalThisMonth: 0, countThisMonth: 0 },
     };
 
-    transactions.forEach((tx) => {
-      const pCode = classifyTxToPillar(tx);
+    const enrichedTransactions = transactions.map((tx) => {
+      const meta = classifyTx(tx);
       const isThisMonth = (tx.date || '').startsWith(targetMonth);
-      if (portfolioStats[pCode]) {
-        portfolioStats[pCode].totalAllTime += Number(tx.amount) || 0;
+      if (portfolioStats[meta.pillarCode]) {
+        portfolioStats[meta.pillarCode].totalAllTime += Number(tx.amount) || 0;
         if (isThisMonth) {
-          portfolioStats[pCode].totalThisMonth += Number(tx.amount) || 0;
-          portfolioStats[pCode].countThisMonth += 1;
+          portfolioStats[meta.pillarCode].totalThisMonth += Number(tx.amount) || 0;
+          portfolioStats[meta.pillarCode].countThisMonth += 1;
         }
       }
+      return {
+        ...tx,
+        pillarCode: meta.pillarCode,
+        symbol: meta.symbol,
+        pillarName: meta.displayName,
+        badgeColor: meta.badgeColor,
+        emoji: meta.emoji,
+      };
     });
+
+    const monthlyTxs = enrichedTransactions.filter((t) => (t.date || '').startsWith(targetMonth));
 
     const cashPillar = pillars.find((p) => p.pillar_code === 'CASH');
     const principle = cashPillar?.note || 'Ray Dalio Principle: "แยกพอร์ตให้ขาด อารมณ์จะไม่กวนเงินสด"';
@@ -81,7 +113,7 @@ export async function GET(request) {
       principle,
       stats: portfolioStats,
       monthlyTransactions: monthlyTxs,
-      allTransactions: transactions,
+      allTransactions: enrichedTransactions,
     });
   } catch (err) {
     console.error('Error fetching 3-portfolio cockpit:', err);
@@ -92,9 +124,8 @@ export async function GET(request) {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { action, pillar_code, amount, note, date, title, desc } = body;
+    const { action, pillar_code, amount, symbol, note, date } = body;
 
-    // Action 1: Add a quick deposit / transaction directly from Cockpit
     if (action === 'quick_deposit') {
       const pCode = pillar_code || 'BETA';
       const amt = Number(amount);
@@ -103,35 +134,34 @@ export async function POST(req) {
       }
 
       const txDate = date || new Date().toISOString().split('T')[0];
-      const categoryName = pCode === 'ALPHA' ? 'เติมพอร์ต Alpha' : (pCode === 'BETA' ? 'เติมพอร์ต Beta' : 'DCA พอร์ตแคช');
+      let categoryName = '';
+      let subCat = '';
+      let raw = '';
+
+      if (pCode === 'BETA') {
+        categoryName = 'พอร์ต Beta (Grid)';
+        subCat = 'Grid Buy - BTC & XAU';
+        raw = `Beta ${amt}`;
+      } else if (pCode === 'ALPHA') {
+        categoryName = 'พอร์ต Alpha';
+        subCat = 'EA / เครื่องยนต์';
+        raw = `Alpha ${amt}`;
+      } else {
+        const sym = (symbol || 'SPXC').toUpperCase();
+        categoryName = `DCA ${sym}`;
+        subCat = 'DCA คริปโต/สินทรัพย์';
+        raw = `DCA ${sym} ${amt}`;
+      }
 
       const stmt = db.prepare(`
         INSERT INTO transactions (date, category_group, category, sub_category, type, amount, raw_text, note)
         VALUES (?, 'INVESTING', ?, ?, 'การลงทุน', ?, ?, ?)
       `);
 
-      const raw = `${categoryName} ${amt}`;
-      const subCat = pCode === 'BETA' ? 'Grid/Snowball' : (pCode === 'ALPHA' ? 'EA/เครื่องยนต์' : 'DCA/ออมสะสม');
-      const result = stmt.run(txDate, categoryName, subCat, amt, raw, note || 'บันทึกผ่านศูนย์ 3 พอร์ต (Web)');
+      const customNote = note || (pCode === 'CASH' ? `DCA สัญลักษณ์ [${symbol || 'SPXC'}]` : 'บันทึกเติมเงินพอร์ต');
+      const result = stmt.run(txDate, categoryName, subCat, amt, raw, customNote);
 
       return NextResponse.json({ success: true, transactionId: result.lastInsertRowid });
-    }
-
-    // Action 2: Add or update sub-portfolio item
-    if (action === 'save_item') {
-      if (body.id) {
-        db.prepare(`
-          UPDATE portfolio_items
-          SET pillar_code = ?, title = ?, desc = ?, status = ?, amount = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `).run(pillar_code, title, desc || '', body.status || 'ACTIVE', Number(amount) || 0, body.id);
-      } else {
-        db.prepare(`
-          INSERT INTO portfolio_items (pillar_code, title, desc, status, amount, sort_order)
-          VALUES (?, ?, ?, ?, ?, 99)
-        `).run(pillar_code, title, desc || '', body.status || 'ACTIVE', Number(amount) || 0);
-      }
-      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
