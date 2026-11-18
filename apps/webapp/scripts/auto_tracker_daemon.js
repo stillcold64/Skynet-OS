@@ -49,6 +49,13 @@ const KNOWN_WORK_APPS = new Set([
   'obs64.exe',
   'code.exe',
   'cursor.exe',
+  'antigravity.exe',
+  'chatgpt.exe',
+  'claude.exe',
+  'codex.exe',
+  'ollama.exe',
+  'terminal64.exe',
+  'metatrader.exe',
 ]);
 
 const WORK_IDLE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes of zero input while working = idle/left open
