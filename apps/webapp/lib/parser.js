@@ -298,7 +298,11 @@ export function classifyItem(itemName) {
     nameLower.includes('กาแฟ') ||
     nameLower.includes('คาเฟ่') ||
     nameLower.includes('น้ำปั่น') ||
-    nameLower.includes('ชา')
+    nameLower.includes('น้ำหวาน') ||
+    nameLower.includes('ชา') ||
+    nameLower.includes('ชานม') ||
+    nameLower.includes('นมเย็น') ||
+    nameLower.includes('โอเลี้ยง')
   ) {
     return {
       categoryGroup: 'LIFE',
@@ -337,13 +341,20 @@ export function classifyItem(itemName) {
 
   if (
     nameLower.includes('makro') ||
+    nameLower.includes('แมคโคร') ||
     nameLower.includes('lotus') ||
+    nameLower.includes('โลตัส') ||
     nameLower.includes('mr.diy') ||
     nameLower.includes('7-11') ||
     nameLower.includes('เซเว่น') ||
     nameLower.includes('ตลาด') ||
     nameLower.includes('ของใช้') ||
-    nameLower.includes('ไข่')
+    nameLower.includes('ไข่') ||
+    nameLower.includes('ซอส') ||
+    nameLower.includes('เครื่องปรุง') ||
+    nameLower.includes('น้ำปลา') ||
+    nameLower.includes('น้ำมันพืช') ||
+    nameLower.includes('น้ำตาล')
   ) {
     return {
       categoryGroup: 'LIFE',
@@ -486,8 +497,8 @@ export function normalizeItemName(rawItemName) {
       };
     }
     const nonBillWater = [
-      'น้ำมัน', 'น้ำปั่น', 'น้ำแข็ง', 'น้ำอัดลม', 'น้ำผลไม้',
-      'น้ำอุ่น', 'น้ำพริก', 'น้ำดื่ม', 'ดื่มน้ำ', 'สิงห์', 'คริสตัล'
+      'น้ำมัน', 'น้ำปั่น', 'น้ำแข็ง', 'น้ำอัดลม', 'น้ำผลไม้', 'น้ำหวาน',
+      'น้ำอุ่น', 'น้ำพริก', 'น้ำดื่ม', 'ดื่มน้ำ', 'สิงห์', 'คริสตัล', 'น้ำชา', 'น้ำเปล่า', 'น้ำปลา', 'น้ำตาล'
     ];
     if (!nonBillWater.some((kw) => cleanLower.includes(kw))) {
       return {
